@@ -39,7 +39,7 @@ func (f *FakeResourceCatalog) ListResources(_ context.Context, filter resourceco
 			continue
 		}
 		if filter.Scope != nil {
-			if nodeID := filter.Scope.GetNodeId(); nodeID != "" && ref.GetNodeId() != nodeID {
+			if serviceID := filter.Scope.GetServiceId(); serviceID != "" && ref.GetServiceId() != serviceID {
 				continue
 			}
 			if providerID := filter.Scope.GetProviderId(); providerID != "" && ref.GetProviderId() != providerID {

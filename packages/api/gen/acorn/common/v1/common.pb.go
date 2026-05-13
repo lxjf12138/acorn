@@ -154,10 +154,9 @@ type Scope struct {
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	NodeId        string                 `protobuf:"bytes,4,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ServiceId     string                 `protobuf:"bytes,4,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
 	ProviderId    string                 `protobuf:"bytes,5,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	WorkspaceId   string                 `protobuf:"bytes,6,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	TraceId       string                 `protobuf:"bytes,7,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	TraceId       string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -213,9 +212,9 @@ func (x *Scope) GetSessionId() string {
 	return ""
 }
 
-func (x *Scope) GetNodeId() string {
+func (x *Scope) GetServiceId() string {
 	if x != nil {
-		return x.NodeId
+		return x.ServiceId
 	}
 	return ""
 }
@@ -223,13 +222,6 @@ func (x *Scope) GetNodeId() string {
 func (x *Scope) GetProviderId() string {
 	if x != nil {
 		return x.ProviderId
-	}
-	return ""
-}
-
-func (x *Scope) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
 	}
 	return ""
 }
@@ -350,17 +342,17 @@ const file_acorn_common_v1_common_proto_rawDesc = "" +
 	"\x05Actor\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\xd4\x01\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\xb7\x01\n" +
 	"\x05Scope\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
-	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x17\n" +
-	"\anode_id\x18\x04 \x01(\tR\x06nodeId\x12\x1f\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"service_id\x18\x04 \x01(\tR\tserviceId\x12\x1f\n" +
 	"\vprovider_id\x18\x05 \x01(\tR\n" +
-	"providerId\x12!\n" +
-	"\fworkspace_id\x18\x06 \x01(\tR\vworkspaceId\x12\x19\n" +
-	"\btrace_id\x18\a \x01(\tR\atraceId\"I\n" +
+	"providerId\x12\x19\n" +
+	"\btrace_id\x18\x06 \x01(\tR\atraceId\"I\n" +
 	"\vPageRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +

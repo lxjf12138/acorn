@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package acorn.capability.v1;
+
+import "acorn/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1;capabilityv1";
+
+message CapabilityService {
+  string id = 1;
+  string name = 2;
+  string kind = 3;
+  string deployment_profile = 4;
+  string status = 5;
+  string version = 6;
+  repeated string labels = 10;
+  google.protobuf.Timestamp registered_at = 20;
+  google.protobuf.Timestamp last_seen_at = 21;
+  bytes metadata_json = 100;
+}
+
+message ListCapabilityServicesRequest {
+  acorn.common.v1.PageRequest page = 1;
+  acorn.common.v1.Scope scope = 2;
+}
+
+message ListCapabilityServicesResponse {
+  repeated CapabilityService services = 1;
+  acorn.common.v1.PageResponse page = 2;
+}
+
+message GetCapabilityServiceRequest {
+  string service_id = 1;
+  acorn.common.v1.Scope scope = 2;
+}
+
+message GetCapabilityServiceResponse {
+  CapabilityService service = 1;
+}
+
+service CapabilityRegistryService {
+  rpc ListCapabilityServices(ListCapabilityServicesRequest) returns (ListCapabilityServicesResponse);
+  rpc GetCapabilityService(GetCapabilityServiceRequest) returns (GetCapabilityServiceResponse);
+}

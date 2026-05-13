@@ -32,7 +32,7 @@ type ResourceRef struct {
 	MimeType      string                 `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
 	Size          int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
 	Authority     string                 `protobuf:"bytes,10,opt,name=authority,proto3" json:"authority,omitempty"`
-	NodeId        string                 `protobuf:"bytes,11,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ServiceId     string                 `protobuf:"bytes,11,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
 	ProviderId    string                 `protobuf:"bytes,12,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	OwnerType     string                 `protobuf:"bytes,20,opt,name=owner_type,json=ownerType,proto3" json:"owner_type,omitempty"`
 	OwnerId       string                 `protobuf:"bytes,21,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
@@ -122,9 +122,9 @@ func (x *ResourceRef) GetAuthority() string {
 	return ""
 }
 
-func (x *ResourceRef) GetNodeId() string {
+func (x *ResourceRef) GetServiceId() string {
 	if x != nil {
-		return x.NodeId
+		return x.ServiceId
 	}
 	return ""
 }
@@ -387,7 +387,7 @@ var File_acorn_resource_v1_resource_proto protoreflect.FileDescriptor
 
 const file_acorn_resource_v1_resource_proto_rawDesc = "" +
 	"\n" +
-	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfc\x02\n" +
+	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x03\n" +
 	"\vResourceRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03uri\x18\x02 \x01(\tR\x03uri\x12\x12\n" +
@@ -396,8 +396,9 @@ const file_acorn_resource_v1_resource_proto_rawDesc = "" +
 	"\tmime_type\x18\x05 \x01(\tR\bmimeType\x12\x12\n" +
 	"\x04size\x18\x06 \x01(\x03R\x04size\x12\x1c\n" +
 	"\tauthority\x18\n" +
-	" \x01(\tR\tauthority\x12\x17\n" +
-	"\anode_id\x18\v \x01(\tR\x06nodeId\x12\x1f\n" +
+	" \x01(\tR\tauthority\x12\x1d\n" +
+	"\n" +
+	"service_id\x18\v \x01(\tR\tserviceId\x12\x1f\n" +
 	"\vprovider_id\x18\f \x01(\tR\n" +
 	"providerId\x12\x1d\n" +
 	"\n" +

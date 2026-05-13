@@ -21,10 +21,9 @@ message Scope {
   string tenant_id = 1;
   string user_id = 2;
   string session_id = 3;
-  string node_id = 4;
+  string service_id = 4;
   string provider_id = 5;
-  string workspace_id = 6;
-  string trace_id = 7;
+  string trace_id = 6;
 }
 
 message PageRequest {

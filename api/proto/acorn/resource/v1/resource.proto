@@ -15,7 +15,7 @@ message ResourceRef {
   string mime_type = 5;
   int64 size = 6;
   string authority = 10;
-  string node_id = 11;
+  string service_id = 11;
   string provider_id = 12;
   string owner_type = 20;
   string owner_id = 21;

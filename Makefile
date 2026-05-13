@@ -1,7 +1,7 @@
 GO_MODULES := \
 	./packages/api \
 	./services/agent-control-plane \
-	./services/capability-node \
+	./services/sandbox-service \
 	./packages/core \
 	./packages/mcp \
 	./packages/signal \
@@ -9,7 +9,7 @@ GO_MODULES := \
 
 SERVICE_MODULES := \
 	./services/agent-control-plane \
-	./services/capability-node
+	./services/sandbox-service
 
 BIN_DIR := ./bin
 
@@ -69,7 +69,6 @@ proto-gen:
 
 proto-check:
 	@buf generate
-	@git update-index --refresh >/dev/null
 	@test -z "$$(git diff --name-only -- packages/api/gen)" || \
 		(git diff --name-only -- packages/api/gen; exit 1)
 	@test -z "$$(git ls-files --others --exclude-standard -- packages/api/gen)" || \

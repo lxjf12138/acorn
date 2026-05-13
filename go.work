@@ -7,5 +7,5 @@ use (
 	./packages/provider-sdk-go
 	./packages/signal
 	./services/agent-control-plane
-	./services/capability-node
+	./services/sandbox-service
 )
