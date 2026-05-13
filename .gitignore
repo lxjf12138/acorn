@@ -1,2 +1,24 @@
+# Go
+bin/
+*.test
+coverage.out
+
+# OS
 .DS_Store
 Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+
+# Local runtime data
+.data/
+tmp/
+dist/
+
+# Env
+.env
+.env.local
+
+# Generated
+gen/
