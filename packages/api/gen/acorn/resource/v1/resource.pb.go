@@ -25,11 +25,19 @@ const (
 
 type ResourceRef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Uri           string                 `protobuf:"bytes,1,opt,name=uri,proto3" json:"uri,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
-	MimeType      string                 `protobuf:"bytes,4,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	Size          int64                  `protobuf:"varint,5,opt,name=size,proto3" json:"size,omitempty"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Uri           string                 `protobuf:"bytes,2,opt,name=uri,proto3" json:"uri,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	MimeType      string                 `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	Size          int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
+	Authority     string                 `protobuf:"bytes,10,opt,name=authority,proto3" json:"authority,omitempty"`
+	NodeId        string                 `protobuf:"bytes,11,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	ProviderId    string                 `protobuf:"bytes,12,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	OwnerType     string                 `protobuf:"bytes,20,opt,name=owner_type,json=ownerType,proto3" json:"owner_type,omitempty"`
+	OwnerId       string                 `protobuf:"bytes,21,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	Version       string                 `protobuf:"bytes,30,opt,name=version,proto3" json:"version,omitempty"`
+	ContentHash   string                 `protobuf:"bytes,31,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
 	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -63,6 +71,13 @@ func (x *ResourceRef) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ResourceRef.ProtoReflect.Descriptor instead.
 func (*ResourceRef) Descriptor() ([]byte, []int) {
 	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ResourceRef) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
 }
 
 func (x *ResourceRef) GetUri() string {
@@ -100,6 +115,55 @@ func (x *ResourceRef) GetSize() int64 {
 	return 0
 }
 
+func (x *ResourceRef) GetAuthority() string {
+	if x != nil {
+		return x.Authority
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetOwnerType() string {
+	if x != nil {
+		return x.OwnerType
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *ResourceRef) GetContentHash() string {
+	if x != nil {
+		return x.ContentHash
+	}
+	return ""
+}
+
 func (x *ResourceRef) GetMetadataJson() []byte {
 	if x != nil {
 		return x.MetadataJson
@@ -110,9 +174,10 @@ func (x *ResourceRef) GetMetadataJson() []byte {
 type Artifact struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Resource      *ResourceRef           `protobuf:"bytes,3,opt,name=resource,proto3" json:"resource,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Resource      *ResourceRef           `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
+	ProducerType  string                 `protobuf:"bytes,10,opt,name=producer_type,json=producerType,proto3" json:"producer_type,omitempty"`
+	ProducerId    string                 `protobuf:"bytes,11,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -155,18 +220,25 @@ func (x *Artifact) GetId() string {
 	return ""
 }
 
-func (x *Artifact) GetWorkspaceId() string {
-	if x != nil {
-		return x.WorkspaceId
-	}
-	return ""
-}
-
 func (x *Artifact) GetResource() *ResourceRef {
 	if x != nil {
 		return x.Resource
 	}
 	return nil
+}
+
+func (x *Artifact) GetProducerType() string {
+	if x != nil {
+		return x.ProducerType
+	}
+	return ""
+}
+
+func (x *Artifact) GetProducerId() string {
+	if x != nil {
+		return x.ProducerId
+	}
+	return ""
 }
 
 func (x *Artifact) GetCreatedAt() *timestamppb.Timestamp {
@@ -186,8 +258,10 @@ func (x *Artifact) GetMetadataJson() []byte {
 type ListResourcesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scope         *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
-	WorkspaceId   string                 `protobuf:"bytes,2,opt,name=workspace_id,json=workspaceId,proto3" json:"workspace_id,omitempty"`
-	Page          *v1.PageRequest        `protobuf:"bytes,3,opt,name=page,proto3" json:"page,omitempty"`
+	OwnerType     string                 `protobuf:"bytes,2,opt,name=owner_type,json=ownerType,proto3" json:"owner_type,omitempty"`
+	OwnerId       string                 `protobuf:"bytes,3,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
+	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
+	Page          *v1.PageRequest        `protobuf:"bytes,10,opt,name=page,proto3" json:"page,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -229,9 +303,23 @@ func (x *ListResourcesRequest) GetScope() *v1.Scope {
 	return nil
 }
 
-func (x *ListResourcesRequest) GetWorkspaceId() string {
+func (x *ListResourcesRequest) GetOwnerType() string {
 	if x != nil {
-		return x.WorkspaceId
+		return x.OwnerType
+	}
+	return ""
+}
+
+func (x *ListResourcesRequest) GetOwnerId() string {
+	if x != nil {
+		return x.OwnerId
+	}
+	return ""
+}
+
+func (x *ListResourcesRequest) GetType() string {
+	if x != nil {
+		return x.Type
 	}
 	return ""
 }
@@ -299,25 +387,43 @@ var File_acorn_resource_v1_resource_proto protoreflect.FileDescriptor
 
 const file_acorn_resource_v1_resource_proto_rawDesc = "" +
 	"\n" +
-	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9d\x01\n" +
-	"\vResourceRef\x12\x10\n" +
-	"\x03uri\x18\x01 \x01(\tR\x03uri\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1b\n" +
-	"\tmime_type\x18\x04 \x01(\tR\bmimeType\x12\x12\n" +
-	"\x04size\x18\x05 \x01(\x03R\x04size\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xd9\x01\n" +
-	"\bArtifact\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
-	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x12:\n" +
-	"\bresource\x18\x03 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\bresource\x129\n" +
+	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfc\x02\n" +
+	"\vResourceRef\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
+	"\x03uri\x18\x02 \x01(\tR\x03uri\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1b\n" +
+	"\tmime_type\x18\x05 \x01(\tR\bmimeType\x12\x12\n" +
+	"\x04size\x18\x06 \x01(\x03R\x04size\x12\x1c\n" +
+	"\tauthority\x18\n" +
+	" \x01(\tR\tauthority\x12\x17\n" +
+	"\anode_id\x18\v \x01(\tR\x06nodeId\x12\x1f\n" +
+	"\vprovider_id\x18\f \x01(\tR\n" +
+	"providerId\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x99\x01\n" +
+	"owner_type\x18\x14 \x01(\tR\townerType\x12\x19\n" +
+	"\bowner_id\x18\x15 \x01(\tR\aownerId\x12\x18\n" +
+	"\aversion\x18\x1e \x01(\tR\aversion\x12!\n" +
+	"\fcontent_hash\x18\x1f \x01(\tR\vcontentHash\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xfc\x01\n" +
+	"\bArtifact\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12:\n" +
+	"\bresource\x18\x02 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\bresource\x12#\n" +
+	"\rproducer_type\x18\n" +
+	" \x01(\tR\fproducerType\x12\x1f\n" +
+	"\vproducer_id\x18\v \x01(\tR\n" +
+	"producerId\x129\n" +
+	"\n" +
+	"created_at\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xc4\x01\n" +
 	"\x14ListResourcesRequest\x12,\n" +
-	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12!\n" +
-	"\fworkspace_id\x18\x02 \x01(\tR\vworkspaceId\x120\n" +
-	"\x04page\x18\x03 \x01(\v2\x1c.acorn.common.v1.PageRequestR\x04page\"\x88\x01\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\x1d\n" +
+	"\n" +
+	"owner_type\x18\x02 \x01(\tR\townerType\x12\x19\n" +
+	"\bowner_id\x18\x03 \x01(\tR\aownerId\x12\x12\n" +
+	"\x04type\x18\x04 \x01(\tR\x04type\x120\n" +
+	"\x04page\x18\n" +
+	" \x01(\v2\x1c.acorn.common.v1.PageRequestR\x04page\"\x88\x01\n" +
 	"\x15ListResourcesResponse\x12<\n" +
 	"\tresources\x18\x01 \x03(\v2\x1e.acorn.resource.v1.ResourceRefR\tresources\x121\n" +
 	"\x04page\x18\x02 \x01(\v2\x1d.acorn.common.v1.PageResponseR\x04page2u\n" +

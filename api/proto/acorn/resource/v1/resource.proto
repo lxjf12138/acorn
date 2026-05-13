@@ -8,26 +8,37 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1;resourcev1";
 
 message ResourceRef {
-  string uri = 1;
-  string name = 2;
-  string type = 3;
-  string mime_type = 4;
-  int64 size = 5;
+  string id = 1;
+  string uri = 2;
+  string name = 3;
+  string type = 4;
+  string mime_type = 5;
+  int64 size = 6;
+  string authority = 10;
+  string node_id = 11;
+  string provider_id = 12;
+  string owner_type = 20;
+  string owner_id = 21;
+  string version = 30;
+  string content_hash = 31;
   bytes metadata_json = 100;
 }
 
 message Artifact {
   string id = 1;
-  string workspace_id = 2;
-  ResourceRef resource = 3;
-  google.protobuf.Timestamp created_at = 4;
+  ResourceRef resource = 2;
+  string producer_type = 10;
+  string producer_id = 11;
+  google.protobuf.Timestamp created_at = 20;
   bytes metadata_json = 100;
 }
 
 message ListResourcesRequest {
   acorn.common.v1.Scope scope = 1;
-  string workspace_id = 2;
-  acorn.common.v1.PageRequest page = 3;
+  string owner_type = 2;
+  string owner_id = 3;
+  string type = 4;
+  acorn.common.v1.PageRequest page = 10;
 }
 
 message ListResourcesResponse {

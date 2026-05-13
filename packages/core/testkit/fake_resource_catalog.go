@@ -11,25 +11,41 @@ import (
 
 type FakeResourceCatalog struct {
 	mu        sync.RWMutex
-	resources map[string][]*resourcev1.ResourceRef
+	resources []*resourcev1.ResourceRef
 }
 
 func NewFakeResourceCatalog() *FakeResourceCatalog {
-	return &FakeResourceCatalog{resources: make(map[string][]*resourcev1.ResourceRef)}
+	return &FakeResourceCatalog{}
 }
 
-func (f *FakeResourceCatalog) AddResource(workspaceID string, ref *resourcev1.ResourceRef) {
+func (f *FakeResourceCatalog) AddResource(ref *resourcev1.ResourceRef) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.resources[workspaceID] = append(f.resources[workspaceID], proto.Clone(ref).(*resourcev1.ResourceRef))
+	f.resources = append(f.resources, proto.Clone(ref).(*resourcev1.ResourceRef))
 }
 
-func (f *FakeResourceCatalog) ListResources(_ context.Context, workspaceID string) ([]*resourcev1.ResourceRef, error) {
+func (f *FakeResourceCatalog) ListResources(_ context.Context, filter resourcecore.ListFilter) ([]*resourcev1.ResourceRef, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	resources := f.resources[workspaceID]
-	out := make([]*resourcev1.ResourceRef, 0, len(resources))
-	for _, ref := range resources {
+	out := make([]*resourcev1.ResourceRef, 0, len(f.resources))
+	for _, ref := range f.resources {
+		if filter.OwnerType != "" && ref.GetOwnerType() != filter.OwnerType {
+			continue
+		}
+		if filter.OwnerID != "" && ref.GetOwnerId() != filter.OwnerID {
+			continue
+		}
+		if filter.Type != "" && ref.GetType() != filter.Type {
+			continue
+		}
+		if filter.Scope != nil {
+			if nodeID := filter.Scope.GetNodeId(); nodeID != "" && ref.GetNodeId() != nodeID {
+				continue
+			}
+			if providerID := filter.Scope.GetProviderId(); providerID != "" && ref.GetProviderId() != providerID {
+				continue
+			}
+		}
 		out = append(out, proto.Clone(ref).(*resourcev1.ResourceRef))
 	}
 	return out, nil

@@ -58,3 +58,5 @@ func (f *FakeProviderCatalog) GetProviderHealth(_ context.Context, providerID st
 	}
 	return proto.Clone(health).(*providerv1.ProviderHealth), nil
 }
+
+var _ providercore.Catalog = (*FakeProviderCatalog)(nil)

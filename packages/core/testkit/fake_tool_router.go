@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
-	nodecore "github.com/lxjf12138/acorn/packages/core/node"
 	providercore "github.com/lxjf12138/acorn/packages/core/provider"
 	toolcore "github.com/lxjf12138/acorn/packages/core/tool"
 )
@@ -36,4 +35,3 @@ func (f *FakeToolRouter) CallTool(ctx context.Context, req *toolv1.ToolCallReque
 }
 
 var _ toolcore.Router = (*FakeToolRouter)(nil)
-var _ = nodecore.ErrNodeNotFound
