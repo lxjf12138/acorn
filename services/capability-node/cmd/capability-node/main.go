@@ -23,7 +23,9 @@ func main() {
 	}
 
 	version.ServiceName = cfg.Service.Name
-	version.Version = cfg.Service.Version
+	if version.Version == "" || version.Version == "dev" {
+		version.Version = cfg.Service.Version
+	}
 
 	logger := newLogger(cfg)
 	helper := klog.NewHelper(logger)
@@ -34,7 +36,7 @@ func main() {
 
 	app := kratos.New(
 		kratos.Name(cfg.Service.Name),
-		kratos.Version(cfg.Service.Version),
+		kratos.Version(version.Version),
 		kratos.Logger(logger),
 		kratos.Server(httpSrv, grpcSrv),
 	)
@@ -60,6 +62,6 @@ func newLogger(cfg *conf.Config) klog.Logger {
 		"ts", klog.DefaultTimestamp,
 		"caller", klog.DefaultCaller,
 		"service.name", cfg.Service.Name,
-		"service.version", cfg.Service.Version,
+		"service.version", version.Version,
 	)
 }

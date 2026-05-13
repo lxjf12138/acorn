@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package acorn.signal.v1;
+
+import "acorn/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/signal/v1;signalv1";
+
+message Signal {
+  string id = 1;
+  string type = 2;
+  string source = 3;
+  string subject = 4;
+  google.protobuf.Timestamp time = 5;
+  acorn.common.v1.Scope scope = 10;
+  string session_hint = 20;
+  string input_kind = 21;
+  string severity = 22;
+  string priority = 23;
+  string dedupe_key = 30;
+  bytes data_json = 40;
+  bytes metadata_json = 100;
+}
+
+message SignalSpec {
+  string type = 1;
+  string input_kind = 2;
+  bytes schema_json = 3;
+  bytes metadata_json = 100;
+}
+
+message EmitSignalRequest {
+  Signal signal = 1;
+}
+
+message EmitSignalResponse {
+  string signal_id = 1;
+}
+
+service SignalIngestService {
+  rpc EmitSignal(EmitSignalRequest) returns (EmitSignalResponse);
+}

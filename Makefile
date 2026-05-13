@@ -1,4 +1,5 @@
 GO_MODULES := \
+	./packages/api \
 	./services/agent-control-plane \
 	./services/capability-node \
 	./packages/core \
@@ -12,10 +13,11 @@ SERVICE_MODULES := \
 
 BIN_DIR := ./bin
 
-.PHONY: fmt fmt-check vet test build ci
+.PHONY: fmt fmt-check vet test build proto-lint proto-gen proto-check ci
 
 fmt:
-	@for module in $(GO_MODULES); do \
+	@set -e; \
+	for module in $(GO_MODULES); do \
 		echo "==> gofmt $$module"; \
 		files=$$(find $$module -type f -name '*.go'); \
 		if [ -n "$$files" ]; then \
@@ -24,7 +26,8 @@ fmt:
 	done
 
 fmt-check:
-	@for module in $(GO_MODULES); do \
+	@set -e; \
+	for module in $(GO_MODULES); do \
 		files=$$(find $$module -type f -name '*.go'); \
 		if [ -n "$$files" ]; then \
 			out=$$(gofmt -l $$files); \
@@ -36,23 +39,36 @@ fmt-check:
 	done
 
 vet:
-	@for module in $(GO_MODULES); do \
+	@set -e; \
+	for module in $(GO_MODULES); do \
 		echo "==> go vet $$module"; \
 		(cd $$module && go vet ./...); \
 	done
 
 test:
-	@for module in $(GO_MODULES); do \
+	@set -e; \
+	for module in $(GO_MODULES); do \
 		echo "==> go test $$module"; \
 		(cd $$module && go test ./...); \
 	done
 
 build:
-	@mkdir -p $(BIN_DIR)
-	@for module in $(SERVICE_MODULES); do \
+	@set -e; \
+	mkdir -p $(BIN_DIR); \
+	for module in $(SERVICE_MODULES); do \
 		name=$$(basename $$module); \
 		echo "==> go build $$name"; \
 		(cd $$module && go build -o ../../bin/$$name ./cmd/$$name); \
 	done
 
-ci: fmt-check vet test build
+proto-lint:
+	@buf lint
+
+proto-gen:
+	@buf generate
+
+proto-check:
+	@buf generate
+	@git diff --exit-code -- packages/api/gen
+
+ci: proto-lint proto-check fmt-check vet test build

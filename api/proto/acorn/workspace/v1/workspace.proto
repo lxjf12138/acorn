@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package acorn.workspace.v1;
+
+import "acorn/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1;workspacev1";
+
+message Workspace {
+  string id = 1;
+  string session_id = 2;
+  string root_uri = 3;
+  string status = 4;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  bytes metadata_json = 100;
+}
+
+message FileInfo {
+  string path = 1;
+  bool is_dir = 2;
+  int64 size = 3;
+  string mime_type = 4;
+  google.protobuf.Timestamp modified_at = 5;
+}
+
+message FileChunk {
+  // path is relative to the workspace root.
+  string path = 1;
+  bytes data = 2;
+  // chunks are returned in offset order.
+  int64 offset = 3;
+  bool eof = 4;
+}
+
+message GetWorkspaceRequest {
+  string workspace_id = 1;
+  acorn.common.v1.Scope scope = 2;
+}
+
+message GetWorkspaceResponse {
+  Workspace workspace = 1;
+}
+
+message ListFilesRequest {
+  string workspace_id = 1;
+  string path = 2;
+  acorn.common.v1.Scope scope = 3;
+}
+
+message ListFilesResponse {
+  repeated FileInfo files = 1;
+}
+
+message ReadFileRequest {
+  string workspace_id = 1;
+  string path = 2;
+  acorn.common.v1.Scope scope = 3;
+}
+
+message ReadFileResponse {
+  FileChunk chunk = 1;
+}
+
+service WorkspaceService {
+  rpc GetWorkspace(GetWorkspaceRequest) returns (GetWorkspaceResponse);
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse);
+  rpc ReadFile(ReadFileRequest) returns (stream ReadFileResponse);
+}

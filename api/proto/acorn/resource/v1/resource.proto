@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package acorn.resource.v1;
+
+import "acorn/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1;resourcev1";
+
+message ResourceRef {
+  string uri = 1;
+  string name = 2;
+  string type = 3;
+  string mime_type = 4;
+  int64 size = 5;
+  bytes metadata_json = 100;
+}
+
+message Artifact {
+  string id = 1;
+  string workspace_id = 2;
+  ResourceRef resource = 3;
+  google.protobuf.Timestamp created_at = 4;
+  bytes metadata_json = 100;
+}
+
+message ListResourcesRequest {
+  acorn.common.v1.Scope scope = 1;
+  string workspace_id = 2;
+  acorn.common.v1.PageRequest page = 3;
+}
+
+message ListResourcesResponse {
+  repeated Artifact artifacts = 1;
+  acorn.common.v1.PageResponse page = 2;
+}
+
+service ResourceService {
+  rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse);
+}

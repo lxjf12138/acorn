@@ -9,16 +9,6 @@ on:
 jobs:
   go-ci:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        module:
-          - services/agent-control-plane
-          - services/capability-node
-          - packages/core
-          - packages/mcp
-          - packages/signal
-          - packages/provider-sdk-go
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,29 +16,17 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: ${{ matrix.module }}/go.mod
+          go-version: '1.26.x'
 
-      - name: Check formatting
-        working-directory: ${{ matrix.module }}
+      - name: Setup Buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          version: 1.44.0
+
+      - name: Setup protoc plugins
         run: |
-          files=$(find . -type f -name '*.go')
-          if [ -n "$files" ]; then
-            output=$(gofmt -l $files)
-            if [ -n "$output" ]; then
-              echo "$output"
-              exit 1
-            fi
-          fi
+          GOBIN=/usr/local/bin go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6
+          GOBIN=/usr/local/bin go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 
-      - name: Vet
-        working-directory: ${{ matrix.module }}
-        run: go vet ./...
-
-      - name: Test
-        working-directory: ${{ matrix.module }}
-        run: go test ./...
-
-      - name: Build services
-        if: startsWith(matrix.module, 'services/')
-        working-directory: ${{ matrix.module }}
-        run: go build ./cmd/$(basename "${{ matrix.module }}")
+      - name: Run CI
+        run: make ci

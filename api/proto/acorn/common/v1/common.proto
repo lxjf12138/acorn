@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package acorn.common.v1;
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1;commonv1";
+
+message Error {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+  bytes details_json = 4;
+}
+
+message Actor {
+  string type = 1;
+  string id = 2;
+  string display_name = 3;
+}
+
+message Scope {
+  string tenant_id = 1;
+  string user_id = 2;
+  string session_id = 3;
+  string node_id = 4;
+  string provider_id = 5;
+  string workspace_id = 6;
+  string trace_id = 7;
+}
+
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message PageResponse {
+  string next_page_token = 1;
+}

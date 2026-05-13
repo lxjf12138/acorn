@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package acorn.tool.v1;
+
+import "acorn/common/v1/common.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1;toolv1";
+
+message ToolSpec {
+  string name = 1;
+  string description = 2;
+  bytes input_schema_json = 3;
+  string risk = 10;
+  string side_effect = 11;
+  bool requires_approval = 12;
+  bytes metadata_json = 100;
+}
+
+message ToolCallRequest {
+  acorn.common.v1.Scope scope = 1;
+  string provider_id = 10;
+  string tool_name = 11;
+  bytes arguments_json = 12;
+  string request_id = 20;
+  google.protobuf.Duration timeout = 21;
+  bytes metadata_json = 100;
+}
+
+message ToolContent {
+  string type = 1;
+  string text = 2;
+  bytes json = 3;
+  string uri = 4;
+  string name = 5;
+  string mime_type = 6;
+}
+
+message ToolError {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+  bytes details_json = 4;
+}
+
+message ToolCallResult {
+  repeated ToolContent content = 1;
+  bytes structured_output_json = 2;
+  // When error is set, the call should be treated as failed.
+  // Successful results normally leave error unset.
+  // content and error are not technically mutually exclusive,
+  // but callers should normally treat them as alternatives.
+  ToolError error = 3;
+  bool truncated = 4;
+  bytes metadata_json = 100;
+}
