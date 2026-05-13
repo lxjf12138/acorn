@@ -31,7 +31,7 @@ message ListResourcesRequest {
 }
 
 message ListResourcesResponse {
-  repeated Artifact artifacts = 1;
+  repeated ResourceRef resources = 1;
   acorn.common.v1.PageResponse page = 2;
 }
 

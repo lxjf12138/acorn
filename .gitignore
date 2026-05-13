@@ -10,4 +10,4 @@ tmp/
 dist/
 .env
 .env.local
-gen/
+/gen/

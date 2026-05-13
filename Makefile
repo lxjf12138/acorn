@@ -69,6 +69,10 @@ proto-gen:
 
 proto-check:
 	@buf generate
-	@git diff --exit-code -- packages/api/gen
+	@git update-index --refresh >/dev/null
+	@test -z "$$(git diff --name-only -- packages/api/gen)" || \
+		(git diff --name-only -- packages/api/gen; exit 1)
+	@test -z "$$(git ls-files --others --exclude-standard -- packages/api/gen)" || \
+		(git ls-files --others --exclude-standard -- packages/api/gen; exit 1)
 
 ci: proto-lint proto-check fmt-check vet test build
