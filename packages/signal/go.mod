@@ -1,3 +1,3 @@
-module github.com/lxjf12138/Acorn/packages/signal
+module github.com/lxjf12138/acorn/packages/signal
 
-go 1.26.0
+go 1.26

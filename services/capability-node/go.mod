@@ -1,3 +1,3 @@
-module github.com/lxjf12138/Acorn/services/capability-node
+module github.com/lxjf12138/acorn/services/capability-node
 
-go 1.26.0
+go 1.26

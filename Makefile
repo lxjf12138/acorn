@@ -17,7 +17,10 @@ BIN_DIR := ./bin
 fmt:
 	@for module in $(GO_MODULES); do \
 		echo "==> gofmt $$module"; \
-		gofmt -w $$(find $$module -type f -name '*.go'); \
+		files=$$(find $$module -type f -name '*.go'); \
+		if [ -n "$$files" ]; then \
+			gofmt -w $$files; \
+		fi; \
 	done
 
 fmt-check:

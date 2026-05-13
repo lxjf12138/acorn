@@ -1,3 +1,3 @@
-module github.com/lxjf12138/Acorn/packages/mcp
+module github.com/lxjf12138/acorn/packages/mcp
 
-go 1.26.0
+go 1.26
