@@ -1,0 +1,10 @@
+go 1.26.0
+
+use (
+	./packages/core
+	./packages/mcp
+	./packages/provider-sdk-go
+	./packages/signal
+	./services/agent-control-plane
+	./services/capability-node
+)

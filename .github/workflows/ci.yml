@@ -1,0 +1,54 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  go-ci:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - services/agent-control-plane
+          - services/capability-node
+          - packages/core
+          - packages/mcp
+          - packages/signal
+          - packages/provider-sdk-go
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+
+      - name: Check formatting
+        working-directory: ${{ matrix.module }}
+        run: |
+          files=$(find . -type f -name '*.go')
+          if [ -n "$files" ]; then
+            output=$(gofmt -l $files)
+            if [ -n "$output" ]; then
+              echo "$output"
+              exit 1
+            fi
+          fi
+
+      - name: Vet
+        working-directory: ${{ matrix.module }}
+        run: go vet ./...
+
+      - name: Test
+        working-directory: ${{ matrix.module }}
+        run: go test ./...
+
+      - name: Build services
+        if: startsWith(matrix.module, 'services/')
+        working-directory: ${{ matrix.module }}
+        run: go build ./cmd/$(basename "${{ matrix.module }}")

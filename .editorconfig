@@ -5,13 +5,14 @@ charset = utf-8
 end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
-
-[*.md]
-trim_trailing_whitespace = false
+indent_style = space
+indent_size = 2
 
 [*.go]
 indent_style = tab
+indent_size = 4
 
-[*.{yaml,yml,json,md,proto}]
+[*.{md,yml,yaml,json,proto}]
 indent_style = space
 indent_size = 2
+trim_trailing_whitespace = false
