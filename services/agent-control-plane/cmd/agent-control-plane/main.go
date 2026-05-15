@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 
-	kratos "github.com/go-kratos/kratos/v2"
 	klog "github.com/go-kratos/kratos/v2/log"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/app"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/server"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
@@ -37,12 +37,7 @@ func main() {
 	httpSrv := server.NewHTTPServer(cfg, statusService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, logger)
 
-	app := kratos.New(
-		kratos.Name(cfg.Service.Name),
-		kratos.Version(version.Version),
-		kratos.Logger(logger),
-		kratos.Server(httpSrv, grpcSrv),
-	)
+	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 
 	helper.Infow(
 		"msg", "starting service",
@@ -51,7 +46,7 @@ func main() {
 		"grpc.addr", cfg.Server.GRPC.Addr,
 	)
 
-	if err := app.Run(); err != nil {
+	if err := kratosApp.Run(); err != nil {
 		helper.Errorw("msg", "service terminated with error", "err", err)
 		panic(err)
 	}

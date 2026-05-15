@@ -27,20 +27,15 @@ type Signal struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Type            string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Source          string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
-	Subject         string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
-	Time            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=time,proto3" json:"time,omitempty"`
+	SourceServiceId string                 `protobuf:"bytes,3,opt,name=source_service_id,json=sourceServiceId,proto3" json:"source_service_id,omitempty"`
+	ProviderId      string                 `protobuf:"bytes,4,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	Subject         string                 `protobuf:"bytes,5,opt,name=subject,proto3" json:"subject,omitempty"`
+	OccurredAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
 	Scope           *v1.Scope              `protobuf:"bytes,10,opt,name=scope,proto3" json:"scope,omitempty"`
-	SessionHint     string                 `protobuf:"bytes,20,opt,name=session_hint,json=sessionHint,proto3" json:"session_hint,omitempty"`
-	InputKind       string                 `protobuf:"bytes,21,opt,name=input_kind,json=inputKind,proto3" json:"input_kind,omitempty"`
-	Severity        string                 `protobuf:"bytes,22,opt,name=severity,proto3" json:"severity,omitempty"`
-	Priority        string                 `protobuf:"bytes,23,opt,name=priority,proto3" json:"priority,omitempty"`
-	SourceServiceId string                 `protobuf:"bytes,24,opt,name=source_service_id,json=sourceServiceId,proto3" json:"source_service_id,omitempty"`
-	ProviderId      string                 `protobuf:"bytes,25,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	Text            string                 `protobuf:"bytes,26,opt,name=text,proto3" json:"text,omitempty"`
-	DedupeKey       string                 `protobuf:"bytes,30,opt,name=dedupe_key,json=dedupeKey,proto3" json:"dedupe_key,omitempty"`
-	ResourceIds     []string               `protobuf:"bytes,31,rep,name=resource_ids,json=resourceIds,proto3" json:"resource_ids,omitempty"`
-	DataJson        []byte                 `protobuf:"bytes,40,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
+	Text            string                 `protobuf:"bytes,20,opt,name=text,proto3" json:"text,omitempty"`
+	ResourceIds     []string               `protobuf:"bytes,21,rep,name=resource_ids,json=resourceIds,proto3" json:"resource_ids,omitempty"`
+	Severity        string                 `protobuf:"bytes,30,opt,name=severity,proto3" json:"severity,omitempty"`
+	DedupeKey       string                 `protobuf:"bytes,31,opt,name=dedupe_key,json=dedupeKey,proto3" json:"dedupe_key,omitempty"`
 	MetadataJson    []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -90,62 +85,6 @@ func (x *Signal) GetType() string {
 	return ""
 }
 
-func (x *Signal) GetSource() string {
-	if x != nil {
-		return x.Source
-	}
-	return ""
-}
-
-func (x *Signal) GetSubject() string {
-	if x != nil {
-		return x.Subject
-	}
-	return ""
-}
-
-func (x *Signal) GetTime() *timestamppb.Timestamp {
-	if x != nil {
-		return x.Time
-	}
-	return nil
-}
-
-func (x *Signal) GetScope() *v1.Scope {
-	if x != nil {
-		return x.Scope
-	}
-	return nil
-}
-
-func (x *Signal) GetSessionHint() string {
-	if x != nil {
-		return x.SessionHint
-	}
-	return ""
-}
-
-func (x *Signal) GetInputKind() string {
-	if x != nil {
-		return x.InputKind
-	}
-	return ""
-}
-
-func (x *Signal) GetSeverity() string {
-	if x != nil {
-		return x.Severity
-	}
-	return ""
-}
-
-func (x *Signal) GetPriority() string {
-	if x != nil {
-		return x.Priority
-	}
-	return ""
-}
-
 func (x *Signal) GetSourceServiceId() string {
 	if x != nil {
 		return x.SourceServiceId
@@ -160,16 +99,30 @@ func (x *Signal) GetProviderId() string {
 	return ""
 }
 
-func (x *Signal) GetText() string {
+func (x *Signal) GetSubject() string {
 	if x != nil {
-		return x.Text
+		return x.Subject
 	}
 	return ""
 }
 
-func (x *Signal) GetDedupeKey() string {
+func (x *Signal) GetOccurredAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.DedupeKey
+		return x.OccurredAt
+	}
+	return nil
+}
+
+func (x *Signal) GetScope() *v1.Scope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *Signal) GetText() string {
+	if x != nil {
+		return x.Text
 	}
 	return ""
 }
@@ -181,11 +134,18 @@ func (x *Signal) GetResourceIds() []string {
 	return nil
 }
 
-func (x *Signal) GetDataJson() []byte {
+func (x *Signal) GetSeverity() string {
 	if x != nil {
-		return x.DataJson
+		return x.Severity
 	}
-	return nil
+	return ""
+}
+
+func (x *Signal) GetDedupeKey() string {
+	if x != nil {
+		return x.DedupeKey
+	}
+	return ""
 }
 
 func (x *Signal) GetMetadataJson() []byte {
@@ -198,8 +158,7 @@ func (x *Signal) GetMetadataJson() []byte {
 type SignalSpec struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	InputKind     string                 `protobuf:"bytes,2,opt,name=input_kind,json=inputKind,proto3" json:"input_kind,omitempty"`
-	SchemaJson    []byte                 `protobuf:"bytes,3,opt,name=schema_json,json=schemaJson,proto3" json:"schema_json,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -242,18 +201,11 @@ func (x *SignalSpec) GetType() string {
 	return ""
 }
 
-func (x *SignalSpec) GetInputKind() string {
+func (x *SignalSpec) GetDescription() string {
 	if x != nil {
-		return x.InputKind
+		return x.Description
 	}
 	return ""
-}
-
-func (x *SignalSpec) GetSchemaJson() []byte {
-	if x != nil {
-		return x.SchemaJson
-	}
-	return nil
 }
 
 func (x *SignalSpec) GetMetadataJson() []byte {
@@ -355,36 +307,28 @@ var File_acorn_signal_v1_signal_proto protoreflect.FileDescriptor
 
 const file_acorn_signal_v1_signal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cacorn/signal/v1/signal.proto\x12\x0facorn.signal.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9b\x04\n" +
+	"\x1cacorn/signal/v1/signal.proto\x12\x0facorn.signal.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x95\x03\n" +
 	"\x06Signal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +
-	"\x06source\x18\x03 \x01(\tR\x06source\x12\x18\n" +
-	"\asubject\x18\x04 \x01(\tR\asubject\x12.\n" +
-	"\x04time\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\x04time\x12,\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12*\n" +
+	"\x11source_service_id\x18\x03 \x01(\tR\x0fsourceServiceId\x12\x1f\n" +
+	"\vprovider_id\x18\x04 \x01(\tR\n" +
+	"providerId\x12\x18\n" +
+	"\asubject\x18\x05 \x01(\tR\asubject\x12;\n" +
+	"\voccurred_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"occurredAt\x12,\n" +
 	"\x05scope\x18\n" +
-	" \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12!\n" +
-	"\fsession_hint\x18\x14 \x01(\tR\vsessionHint\x12\x1d\n" +
+	" \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\x12\n" +
+	"\x04text\x18\x14 \x01(\tR\x04text\x12!\n" +
+	"\fresource_ids\x18\x15 \x03(\tR\vresourceIds\x12\x1a\n" +
+	"\bseverity\x18\x1e \x01(\tR\bseverity\x12\x1d\n" +
 	"\n" +
-	"input_kind\x18\x15 \x01(\tR\tinputKind\x12\x1a\n" +
-	"\bseverity\x18\x16 \x01(\tR\bseverity\x12\x1a\n" +
-	"\bpriority\x18\x17 \x01(\tR\bpriority\x12*\n" +
-	"\x11source_service_id\x18\x18 \x01(\tR\x0fsourceServiceId\x12\x1f\n" +
-	"\vprovider_id\x18\x19 \x01(\tR\n" +
-	"providerId\x12\x12\n" +
-	"\x04text\x18\x1a \x01(\tR\x04text\x12\x1d\n" +
-	"\n" +
-	"dedupe_key\x18\x1e \x01(\tR\tdedupeKey\x12!\n" +
-	"\fresource_ids\x18\x1f \x03(\tR\vresourceIds\x12\x1b\n" +
-	"\tdata_json\x18( \x01(\fR\bdataJson\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x85\x01\n" +
+	"dedupe_key\x18\x1f \x01(\tR\tdedupeKey\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"g\n" +
 	"\n" +
 	"SignalSpec\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1d\n" +
-	"\n" +
-	"input_kind\x18\x02 \x01(\tR\tinputKind\x12\x1f\n" +
-	"\vschema_json\x18\x03 \x01(\fR\n" +
-	"schemaJson\x12#\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"D\n" +
 	"\x11EmitSignalRequest\x12/\n" +
 	"\x06signal\x18\x01 \x01(\v2\x17.acorn.signal.v1.SignalR\x06signal\"1\n" +
@@ -416,7 +360,7 @@ var file_acorn_signal_v1_signal_proto_goTypes = []any{
 	(*v1.Scope)(nil),              // 5: acorn.common.v1.Scope
 }
 var file_acorn_signal_v1_signal_proto_depIdxs = []int32{
-	4, // 0: acorn.signal.v1.Signal.time:type_name -> google.protobuf.Timestamp
+	4, // 0: acorn.signal.v1.Signal.occurred_at:type_name -> google.protobuf.Timestamp
 	5, // 1: acorn.signal.v1.Signal.scope:type_name -> acorn.common.v1.Scope
 	0, // 2: acorn.signal.v1.EmitSignalRequest.signal:type_name -> acorn.signal.v1.Signal
 	2, // 3: acorn.signal.v1.SignalIngestService.EmitSignal:input_type -> acorn.signal.v1.EmitSignalRequest

@@ -10,27 +10,21 @@ option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/signal/v1
 message Signal {
   string id = 1;
   string type = 2;
-  string source = 3;
-  string subject = 4;
-  google.protobuf.Timestamp time = 5;
+  string source_service_id = 3;
+  string provider_id = 4;
+  string subject = 5;
+  google.protobuf.Timestamp occurred_at = 6;
   acorn.common.v1.Scope scope = 10;
-  string session_hint = 20;
-  string input_kind = 21;
-  string severity = 22;
-  string priority = 23;
-  string source_service_id = 24;
-  string provider_id = 25;
-  string text = 26;
-  string dedupe_key = 30;
-  repeated string resource_ids = 31;
-  bytes data_json = 40;
+  string text = 20;
+  repeated string resource_ids = 21;
+  string severity = 30;
+  string dedupe_key = 31;
   bytes metadata_json = 100;
 }
 
 message SignalSpec {
   string type = 1;
-  string input_kind = 2;
-  bytes schema_json = 3;
+  string description = 2;
   bytes metadata_json = 100;
 }
 
