@@ -14,7 +14,9 @@ message CapabilityService {
   string deployment_profile = 4;
   string status = 5;
   string version = 6;
+  string contract = 7;
   repeated string labels = 10;
+  repeated string features = 11;
   google.protobuf.Timestamp registered_at = 20;
   google.protobuf.Timestamp last_seen_at = 21;
   bytes metadata_json = 100;

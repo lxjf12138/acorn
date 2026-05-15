@@ -2,10 +2,10 @@ package main
 
 import (
 	"flag"
-	"os"
 
 	kratos "github.com/go-kratos/kratos/v2"
 	klog "github.com/go-kratos/kratos/v2/log"
+	"github.com/lxjf12138/acorn/packages/servicekit"
 
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
@@ -27,7 +27,10 @@ func main() {
 		version.Version = cfg.Service.Version
 	}
 
-	logger := newLogger(cfg)
+	logger := servicekit.NewLogger(servicekit.BuildInfo{
+		Name:    cfg.Service.Name,
+		Version: version.Version,
+	}, cfg.Log.Level)
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
 
@@ -52,16 +55,4 @@ func main() {
 		helper.Errorw("msg", "service terminated with error", "err", err)
 		panic(err)
 	}
-}
-
-func newLogger(cfg *conf.Config) klog.Logger {
-	base := klog.NewStdLogger(os.Stdout)
-	filtered := klog.NewFilter(base, klog.FilterLevel(klog.ParseLevel(cfg.Log.Level)))
-	return klog.With(
-		filtered,
-		"ts", klog.DefaultTimestamp,
-		"caller", klog.DefaultCaller,
-		"service.name", cfg.Service.Name,
-		"service.version", version.Version,
-	)
 }

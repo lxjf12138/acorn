@@ -24,22 +24,26 @@ const (
 )
 
 type Signal struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
-	Subject       string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
-	Time          *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=time,proto3" json:"time,omitempty"`
-	Scope         *v1.Scope              `protobuf:"bytes,10,opt,name=scope,proto3" json:"scope,omitempty"`
-	SessionHint   string                 `protobuf:"bytes,20,opt,name=session_hint,json=sessionHint,proto3" json:"session_hint,omitempty"`
-	InputKind     string                 `protobuf:"bytes,21,opt,name=input_kind,json=inputKind,proto3" json:"input_kind,omitempty"`
-	Severity      string                 `protobuf:"bytes,22,opt,name=severity,proto3" json:"severity,omitempty"`
-	Priority      string                 `protobuf:"bytes,23,opt,name=priority,proto3" json:"priority,omitempty"`
-	DedupeKey     string                 `protobuf:"bytes,30,opt,name=dedupe_key,json=dedupeKey,proto3" json:"dedupe_key,omitempty"`
-	DataJson      []byte                 `protobuf:"bytes,40,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
-	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type            string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Source          string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
+	Subject         string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	Time            *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=time,proto3" json:"time,omitempty"`
+	Scope           *v1.Scope              `protobuf:"bytes,10,opt,name=scope,proto3" json:"scope,omitempty"`
+	SessionHint     string                 `protobuf:"bytes,20,opt,name=session_hint,json=sessionHint,proto3" json:"session_hint,omitempty"`
+	InputKind       string                 `protobuf:"bytes,21,opt,name=input_kind,json=inputKind,proto3" json:"input_kind,omitempty"`
+	Severity        string                 `protobuf:"bytes,22,opt,name=severity,proto3" json:"severity,omitempty"`
+	Priority        string                 `protobuf:"bytes,23,opt,name=priority,proto3" json:"priority,omitempty"`
+	SourceServiceId string                 `protobuf:"bytes,24,opt,name=source_service_id,json=sourceServiceId,proto3" json:"source_service_id,omitempty"`
+	ProviderId      string                 `protobuf:"bytes,25,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	Text            string                 `protobuf:"bytes,26,opt,name=text,proto3" json:"text,omitempty"`
+	DedupeKey       string                 `protobuf:"bytes,30,opt,name=dedupe_key,json=dedupeKey,proto3" json:"dedupe_key,omitempty"`
+	ResourceIds     []string               `protobuf:"bytes,31,rep,name=resource_ids,json=resourceIds,proto3" json:"resource_ids,omitempty"`
+	DataJson        []byte                 `protobuf:"bytes,40,opt,name=data_json,json=dataJson,proto3" json:"data_json,omitempty"`
+	MetadataJson    []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Signal) Reset() {
@@ -142,11 +146,39 @@ func (x *Signal) GetPriority() string {
 	return ""
 }
 
+func (x *Signal) GetSourceServiceId() string {
+	if x != nil {
+		return x.SourceServiceId
+	}
+	return ""
+}
+
+func (x *Signal) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *Signal) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
 func (x *Signal) GetDedupeKey() string {
 	if x != nil {
 		return x.DedupeKey
 	}
 	return ""
+}
+
+func (x *Signal) GetResourceIds() []string {
+	if x != nil {
+		return x.ResourceIds
+	}
+	return nil
 }
 
 func (x *Signal) GetDataJson() []byte {
@@ -323,7 +355,7 @@ var File_acorn_signal_v1_signal_proto protoreflect.FileDescriptor
 
 const file_acorn_signal_v1_signal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cacorn/signal/v1/signal.proto\x12\x0facorn.signal.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x97\x03\n" +
+	"\x1cacorn/signal/v1/signal.proto\x12\x0facorn.signal.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9b\x04\n" +
 	"\x06Signal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x16\n" +
@@ -336,9 +368,14 @@ const file_acorn_signal_v1_signal_proto_rawDesc = "" +
 	"\n" +
 	"input_kind\x18\x15 \x01(\tR\tinputKind\x12\x1a\n" +
 	"\bseverity\x18\x16 \x01(\tR\bseverity\x12\x1a\n" +
-	"\bpriority\x18\x17 \x01(\tR\bpriority\x12\x1d\n" +
+	"\bpriority\x18\x17 \x01(\tR\bpriority\x12*\n" +
+	"\x11source_service_id\x18\x18 \x01(\tR\x0fsourceServiceId\x12\x1f\n" +
+	"\vprovider_id\x18\x19 \x01(\tR\n" +
+	"providerId\x12\x12\n" +
+	"\x04text\x18\x1a \x01(\tR\x04text\x12\x1d\n" +
 	"\n" +
-	"dedupe_key\x18\x1e \x01(\tR\tdedupeKey\x12\x1b\n" +
+	"dedupe_key\x18\x1e \x01(\tR\tdedupeKey\x12!\n" +
+	"\fresource_ids\x18\x1f \x03(\tR\vresourceIds\x12\x1b\n" +
 	"\tdata_json\x18( \x01(\fR\bdataJson\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x85\x01\n" +
 	"\n" +

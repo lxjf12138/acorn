@@ -1,5 +1,6 @@
 GO_MODULES := \
 	./packages/api \
+	./packages/servicekit \
 	./services/agent-control-plane \
 	./services/sandbox-service \
 	./packages/core \

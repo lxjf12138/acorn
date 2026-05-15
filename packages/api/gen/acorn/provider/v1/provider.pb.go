@@ -38,6 +38,8 @@ type ProviderManifest struct {
 	ObservationSurface *ObservationSurface    `protobuf:"bytes,13,opt,name=observation_surface,json=observationSurface,proto3" json:"observation_surface,omitempty"`
 	ResourceSurface    *ResourceSurface       `protobuf:"bytes,14,opt,name=resource_surface,json=resourceSurface,proto3" json:"resource_surface,omitempty"`
 	Security           *SecurityPolicy        `protobuf:"bytes,15,opt,name=security,proto3" json:"security,omitempty"`
+	StateSurface       *StateSurface          `protobuf:"bytes,16,opt,name=state_surface,json=stateSurface,proto3" json:"state_surface,omitempty"`
+	GovernanceSurface  *GovernanceSurface     `protobuf:"bytes,17,opt,name=governance_surface,json=governanceSurface,proto3" json:"governance_surface,omitempty"`
 	MetadataJson       []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
@@ -150,6 +152,20 @@ func (x *ProviderManifest) GetSecurity() *SecurityPolicy {
 	return nil
 }
 
+func (x *ProviderManifest) GetStateSurface() *StateSurface {
+	if x != nil {
+		return x.StateSurface
+	}
+	return nil
+}
+
+func (x *ProviderManifest) GetGovernanceSurface() *GovernanceSurface {
+	if x != nil {
+		return x.GovernanceSurface
+	}
+	return nil
+}
+
 func (x *ProviderManifest) GetMetadataJson() []byte {
 	if x != nil {
 		return x.MetadataJson
@@ -211,7 +227,8 @@ func (x *AgentSurface) GetTools() []*v1.ToolSpec {
 
 type SignalSurface struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Emits         []*v11.SignalSpec      `protobuf:"bytes,1,rep,name=emits,proto3" json:"emits,omitempty"`
+	Supported     bool                   `protobuf:"varint,1,opt,name=supported,proto3" json:"supported,omitempty"`
+	Emits         []*v11.SignalSpec      `protobuf:"bytes,2,rep,name=emits,proto3" json:"emits,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -246,11 +263,62 @@ func (*SignalSurface) Descriptor() ([]byte, []int) {
 	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *SignalSurface) GetSupported() bool {
+	if x != nil {
+		return x.Supported
+	}
+	return false
+}
+
 func (x *SignalSurface) GetEmits() []*v11.SignalSpec {
 	if x != nil {
 		return x.Emits
 	}
 	return nil
+}
+
+type StateSurface struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Supported     bool                   `protobuf:"varint,1,opt,name=supported,proto3" json:"supported,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StateSurface) Reset() {
+	*x = StateSurface{}
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StateSurface) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StateSurface) ProtoMessage() {}
+
+func (x *StateSurface) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StateSurface.ProtoReflect.Descriptor instead.
+func (*StateSurface) Descriptor() ([]byte, []int) {
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *StateSurface) GetSupported() bool {
+	if x != nil {
+		return x.Supported
+	}
+	return false
 }
 
 type ControlSurface struct {
@@ -262,7 +330,7 @@ type ControlSurface struct {
 
 func (x *ControlSurface) Reset() {
 	*x = ControlSurface{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[3]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -274,7 +342,7 @@ func (x *ControlSurface) String() string {
 func (*ControlSurface) ProtoMessage() {}
 
 func (x *ControlSurface) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[3]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -287,7 +355,7 @@ func (x *ControlSurface) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ControlSurface.ProtoReflect.Descriptor instead.
 func (*ControlSurface) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{3}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ControlSurface) GetFeatures() []string {
@@ -307,7 +375,7 @@ type ObservationSurface struct {
 
 func (x *ObservationSurface) Reset() {
 	*x = ObservationSurface{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[4]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -319,7 +387,7 @@ func (x *ObservationSurface) String() string {
 func (*ObservationSurface) ProtoMessage() {}
 
 func (x *ObservationSurface) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[4]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -332,7 +400,7 @@ func (x *ObservationSurface) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObservationSurface.ProtoReflect.Descriptor instead.
 func (*ObservationSurface) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{4}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ObservationSurface) GetEvents() []string {
@@ -358,7 +426,7 @@ type ResourceSurface struct {
 
 func (x *ResourceSurface) Reset() {
 	*x = ResourceSurface{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[5]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -370,7 +438,7 @@ func (x *ResourceSurface) String() string {
 func (*ResourceSurface) ProtoMessage() {}
 
 func (x *ResourceSurface) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[5]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -383,7 +451,7 @@ func (x *ResourceSurface) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResourceSurface.ProtoReflect.Descriptor instead.
 func (*ResourceSurface) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{5}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ResourceSurface) GetResourceTypes() []string {
@@ -391,6 +459,50 @@ func (x *ResourceSurface) GetResourceTypes() []string {
 		return x.ResourceTypes
 	}
 	return nil
+}
+
+type GovernanceSurface struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Supported     bool                   `protobuf:"varint,1,opt,name=supported,proto3" json:"supported,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GovernanceSurface) Reset() {
+	*x = GovernanceSurface{}
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GovernanceSurface) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GovernanceSurface) ProtoMessage() {}
+
+func (x *GovernanceSurface) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GovernanceSurface.ProtoReflect.Descriptor instead.
+func (*GovernanceSurface) Descriptor() ([]byte, []int) {
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GovernanceSurface) GetSupported() bool {
+	if x != nil {
+		return x.Supported
+	}
+	return false
 }
 
 type SecurityPolicy struct {
@@ -404,7 +516,7 @@ type SecurityPolicy struct {
 
 func (x *SecurityPolicy) Reset() {
 	*x = SecurityPolicy{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[6]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -416,7 +528,7 @@ func (x *SecurityPolicy) String() string {
 func (*SecurityPolicy) ProtoMessage() {}
 
 func (x *SecurityPolicy) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[6]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -429,7 +541,7 @@ func (x *SecurityPolicy) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SecurityPolicy.ProtoReflect.Descriptor instead.
 func (*SecurityPolicy) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{6}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SecurityPolicy) GetTargets() []string {
@@ -465,7 +577,7 @@ type ProviderHealth struct {
 
 func (x *ProviderHealth) Reset() {
 	*x = ProviderHealth{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[7]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -477,7 +589,7 @@ func (x *ProviderHealth) String() string {
 func (*ProviderHealth) ProtoMessage() {}
 
 func (x *ProviderHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[7]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -490,7 +602,7 @@ func (x *ProviderHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProviderHealth.ProtoReflect.Descriptor instead.
 func (*ProviderHealth) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{7}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ProviderHealth) GetProviderId() string {
@@ -531,7 +643,7 @@ type ListProvidersRequest struct {
 
 func (x *ListProvidersRequest) Reset() {
 	*x = ListProvidersRequest{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[8]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -543,7 +655,7 @@ func (x *ListProvidersRequest) String() string {
 func (*ListProvidersRequest) ProtoMessage() {}
 
 func (x *ListProvidersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[8]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -556,7 +668,7 @@ func (x *ListProvidersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProvidersRequest.ProtoReflect.Descriptor instead.
 func (*ListProvidersRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{8}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListProvidersRequest) GetPage() *v12.PageRequest {
@@ -583,7 +695,7 @@ type ListProvidersResponse struct {
 
 func (x *ListProvidersResponse) Reset() {
 	*x = ListProvidersResponse{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[9]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -595,7 +707,7 @@ func (x *ListProvidersResponse) String() string {
 func (*ListProvidersResponse) ProtoMessage() {}
 
 func (x *ListProvidersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[9]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -608,7 +720,7 @@ func (x *ListProvidersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProvidersResponse.ProtoReflect.Descriptor instead.
 func (*ListProvidersResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{9}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListProvidersResponse) GetProviders() []*ProviderManifest {
@@ -635,7 +747,7 @@ type GetProviderRequest struct {
 
 func (x *GetProviderRequest) Reset() {
 	*x = GetProviderRequest{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[10]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -647,7 +759,7 @@ func (x *GetProviderRequest) String() string {
 func (*GetProviderRequest) ProtoMessage() {}
 
 func (x *GetProviderRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[10]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -660,7 +772,7 @@ func (x *GetProviderRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProviderRequest.ProtoReflect.Descriptor instead.
 func (*GetProviderRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{10}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetProviderRequest) GetProviderId() string {
@@ -686,7 +798,7 @@ type GetProviderResponse struct {
 
 func (x *GetProviderResponse) Reset() {
 	*x = GetProviderResponse{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[11]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -698,7 +810,7 @@ func (x *GetProviderResponse) String() string {
 func (*GetProviderResponse) ProtoMessage() {}
 
 func (x *GetProviderResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[11]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -711,7 +823,7 @@ func (x *GetProviderResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProviderResponse.ProtoReflect.Descriptor instead.
 func (*GetProviderResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{11}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetProviderResponse) GetProvider() *ProviderManifest {
@@ -731,7 +843,7 @@ type GetProviderHealthRequest struct {
 
 func (x *GetProviderHealthRequest) Reset() {
 	*x = GetProviderHealthRequest{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[12]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -743,7 +855,7 @@ func (x *GetProviderHealthRequest) String() string {
 func (*GetProviderHealthRequest) ProtoMessage() {}
 
 func (x *GetProviderHealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[12]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -756,7 +868,7 @@ func (x *GetProviderHealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProviderHealthRequest.ProtoReflect.Descriptor instead.
 func (*GetProviderHealthRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{12}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetProviderHealthRequest) GetProviderId() string {
@@ -782,7 +894,7 @@ type GetProviderHealthResponse struct {
 
 func (x *GetProviderHealthResponse) Reset() {
 	*x = GetProviderHealthResponse{}
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[13]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -794,7 +906,7 @@ func (x *GetProviderHealthResponse) String() string {
 func (*GetProviderHealthResponse) ProtoMessage() {}
 
 func (x *GetProviderHealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_provider_v1_provider_proto_msgTypes[13]
+	mi := &file_acorn_provider_v1_provider_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -807,7 +919,7 @@ func (x *GetProviderHealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetProviderHealthResponse.ProtoReflect.Descriptor instead.
 func (*GetProviderHealthResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{13}
+	return file_acorn_provider_v1_provider_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetProviderHealthResponse) GetHealth() *ProviderHealth {
@@ -821,7 +933,7 @@ var File_acorn_provider_v1_provider_proto protoreflect.FileDescriptor
 
 const file_acorn_provider_v1_provider_proto_rawDesc = "" +
 	"\n" +
-	" acorn/provider/v1/provider.proto\x12\x11acorn.provider.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1cacorn/signal/v1/signal.proto\x1a\x18acorn/tool/v1/tool.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfb\x04\n" +
+	" acorn/provider/v1/provider.proto\x12\x11acorn.provider.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1cacorn/signal/v1/signal.proto\x1a\x18acorn/tool/v1/tool.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x96\x06\n" +
 	"\x10ProviderManifest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x18\n" +
@@ -834,20 +946,27 @@ const file_acorn_provider_v1_provider_proto_rawDesc = "" +
 	"\x0fcontrol_surface\x18\f \x01(\v2!.acorn.provider.v1.ControlSurfaceR\x0econtrolSurface\x12V\n" +
 	"\x13observation_surface\x18\r \x01(\v2%.acorn.provider.v1.ObservationSurfaceR\x12observationSurface\x12M\n" +
 	"\x10resource_surface\x18\x0e \x01(\v2\".acorn.provider.v1.ResourceSurfaceR\x0fresourceSurface\x12=\n" +
-	"\bsecurity\x18\x0f \x01(\v2!.acorn.provider.v1.SecurityPolicyR\bsecurity\x12#\n" +
+	"\bsecurity\x18\x0f \x01(\v2!.acorn.provider.v1.SecurityPolicyR\bsecurity\x12D\n" +
+	"\rstate_surface\x18\x10 \x01(\v2\x1f.acorn.provider.v1.StateSurfaceR\fstateSurface\x12S\n" +
+	"\x12governance_surface\x18\x11 \x01(\v2$.acorn.provider.v1.GovernanceSurfaceR\x11governanceSurface\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"Y\n" +
 	"\fAgentSurface\x12\x1a\n" +
 	"\bprotocol\x18\x01 \x01(\tR\bprotocol\x12-\n" +
-	"\x05tools\x18\x02 \x03(\v2\x17.acorn.tool.v1.ToolSpecR\x05tools\"B\n" +
-	"\rSignalSurface\x121\n" +
-	"\x05emits\x18\x01 \x03(\v2\x1b.acorn.signal.v1.SignalSpecR\x05emits\",\n" +
+	"\x05tools\x18\x02 \x03(\v2\x17.acorn.tool.v1.ToolSpecR\x05tools\"`\n" +
+	"\rSignalSurface\x12\x1c\n" +
+	"\tsupported\x18\x01 \x01(\bR\tsupported\x121\n" +
+	"\x05emits\x18\x02 \x03(\v2\x1b.acorn.signal.v1.SignalSpecR\x05emits\",\n" +
+	"\fStateSurface\x12\x1c\n" +
+	"\tsupported\x18\x01 \x01(\bR\tsupported\",\n" +
 	"\x0eControlSurface\x12\x1a\n" +
 	"\bfeatures\x18\x01 \x03(\tR\bfeatures\"F\n" +
 	"\x12ObservationSurface\x12\x16\n" +
 	"\x06events\x18\x01 \x03(\tR\x06events\x12\x18\n" +
 	"\ametrics\x18\x02 \x03(\tR\ametrics\"8\n" +
 	"\x0fResourceSurface\x12%\n" +
-	"\x0eresource_types\x18\x01 \x03(\tR\rresourceTypes\"v\n" +
+	"\x0eresource_types\x18\x01 \x03(\tR\rresourceTypes\"1\n" +
+	"\x11GovernanceSurface\x12\x1c\n" +
+	"\tsupported\x18\x01 \x01(\bR\tsupported\"v\n" +
 	"\x0eSecurityPolicy\x12\x18\n" +
 	"\atargets\x18\x01 \x03(\tR\atargets\x12%\n" +
 	"\x0edefault_target\x18\x02 \x01(\tR\rdefaultTarget\x12#\n" +
@@ -894,58 +1013,62 @@ func file_acorn_provider_v1_provider_proto_rawDescGZIP() []byte {
 	return file_acorn_provider_v1_provider_proto_rawDescData
 }
 
-var file_acorn_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_acorn_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_acorn_provider_v1_provider_proto_goTypes = []any{
 	(*ProviderManifest)(nil),          // 0: acorn.provider.v1.ProviderManifest
 	(*AgentSurface)(nil),              // 1: acorn.provider.v1.AgentSurface
 	(*SignalSurface)(nil),             // 2: acorn.provider.v1.SignalSurface
-	(*ControlSurface)(nil),            // 3: acorn.provider.v1.ControlSurface
-	(*ObservationSurface)(nil),        // 4: acorn.provider.v1.ObservationSurface
-	(*ResourceSurface)(nil),           // 5: acorn.provider.v1.ResourceSurface
-	(*SecurityPolicy)(nil),            // 6: acorn.provider.v1.SecurityPolicy
-	(*ProviderHealth)(nil),            // 7: acorn.provider.v1.ProviderHealth
-	(*ListProvidersRequest)(nil),      // 8: acorn.provider.v1.ListProvidersRequest
-	(*ListProvidersResponse)(nil),     // 9: acorn.provider.v1.ListProvidersResponse
-	(*GetProviderRequest)(nil),        // 10: acorn.provider.v1.GetProviderRequest
-	(*GetProviderResponse)(nil),       // 11: acorn.provider.v1.GetProviderResponse
-	(*GetProviderHealthRequest)(nil),  // 12: acorn.provider.v1.GetProviderHealthRequest
-	(*GetProviderHealthResponse)(nil), // 13: acorn.provider.v1.GetProviderHealthResponse
-	(*v1.ToolSpec)(nil),               // 14: acorn.tool.v1.ToolSpec
-	(*v11.SignalSpec)(nil),            // 15: acorn.signal.v1.SignalSpec
-	(*timestamppb.Timestamp)(nil),     // 16: google.protobuf.Timestamp
-	(*v12.PageRequest)(nil),           // 17: acorn.common.v1.PageRequest
-	(*v12.Scope)(nil),                 // 18: acorn.common.v1.Scope
-	(*v12.PageResponse)(nil),          // 19: acorn.common.v1.PageResponse
+	(*StateSurface)(nil),              // 3: acorn.provider.v1.StateSurface
+	(*ControlSurface)(nil),            // 4: acorn.provider.v1.ControlSurface
+	(*ObservationSurface)(nil),        // 5: acorn.provider.v1.ObservationSurface
+	(*ResourceSurface)(nil),           // 6: acorn.provider.v1.ResourceSurface
+	(*GovernanceSurface)(nil),         // 7: acorn.provider.v1.GovernanceSurface
+	(*SecurityPolicy)(nil),            // 8: acorn.provider.v1.SecurityPolicy
+	(*ProviderHealth)(nil),            // 9: acorn.provider.v1.ProviderHealth
+	(*ListProvidersRequest)(nil),      // 10: acorn.provider.v1.ListProvidersRequest
+	(*ListProvidersResponse)(nil),     // 11: acorn.provider.v1.ListProvidersResponse
+	(*GetProviderRequest)(nil),        // 12: acorn.provider.v1.GetProviderRequest
+	(*GetProviderResponse)(nil),       // 13: acorn.provider.v1.GetProviderResponse
+	(*GetProviderHealthRequest)(nil),  // 14: acorn.provider.v1.GetProviderHealthRequest
+	(*GetProviderHealthResponse)(nil), // 15: acorn.provider.v1.GetProviderHealthResponse
+	(*v1.ToolSpec)(nil),               // 16: acorn.tool.v1.ToolSpec
+	(*v11.SignalSpec)(nil),            // 17: acorn.signal.v1.SignalSpec
+	(*timestamppb.Timestamp)(nil),     // 18: google.protobuf.Timestamp
+	(*v12.PageRequest)(nil),           // 19: acorn.common.v1.PageRequest
+	(*v12.Scope)(nil),                 // 20: acorn.common.v1.Scope
+	(*v12.PageResponse)(nil),          // 21: acorn.common.v1.PageResponse
 }
 var file_acorn_provider_v1_provider_proto_depIdxs = []int32{
 	1,  // 0: acorn.provider.v1.ProviderManifest.agent_surface:type_name -> acorn.provider.v1.AgentSurface
 	2,  // 1: acorn.provider.v1.ProviderManifest.signal_surface:type_name -> acorn.provider.v1.SignalSurface
-	3,  // 2: acorn.provider.v1.ProviderManifest.control_surface:type_name -> acorn.provider.v1.ControlSurface
-	4,  // 3: acorn.provider.v1.ProviderManifest.observation_surface:type_name -> acorn.provider.v1.ObservationSurface
-	5,  // 4: acorn.provider.v1.ProviderManifest.resource_surface:type_name -> acorn.provider.v1.ResourceSurface
-	6,  // 5: acorn.provider.v1.ProviderManifest.security:type_name -> acorn.provider.v1.SecurityPolicy
-	14, // 6: acorn.provider.v1.AgentSurface.tools:type_name -> acorn.tool.v1.ToolSpec
-	15, // 7: acorn.provider.v1.SignalSurface.emits:type_name -> acorn.signal.v1.SignalSpec
-	16, // 8: acorn.provider.v1.ProviderHealth.checked_at:type_name -> google.protobuf.Timestamp
-	17, // 9: acorn.provider.v1.ListProvidersRequest.page:type_name -> acorn.common.v1.PageRequest
-	18, // 10: acorn.provider.v1.ListProvidersRequest.scope:type_name -> acorn.common.v1.Scope
-	0,  // 11: acorn.provider.v1.ListProvidersResponse.providers:type_name -> acorn.provider.v1.ProviderManifest
-	19, // 12: acorn.provider.v1.ListProvidersResponse.page:type_name -> acorn.common.v1.PageResponse
-	18, // 13: acorn.provider.v1.GetProviderRequest.scope:type_name -> acorn.common.v1.Scope
-	0,  // 14: acorn.provider.v1.GetProviderResponse.provider:type_name -> acorn.provider.v1.ProviderManifest
-	18, // 15: acorn.provider.v1.GetProviderHealthRequest.scope:type_name -> acorn.common.v1.Scope
-	7,  // 16: acorn.provider.v1.GetProviderHealthResponse.health:type_name -> acorn.provider.v1.ProviderHealth
-	8,  // 17: acorn.provider.v1.ProviderService.ListProviders:input_type -> acorn.provider.v1.ListProvidersRequest
-	10, // 18: acorn.provider.v1.ProviderService.GetProvider:input_type -> acorn.provider.v1.GetProviderRequest
-	12, // 19: acorn.provider.v1.ProviderService.GetProviderHealth:input_type -> acorn.provider.v1.GetProviderHealthRequest
-	9,  // 20: acorn.provider.v1.ProviderService.ListProviders:output_type -> acorn.provider.v1.ListProvidersResponse
-	11, // 21: acorn.provider.v1.ProviderService.GetProvider:output_type -> acorn.provider.v1.GetProviderResponse
-	13, // 22: acorn.provider.v1.ProviderService.GetProviderHealth:output_type -> acorn.provider.v1.GetProviderHealthResponse
-	20, // [20:23] is the sub-list for method output_type
-	17, // [17:20] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	4,  // 2: acorn.provider.v1.ProviderManifest.control_surface:type_name -> acorn.provider.v1.ControlSurface
+	5,  // 3: acorn.provider.v1.ProviderManifest.observation_surface:type_name -> acorn.provider.v1.ObservationSurface
+	6,  // 4: acorn.provider.v1.ProviderManifest.resource_surface:type_name -> acorn.provider.v1.ResourceSurface
+	8,  // 5: acorn.provider.v1.ProviderManifest.security:type_name -> acorn.provider.v1.SecurityPolicy
+	3,  // 6: acorn.provider.v1.ProviderManifest.state_surface:type_name -> acorn.provider.v1.StateSurface
+	7,  // 7: acorn.provider.v1.ProviderManifest.governance_surface:type_name -> acorn.provider.v1.GovernanceSurface
+	16, // 8: acorn.provider.v1.AgentSurface.tools:type_name -> acorn.tool.v1.ToolSpec
+	17, // 9: acorn.provider.v1.SignalSurface.emits:type_name -> acorn.signal.v1.SignalSpec
+	18, // 10: acorn.provider.v1.ProviderHealth.checked_at:type_name -> google.protobuf.Timestamp
+	19, // 11: acorn.provider.v1.ListProvidersRequest.page:type_name -> acorn.common.v1.PageRequest
+	20, // 12: acorn.provider.v1.ListProvidersRequest.scope:type_name -> acorn.common.v1.Scope
+	0,  // 13: acorn.provider.v1.ListProvidersResponse.providers:type_name -> acorn.provider.v1.ProviderManifest
+	21, // 14: acorn.provider.v1.ListProvidersResponse.page:type_name -> acorn.common.v1.PageResponse
+	20, // 15: acorn.provider.v1.GetProviderRequest.scope:type_name -> acorn.common.v1.Scope
+	0,  // 16: acorn.provider.v1.GetProviderResponse.provider:type_name -> acorn.provider.v1.ProviderManifest
+	20, // 17: acorn.provider.v1.GetProviderHealthRequest.scope:type_name -> acorn.common.v1.Scope
+	9,  // 18: acorn.provider.v1.GetProviderHealthResponse.health:type_name -> acorn.provider.v1.ProviderHealth
+	10, // 19: acorn.provider.v1.ProviderService.ListProviders:input_type -> acorn.provider.v1.ListProvidersRequest
+	12, // 20: acorn.provider.v1.ProviderService.GetProvider:input_type -> acorn.provider.v1.GetProviderRequest
+	14, // 21: acorn.provider.v1.ProviderService.GetProviderHealth:input_type -> acorn.provider.v1.GetProviderHealthRequest
+	11, // 22: acorn.provider.v1.ProviderService.ListProviders:output_type -> acorn.provider.v1.ListProvidersResponse
+	13, // 23: acorn.provider.v1.ProviderService.GetProvider:output_type -> acorn.provider.v1.GetProviderResponse
+	15, // 24: acorn.provider.v1.ProviderService.GetProviderHealth:output_type -> acorn.provider.v1.GetProviderHealthResponse
+	22, // [22:25] is the sub-list for method output_type
+	19, // [19:22] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_acorn_provider_v1_provider_proto_init() }
@@ -959,7 +1082,7 @@ func file_acorn_provider_v1_provider_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_acorn_provider_v1_provider_proto_rawDesc), len(file_acorn_provider_v1_provider_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

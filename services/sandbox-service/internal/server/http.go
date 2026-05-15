@@ -4,9 +4,8 @@ import (
 	nethttp "net/http"
 
 	klog "github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/logging"
-	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
+	"github.com/lxjf12138/acorn/packages/servicekit"
 
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
@@ -16,10 +15,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, logge
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
-		khttp.Middleware(
-			recovery.Recovery(),
-			logging.Server(logger),
-		),
+		khttp.Middleware(servicekit.DefaultServerMiddleware(logger)...),
 	)
 
 	router := srv.Route("/")

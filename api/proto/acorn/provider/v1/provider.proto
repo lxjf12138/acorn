@@ -21,6 +21,8 @@ message ProviderManifest {
   ObservationSurface observation_surface = 13;
   ResourceSurface resource_surface = 14;
   SecurityPolicy security = 15;
+  StateSurface state_surface = 16;
+  GovernanceSurface governance_surface = 17;
   bytes metadata_json = 100;
 }
 
@@ -30,7 +32,12 @@ message AgentSurface {
 }
 
 message SignalSurface {
-  repeated acorn.signal.v1.SignalSpec emits = 1;
+  bool supported = 1;
+  repeated acorn.signal.v1.SignalSpec emits = 2;
+}
+
+message StateSurface {
+  bool supported = 1;
 }
 
 message ControlSurface {
@@ -44,6 +51,10 @@ message ObservationSurface {
 
 message ResourceSurface {
   repeated string resource_types = 1;
+}
+
+message GovernanceSurface {
+  bool supported = 1;
 }
 
 message SecurityPolicy {

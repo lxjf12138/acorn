@@ -18,7 +18,11 @@ message Signal {
   string input_kind = 21;
   string severity = 22;
   string priority = 23;
+  string source_service_id = 24;
+  string provider_id = 25;
+  string text = 26;
   string dedupe_key = 30;
+  repeated string resource_ids = 31;
   bytes data_json = 40;
   bytes metadata_json = 100;
 }

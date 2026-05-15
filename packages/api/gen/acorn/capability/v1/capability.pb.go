@@ -31,7 +31,9 @@ type CapabilityService struct {
 	DeploymentProfile string                 `protobuf:"bytes,4,opt,name=deployment_profile,json=deploymentProfile,proto3" json:"deployment_profile,omitempty"`
 	Status            string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"`
 	Version           string                 `protobuf:"bytes,6,opt,name=version,proto3" json:"version,omitempty"`
+	Contract          string                 `protobuf:"bytes,7,opt,name=contract,proto3" json:"contract,omitempty"`
 	Labels            []string               `protobuf:"bytes,10,rep,name=labels,proto3" json:"labels,omitempty"`
+	Features          []string               `protobuf:"bytes,11,rep,name=features,proto3" json:"features,omitempty"`
 	RegisteredAt      *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=registered_at,json=registeredAt,proto3" json:"registered_at,omitempty"`
 	LastSeenAt        *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=last_seen_at,json=lastSeenAt,proto3" json:"last_seen_at,omitempty"`
 	MetadataJson      []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
@@ -111,9 +113,23 @@ func (x *CapabilityService) GetVersion() string {
 	return ""
 }
 
+func (x *CapabilityService) GetContract() string {
+	if x != nil {
+		return x.Contract
+	}
+	return ""
+}
+
 func (x *CapabilityService) GetLabels() []string {
 	if x != nil {
 		return x.Labels
+	}
+	return nil
+}
+
+func (x *CapabilityService) GetFeatures() []string {
+	if x != nil {
+		return x.Features
 	}
 	return nil
 }
@@ -343,16 +359,18 @@ var File_acorn_capability_v1_capability_proto protoreflect.FileDescriptor
 
 const file_acorn_capability_v1_capability_proto_rawDesc = "" +
 	"\n" +
-	"$acorn/capability/v1/capability.proto\x12\x13acorn.capability.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe8\x02\n" +
+	"$acorn/capability/v1/capability.proto\x12\x13acorn.capability.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa0\x03\n" +
 	"\x11CapabilityService\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
 	"\x04kind\x18\x03 \x01(\tR\x04kind\x12-\n" +
 	"\x12deployment_profile\x18\x04 \x01(\tR\x11deploymentProfile\x12\x16\n" +
 	"\x06status\x18\x05 \x01(\tR\x06status\x12\x18\n" +
-	"\aversion\x18\x06 \x01(\tR\aversion\x12\x16\n" +
+	"\aversion\x18\x06 \x01(\tR\aversion\x12\x1a\n" +
+	"\bcontract\x18\a \x01(\tR\bcontract\x12\x16\n" +
 	"\x06labels\x18\n" +
-	" \x03(\tR\x06labels\x12?\n" +
+	" \x03(\tR\x06labels\x12\x1a\n" +
+	"\bfeatures\x18\v \x03(\tR\bfeatures\x12?\n" +
 	"\rregistered_at\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\fregisteredAt\x12<\n" +
 	"\flast_seen_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"lastSeenAt\x12#\n" +
