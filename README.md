@@ -23,4 +23,4 @@ The first concrete Capability Service is `sandbox-service`.
 
 Sandbox workspace is owned by `sandbox-service`; it is not a global shared filesystem. Cross-service files flow through `ResourceRef`.
 
-See [`docs/architecture.md`](docs/architecture.md).
+See [`docs/acorn_architecture.md`](docs/acorn_architecture.md).
