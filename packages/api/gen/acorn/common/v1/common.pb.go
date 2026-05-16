@@ -155,7 +155,6 @@ type Scope struct {
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	SessionId     string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	ServiceId     string                 `protobuf:"bytes,4,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
-	ProviderId    string                 `protobuf:"bytes,5,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	TraceId       string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
 	RunId         string                 `protobuf:"bytes,7,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	TurnId        string                 `protobuf:"bytes,8,opt,name=turn_id,json=turnId,proto3" json:"turn_id,omitempty"`
@@ -218,13 +217,6 @@ func (x *Scope) GetSessionId() string {
 func (x *Scope) GetServiceId() string {
 	if x != nil {
 		return x.ServiceId
-	}
-	return ""
-}
-
-func (x *Scope) GetProviderId() string {
-	if x != nil {
-		return x.ProviderId
 	}
 	return ""
 }
@@ -366,21 +358,19 @@ const file_acorn_common_v1_common_proto_rawDesc = "" +
 	"\x05Actor\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x89\x02\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\xfb\x01\n" +
 	"\x05Scope\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1d\n" +
 	"\n" +
-	"service_id\x18\x04 \x01(\tR\tserviceId\x12\x1f\n" +
-	"\vprovider_id\x18\x05 \x01(\tR\n" +
-	"providerId\x12\x19\n" +
+	"service_id\x18\x04 \x01(\tR\tserviceId\x12\x19\n" +
 	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x15\n" +
 	"\x06run_id\x18\a \x01(\tR\x05runId\x12\x17\n" +
 	"\aturn_id\x18\b \x01(\tR\x06turnId\x12 \n" +
 	"\ftool_call_id\x18\t \x01(\tR\n" +
-	"toolCallId\"I\n" +
+	"toolCallIdJ\x04\b\x05\x10\x06R\vprovider_id\"I\n" +
 	"\vPageRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +

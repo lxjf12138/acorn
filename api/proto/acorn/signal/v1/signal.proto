@@ -8,10 +8,12 @@ import "google/protobuf/timestamp.proto";
 option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/signal/v1;signalv1";
 
 message Signal {
+  reserved 4;
+  reserved "provider_id";
+
   string id = 1;
   string type = 2;
   string source_service_id = 3;
-  string provider_id = 4;
   string subject = 5;
   google.protobuf.Timestamp occurred_at = 6;
   acorn.common.v1.Scope scope = 10;

@@ -116,16 +116,16 @@ func (x *ToolSpec) GetMetadataJson() []byte {
 }
 
 type ToolCallRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Scope         *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
-	ProviderId    string                 `protobuf:"bytes,10,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	ToolName      string                 `protobuf:"bytes,11,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
-	ArgumentsJson []byte                 `protobuf:"bytes,12,opt,name=arguments_json,json=argumentsJson,proto3" json:"arguments_json,omitempty"`
-	RequestId     string                 `protobuf:"bytes,20,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	Timeout       *durationpb.Duration   `protobuf:"bytes,21,opt,name=timeout,proto3" json:"timeout,omitempty"`
-	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Scope           *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	TargetServiceId string                 `protobuf:"bytes,10,opt,name=target_service_id,json=targetServiceId,proto3" json:"target_service_id,omitempty"`
+	ToolName        string                 `protobuf:"bytes,11,opt,name=tool_name,json=toolName,proto3" json:"tool_name,omitempty"`
+	ArgumentsJson   []byte                 `protobuf:"bytes,12,opt,name=arguments_json,json=argumentsJson,proto3" json:"arguments_json,omitempty"`
+	RequestId       string                 `protobuf:"bytes,20,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Timeout         *durationpb.Duration   `protobuf:"bytes,21,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	MetadataJson    []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *ToolCallRequest) Reset() {
@@ -165,9 +165,9 @@ func (x *ToolCallRequest) GetScope() *v1.Scope {
 	return nil
 }
 
-func (x *ToolCallRequest) GetProviderId() string {
+func (x *ToolCallRequest) GetTargetServiceId() string {
 	if x != nil {
-		return x.ProviderId
+		return x.TargetServiceId
 	}
 	return ""
 }
@@ -453,12 +453,11 @@ const file_acorn_tool_v1_tool_proto_rawDesc = "" +
 	"\vside_effect\x18\v \x01(\tR\n" +
 	"sideEffect\x12+\n" +
 	"\x11requires_approval\x18\f \x01(\bR\x10requiresApproval\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x9d\x02\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xa8\x02\n" +
 	"\x0fToolCallRequest\x12,\n" +
-	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\x1f\n" +
-	"\vprovider_id\x18\n" +
-	" \x01(\tR\n" +
-	"providerId\x12\x1b\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12*\n" +
+	"\x11target_service_id\x18\n" +
+	" \x01(\tR\x0ftargetServiceId\x12\x1b\n" +
 	"\ttool_name\x18\v \x01(\tR\btoolName\x12%\n" +
 	"\x0earguments_json\x18\f \x01(\fR\rargumentsJson\x12\x1d\n" +
 	"\n" +

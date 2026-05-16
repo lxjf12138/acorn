@@ -28,7 +28,6 @@ type Signal struct {
 	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Type            string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	SourceServiceId string                 `protobuf:"bytes,3,opt,name=source_service_id,json=sourceServiceId,proto3" json:"source_service_id,omitempty"`
-	ProviderId      string                 `protobuf:"bytes,4,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	Subject         string                 `protobuf:"bytes,5,opt,name=subject,proto3" json:"subject,omitempty"`
 	OccurredAt      *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
 	Scope           *v1.Scope              `protobuf:"bytes,10,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -88,13 +87,6 @@ func (x *Signal) GetType() string {
 func (x *Signal) GetSourceServiceId() string {
 	if x != nil {
 		return x.SourceServiceId
-	}
-	return ""
-}
-
-func (x *Signal) GetProviderId() string {
-	if x != nil {
-		return x.ProviderId
 	}
 	return ""
 }
@@ -307,13 +299,11 @@ var File_acorn_signal_v1_signal_proto protoreflect.FileDescriptor
 
 const file_acorn_signal_v1_signal_proto_rawDesc = "" +
 	"\n" +
-	"\x1cacorn/signal/v1/signal.proto\x12\x0facorn.signal.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x95\x03\n" +
+	"\x1cacorn/signal/v1/signal.proto\x12\x0facorn.signal.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x87\x03\n" +
 	"\x06Signal\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12*\n" +
-	"\x11source_service_id\x18\x03 \x01(\tR\x0fsourceServiceId\x12\x1f\n" +
-	"\vprovider_id\x18\x04 \x01(\tR\n" +
-	"providerId\x12\x18\n" +
+	"\x11source_service_id\x18\x03 \x01(\tR\x0fsourceServiceId\x12\x18\n" +
 	"\asubject\x18\x05 \x01(\tR\asubject\x12;\n" +
 	"\voccurred_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"occurredAt\x12,\n" +
@@ -324,7 +314,7 @@ const file_acorn_signal_v1_signal_proto_rawDesc = "" +
 	"\bseverity\x18\x1e \x01(\tR\bseverity\x12\x1d\n" +
 	"\n" +
 	"dedupe_key\x18\x1f \x01(\tR\tdedupeKey\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"g\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJsonJ\x04\b\x04\x10\x05R\vprovider_id\"g\n" +
 	"\n" +
 	"SignalSpec\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +

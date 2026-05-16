@@ -22,7 +22,8 @@ message Scope {
   string user_id = 2;
   string session_id = 3;
   string service_id = 4;
-  string provider_id = 5;
+  reserved 5;
+  reserved "provider_id";
   string trace_id = 6;
   string run_id = 7;
   string turn_id = 8;

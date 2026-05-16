@@ -8,11 +8,11 @@ import (
 )
 
 func TestFakeProviderEcho(t *testing.T) {
-	provider := NewFakeProviderWithEcho("provider-1")
+	provider := NewFakeProviderWithEcho("fake-service")
 	result, err := provider.CallTool(context.Background(), &toolv1.ToolCallRequest{
-		ProviderId:    "provider-1",
-		ToolName:      "fake.echo",
-		ArgumentsJson: []byte(`{"text":"hello"}`),
+		TargetServiceId: "fake-service",
+		ToolName:        "fake.echo",
+		ArgumentsJson:   []byte(`{"text":"hello"}`),
 	})
 	if err != nil {
 		t.Fatalf("CallTool returned error: %v", err)

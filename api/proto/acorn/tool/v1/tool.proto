@@ -19,7 +19,7 @@ message ToolSpec {
 
 message ToolCallRequest {
   acorn.common.v1.Scope scope = 1;
-  string provider_id = 10;
+  string target_service_id = 10;
   string tool_name = 11;
   bytes arguments_json = 12;
   string request_id = 20;
