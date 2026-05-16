@@ -55,7 +55,7 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 	if err != nil {
 		return nil, err
 	}
-	absPath, err := joinWorkspacePath(workspace.RootPath, relPath)
+	absPath, err := lexicalWorkspacePath(workspace.RootPath, relPath)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace path")
 	}
@@ -66,11 +66,18 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "stat workspace directory: %v", err)
 	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return nil, status.Error(codes.PermissionDenied, "workspace directory view does not follow symlinks")
+	}
+	resolvedPath, err := resolveExistingWorkspacePath(workspace.RootPath, absPath)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, "workspace path escapes workspace root")
+	}
 	if !info.IsDir() {
 		return nil, status.Error(codes.FailedPrecondition, "workspace path is not a directory")
 	}
 
-	entries, err := os.ReadDir(absPath)
+	entries, err := os.ReadDir(resolvedPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, status.Error(codes.NotFound, "workspace directory not found")
 	}
@@ -120,7 +127,7 @@ func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sa
 	if err != nil {
 		return nil, err
 	}
-	absPath, err := joinWorkspacePath(workspace.RootPath, relPath)
+	absPath, err := lexicalWorkspacePath(workspace.RootPath, relPath)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace path")
 	}
@@ -134,12 +141,16 @@ func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sa
 	if info.Mode()&os.ModeSymlink != 0 {
 		return nil, status.Error(codes.PermissionDenied, "workspace file preview does not follow symlinks")
 	}
+	resolvedPath, err := resolveExistingWorkspacePath(workspace.RootPath, absPath)
+	if err != nil {
+		return nil, status.Error(codes.PermissionDenied, "workspace path escapes workspace root")
+	}
 	if info.IsDir() {
 		return nil, status.Error(codes.FailedPrecondition, "workspace path is a directory")
 	}
 
 	limit := clampPreviewBytes(req.GetMaxBytes(), s.defaultPreviewBytes, s.maxPreviewBytes)
-	file, err := os.Open(absPath)
+	file, err := os.Open(resolvedPath)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "open workspace file: %v", err)
 	}
@@ -174,6 +185,9 @@ func (s *WorkspaceViewService) workspaceAndPath(ctx context.Context, serviceWork
 	if err != nil {
 		return workspacedomain.Workspace{}, "", status.Errorf(codes.Internal, "get hosted workspace: %v", err)
 	}
+	if workspace.RootPath == "" {
+		return workspacedomain.Workspace{}, "", status.Error(codes.FailedPrecondition, "hosted workspace has no root path")
+	}
 	relPath, err := pathdomain.NormalizeWorkspacePath(inputPath, allowRoot)
 	if err != nil {
 		return workspacedomain.Workspace{}, "", status.Error(codes.InvalidArgument, "invalid workspace path")
@@ -194,7 +208,10 @@ func (s *WorkspaceViewService) pathRef(workspace workspacedomain.Workspace, relP
 	}
 }
 
-func joinWorkspacePath(root string, rel string) (string, error) {
+func lexicalWorkspacePath(root string, rel string) (string, error) {
+	if root == "" {
+		return "", pathdomain.ErrInvalidPath
+	}
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
 		return "", err
@@ -208,6 +225,25 @@ func joinWorkspacePath(root string, rel string) (string, error) {
 		return "", pathdomain.ErrInvalidPath
 	}
 	return absPath, nil
+}
+
+func resolveExistingWorkspacePath(root string, absPath string) (string, error) {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	resolvedRoot, err := filepath.EvalSymlinks(absRoot)
+	if err != nil {
+		return "", err
+	}
+	resolvedPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		return "", err
+	}
+	if resolvedPath != resolvedRoot && !strings.HasPrefix(resolvedPath, resolvedRoot+string(os.PathSeparator)) {
+		return "", pathdomain.ErrInvalidPath
+	}
+	return resolvedPath, nil
 }
 
 func parsePageToken(token string) (int, error) {

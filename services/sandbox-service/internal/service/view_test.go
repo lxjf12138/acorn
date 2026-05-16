@@ -78,6 +78,15 @@ func TestWorkspaceViewServiceListWorkspaceDirPagination(t *testing.T) {
 func TestWorkspaceViewServiceListWorkspaceDirErrors(t *testing.T) {
 	view, workspace := newTestViewService(t)
 	writeFile(t, workspace.RootPath, "file.txt", "content")
+	if runtime.GOOS != "windows" {
+		outside := t.TempDir()
+		if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
+			t.Fatalf("write outside secret: %v", err)
+		}
+		if err := os.Symlink(outside, filepath.Join(workspace.RootPath, "linkdir")); err != nil {
+			t.Fatalf("symlink outside dir: %v", err)
+		}
+	}
 	tests := []struct {
 		name string
 		req  *sandboxv1.ListWorkspaceDirRequest
@@ -87,6 +96,13 @@ func TestWorkspaceViewServiceListWorkspaceDirErrors(t *testing.T) {
 		{name: "file path", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, Path: "file.txt"}, code: codes.FailedPrecondition},
 		{name: "traversal", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, Path: "../secret"}, code: codes.InvalidArgument},
 		{name: "bad page token", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, PageToken: "bad"}, code: codes.InvalidArgument},
+	}
+	if runtime.GOOS != "windows" {
+		tests = append(tests, struct {
+			name string
+			req  *sandboxv1.ListWorkspaceDirRequest
+			code codes.Code
+		}{name: "parent symlink escape", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, Path: "linkdir"}, code: codes.PermissionDenied})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -135,6 +151,13 @@ func TestWorkspaceViewServicePreviewWorkspaceFileErrors(t *testing.T) {
 		if err := os.Symlink(filepath.Join(workspace.RootPath, "file.txt"), filepath.Join(workspace.RootPath, "link.txt")); err != nil {
 			t.Fatalf("symlink: %v", err)
 		}
+		outside := t.TempDir()
+		if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
+			t.Fatalf("write outside secret: %v", err)
+		}
+		if err := os.Symlink(outside, filepath.Join(workspace.RootPath, "linkdir")); err != nil {
+			t.Fatalf("symlink outside dir: %v", err)
+		}
 	}
 
 	tests := []struct {
@@ -152,6 +175,11 @@ func TestWorkspaceViewServicePreviewWorkspaceFileErrors(t *testing.T) {
 			req  *sandboxv1.PreviewWorkspaceFileRequest
 			code codes.Code
 		}{name: "symlink", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "link.txt"}, code: codes.PermissionDenied})
+		tests = append(tests, struct {
+			name string
+			req  *sandboxv1.PreviewWorkspaceFileRequest
+			code codes.Code
+		}{name: "parent symlink escape", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "linkdir/secret.txt"}, code: codes.PermissionDenied})
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -160,6 +188,25 @@ func TestWorkspaceViewServicePreviewWorkspaceFileErrors(t *testing.T) {
 				t.Fatalf("expected %s, got %v", tt.code, err)
 			}
 		})
+	}
+}
+
+func TestWorkspaceViewServiceRejectsEmptyRootPath(t *testing.T) {
+	store := workspacedomain.NewMemoryStore()
+	workspace := workspacedomain.Workspace{
+		ID:               "ws-empty-root",
+		SandboxProfileID: "local-process",
+		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
+	}
+	if _, err := store.Create(context.Background(), workspace); err != nil {
+		t.Fatalf("Create workspace returned error: %v", err)
+	}
+	view := NewWorkspaceViewService("sandbox-service", store)
+	if _, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition for list, got %v", err)
+	}
+	if _, err := view.PreviewWorkspaceFile(context.Background(), &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "file.txt"}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition for preview, got %v", err)
 	}
 }
 

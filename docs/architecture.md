@@ -759,30 +759,30 @@ HostedWorkspaceState
 sandbox/v1 proto package split
 View Surface declared in CapabilityDescriptor
 Sandbox Workspace View Surface implementation
+WorkspacePathRef
+ListWorkspaceDir / PreviewWorkspaceFile
+Control Plane workspace view forwarding
 Artifact removed from Phase 1 proto/code path
 ResourceRef / ResourceRecord contract
 Control Plane in-memory ResourceRecord store
-Control Plane resource metadata HTTP API
+Control Plane resource metadata HTTP/gRPC API
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: Workspace View Surface implementation
-  - WorkspacePathRef
-  - ListWorkspaceDir
-  - PreviewWorkspaceFile
-  - Control Plane view forwarding
-  - No ResourceRef creation
-
-PR 2: Workspace Resource Transfer
+PR 1: Workspace Resource Transfer
   - ImportResource
   - ExportWorkspacePath
-  - Export creates ResourceRef
+  - Export creates ResourceRef / ResourceRecord
 
-PR 3: Upload / Download Gateway
+PR 2: Upload / Download Gateway
   - User upload -> ResourceRef
   - ResourceRef download through Control Plane
+
+PR 3: Minimal Sandbox Exec
+  - Execute inside existing HostedWorkspace
+  - Generated files remain WorkspacePathRef until export/download
 ```
 
 ---
