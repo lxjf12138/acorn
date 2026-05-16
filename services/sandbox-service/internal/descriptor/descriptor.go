@@ -155,6 +155,32 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 	}, nil
 }
 
+func (s *Source) SandboxProfile(id string) (*capabilityv1.SandboxProfile, bool) {
+	descriptor, err := s.DescribeCapabilities(context.Background())
+	if err != nil {
+		return nil, false
+	}
+	for _, profile := range descriptor.GetSandboxProfiles() {
+		if profile.GetId() == id {
+			return profile, true
+		}
+	}
+	return nil, false
+}
+
+func (s *Source) DefaultSandboxProfile() (*capabilityv1.SandboxProfile, bool) {
+	descriptor, err := s.DescribeCapabilities(context.Background())
+	if err != nil {
+		return nil, false
+	}
+	for _, profile := range descriptor.GetSandboxProfiles() {
+		if profile.GetDefault() {
+			return profile, true
+		}
+	}
+	return nil, false
+}
+
 func (o Options) withDefaults() Options {
 	if o.ServiceID == "" {
 		o.ServiceID = "sandbox-service"
