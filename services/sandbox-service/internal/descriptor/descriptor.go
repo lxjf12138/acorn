@@ -56,6 +56,8 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 					"describe_capabilities",
 					"health",
 					"version",
+					"create_hosted_workspace",
+					"get_hosted_workspace",
 				},
 			},
 			{
@@ -144,6 +146,15 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				Address:   s.opts.GRPCAddr,
 				Path:      "/acorn.capability.v1.CapabilityDescriptorService/GetCapabilityDescriptor",
 				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED,
+			},
+			{
+				Name:      "workspace-host-grpc",
+				Surface:   "control",
+				Protocol:  "grpc",
+				Transport: "grpc",
+				Address:   s.opts.GRPCAddr,
+				Path:      "/acorn.sandbox.v1.WorkspaceHostService",
+				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 			},
 			{
 				Name:      "agent-mcp",

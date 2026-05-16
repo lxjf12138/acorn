@@ -39,6 +39,14 @@ func TestDescribeCapabilities(t *testing.T) {
 	if status := surfaceStatus(descriptor, "control"); status != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected control surface status: %s", status)
 	}
+	control := surfaceByName(descriptor, "control")
+	if !hasFeature(control, "create_hosted_workspace") || !hasFeature(control, "get_hosted_workspace") {
+		t.Fatalf("control surface missing hosted workspace features: %+v", control.GetFeatures())
+	}
+	state := surfaceByName(descriptor, "state")
+	if state.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL || !hasFeature(state, "workspace_state") {
+		t.Fatalf("unexpected state surface: %+v", state)
+	}
 	if status := surfaceStatus(descriptor, "resource"); status != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
 		t.Fatalf("unexpected resource surface status: %s", status)
 	}
@@ -48,15 +56,22 @@ func TestDescribeCapabilities(t *testing.T) {
 	if endpoint := endpointByName(descriptor, "control-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {
 		t.Fatalf("unexpected control gRPC endpoint: %+v", endpoint)
 	}
+	if endpoint := endpointByName(descriptor, "workspace-host-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceHostService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
+		t.Fatalf("unexpected workspace host gRPC endpoint: %+v", endpoint)
+	}
 }
 
 func surfaceStatus(descriptor *capabilityv1.CapabilityDescriptor, name string) capabilityv1.ImplementationStatus {
+	return surfaceByName(descriptor, name).GetStatus()
+}
+
+func surfaceByName(descriptor *capabilityv1.CapabilityDescriptor, name string) *capabilityv1.SurfaceDescriptor {
 	for _, surface := range descriptor.GetSurfaces() {
 		if surface.GetName() == name {
-			return surface.GetStatus()
+			return surface
 		}
 	}
-	return capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_UNSPECIFIED
+	return nil
 }
 
 func endpointByName(descriptor *capabilityv1.CapabilityDescriptor, name string) *capabilityv1.EndpointDescriptor {
@@ -66,4 +81,13 @@ func endpointByName(descriptor *capabilityv1.CapabilityDescriptor, name string) 
 		}
 	}
 	return nil
+}
+
+func hasFeature(surface *capabilityv1.SurfaceDescriptor, feature string) bool {
+	for _, candidate := range surface.GetFeatures() {
+		if candidate == feature {
+			return true
+		}
+	}
+	return false
 }
