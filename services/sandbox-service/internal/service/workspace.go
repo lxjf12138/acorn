@@ -53,6 +53,9 @@ func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *works
 }
 
 func (s *WorkspaceService) GetHostedWorkspace(ctx context.Context, req *workspacev1.GetHostedWorkspaceRequest) (*workspacev1.GetHostedWorkspaceResponse, error) {
+	if req.GetServiceWorkspaceId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "service_workspace_id is required")
+	}
 	workspace, err := s.store.Get(ctx, req.GetServiceWorkspaceId())
 	if errors.Is(err, workspacedomain.ErrNotFound) {
 		return nil, status.Error(codes.NotFound, "hosted workspace not found")

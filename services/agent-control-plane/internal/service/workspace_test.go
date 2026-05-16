@@ -7,11 +7,15 @@ import (
 
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type fakeWorkspaceHostClient struct {
-	err     error
-	created int
+	err       error
+	created   int
+	hosted    *workspacev1.HostedWorkspace
+	useHosted bool
 }
 
 func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*workspacev1.HostedWorkspace, error) {
@@ -19,6 +23,9 @@ func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessi
 		return nil, f.err
 	}
 	f.created++
+	if f.useHosted {
+		return f.hosted, nil
+	}
 	return &workspacev1.HostedWorkspace{
 		Ref: &workspacev1.WorkspaceHostRef{
 			ServiceId:          "sandbox-service",
@@ -37,7 +44,7 @@ func (f *fakeWorkspaceHostClient) Close() error { return nil }
 
 func TestWorkspaceServiceCreateSessionWorkspace(t *testing.T) {
 	client := &fakeWorkspaceHostClient{}
-	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "local-process")
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
 	record, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1")
 	if err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
@@ -52,7 +59,7 @@ func TestWorkspaceServiceCreateSessionWorkspace(t *testing.T) {
 
 func TestWorkspaceServiceCreateSessionWorkspaceIdempotent(t *testing.T) {
 	client := &fakeWorkspaceHostClient{}
-	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "local-process")
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
 	first, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1")
 	if err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
@@ -71,7 +78,7 @@ func TestWorkspaceServiceCreateSessionWorkspaceIdempotent(t *testing.T) {
 
 func TestWorkspaceServiceDifferentSessionsCreateDifferentRecords(t *testing.T) {
 	client := &fakeWorkspaceHostClient{}
-	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "local-process")
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
 	first, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1")
 	if err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
@@ -88,11 +95,78 @@ func TestWorkspaceServiceDifferentSessionsCreateDifferentRecords(t *testing.T) {
 func TestWorkspaceServiceSandboxFailureDoesNotCreateRecord(t *testing.T) {
 	client := &fakeWorkspaceHostClient{err: errors.New("sandbox unavailable")}
 	store := workspacedomain.NewMemoryStore()
-	service := NewWorkspaceService(store, client, "local-process")
+	service := NewWorkspaceService(store, client, "sandbox-service", "local-process")
 	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err == nil {
 		t.Fatal("expected error")
 	}
 	if _, ok, err := store.GetBySession(context.Background(), "sess-1"); err != nil || ok {
 		t.Fatalf("unexpected stored record after sandbox failure: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestWorkspaceServiceRejectsInvalidHostedWorkspace(t *testing.T) {
+	tests := []struct {
+		name   string
+		hosted *workspacev1.HostedWorkspace
+	}{
+		{
+			name:   "nil workspace",
+			hosted: nil,
+		},
+		{
+			name:   "missing ref",
+			hosted: &workspacev1.HostedWorkspace{},
+		},
+		{
+			name: "missing service id",
+			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+				ServiceWorkspaceId: "ws-1",
+				SandboxProfileId:   "local-process",
+			}},
+		},
+		{
+			name: "missing workspace id",
+			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+				ServiceId:        "sandbox-service",
+				SandboxProfileId: "local-process",
+			}},
+		},
+		{
+			name: "missing profile id",
+			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+				ServiceId:          "sandbox-service",
+				ServiceWorkspaceId: "ws-1",
+			}},
+		},
+		{
+			name: "unexpected service id",
+			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+				ServiceId:          "other-service",
+				ServiceWorkspaceId: "ws-1",
+				SandboxProfileId:   "local-process",
+			}},
+		},
+		{
+			name: "unexpected profile id",
+			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+				ServiceId:          "sandbox-service",
+				ServiceWorkspaceId: "ws-1",
+				SandboxProfileId:   "local-docker",
+			}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeWorkspaceHostClient{hosted: tt.hosted, useHosted: true}
+			store := workspacedomain.NewMemoryStore()
+			service := NewWorkspaceService(store, client, "sandbox-service", "local-process")
+			if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); status.Code(err) != codes.Internal {
+				t.Fatalf("expected Internal, got %v", err)
+			}
+			if _, ok, err := store.GetBySession(context.Background(), "sess-1"); err != nil || ok {
+				t.Fatalf("unexpected stored record after invalid hosted workspace: ok=%v err=%v", ok, err)
+			}
+		})
 	}
 }

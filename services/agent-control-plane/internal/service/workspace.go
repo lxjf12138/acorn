@@ -19,13 +19,15 @@ type WorkspaceService struct {
 	mu               sync.Mutex
 	store            workspacedomain.Store
 	sandboxClient    sandboxclient.WorkspaceHostClient
+	sandboxServiceID string
 	sandboxProfileID string
 }
 
-func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxProfileID string) *WorkspaceService {
+func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
 	return &WorkspaceService{
 		store:            store,
 		sandboxClient:    sandboxClient,
+		sandboxServiceID: sandboxServiceID,
 		sandboxProfileID: sandboxProfileID,
 	}
 }
@@ -51,6 +53,9 @@ func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID
 	if err != nil {
 		return nil, err
 	}
+	if err := validateHostedWorkspace(hosted, s.sandboxServiceID, s.sandboxProfileID); err != nil {
+		return nil, err
+	}
 	now := time.Now().UTC()
 	record, err := s.store.Create(ctx, workspacedomain.Record{
 		SessionID:   sessionID,
@@ -64,6 +69,32 @@ func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID
 		return nil, err
 	}
 	return toProto(record), nil
+}
+
+func validateHostedWorkspace(hosted *workspacev1.HostedWorkspace, expectedServiceID string, expectedProfileID string) error {
+	if hosted == nil {
+		return status.Error(codes.Internal, "sandbox host returned empty workspace")
+	}
+	ref := hosted.GetRef()
+	if ref == nil {
+		return status.Error(codes.Internal, "sandbox host returned workspace without ref")
+	}
+	if ref.GetServiceId() == "" {
+		return status.Error(codes.Internal, "sandbox host returned workspace without service_id")
+	}
+	if ref.GetServiceWorkspaceId() == "" {
+		return status.Error(codes.Internal, "sandbox host returned workspace without service_workspace_id")
+	}
+	if ref.GetSandboxProfileId() == "" {
+		return status.Error(codes.Internal, "sandbox host returned workspace without sandbox_profile_id")
+	}
+	if ref.GetServiceId() != expectedServiceID {
+		return status.Errorf(codes.Internal, "sandbox host returned workspace for unexpected service_id: %s", ref.GetServiceId())
+	}
+	if ref.GetSandboxProfileId() != expectedProfileID {
+		return status.Errorf(codes.Internal, "sandbox host returned workspace for unexpected sandbox_profile_id: %s", ref.GetSandboxProfileId())
+	}
+	return nil
 }
 
 func (s *WorkspaceService) GetSessionWorkspace(ctx context.Context, sessionID string) (*workspacev1.WorkspaceRecord, error) {

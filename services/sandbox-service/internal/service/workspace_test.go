@@ -70,6 +70,14 @@ func TestWorkspaceServiceGetHostedWorkspace(t *testing.T) {
 	}
 }
 
+func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
+	service := newTestWorkspaceService()
+	_, err := service.GetHostedWorkspace(context.Background(), &workspacev1.GetHostedWorkspaceRequest{})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
 func newTestWorkspaceService() *WorkspaceService {
 	return NewWorkspaceService(
 		"sandbox-service",
