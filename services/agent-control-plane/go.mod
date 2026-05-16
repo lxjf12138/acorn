@@ -4,7 +4,10 @@ go 1.26
 
 require (
 	github.com/go-kratos/kratos/v2 v2.9.2
+	github.com/lxjf12138/acorn/packages/api v0.0.0
 	github.com/lxjf12138/acorn/packages/servicekit v0.0.0
+	google.golang.org/grpc v1.67.0
+	google.golang.org/protobuf v1.36.6
 )
 
 require (
@@ -21,9 +24,9 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
-	google.golang.org/grpc v1.67.0 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/lxjf12138/acorn/packages/api => ../../packages/api
 
 replace github.com/lxjf12138/acorn/packages/servicekit => ../../packages/servicekit
