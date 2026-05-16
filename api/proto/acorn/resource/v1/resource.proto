@@ -3,7 +3,6 @@ syntax = "proto3";
 package acorn.resource.v1;
 
 import "acorn/common/v1/common.proto";
-import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1;resourcev1";
 
@@ -21,15 +20,6 @@ message ResourceRef {
   string owner_id = 21;
   string version = 30;
   string content_hash = 31;
-  bytes metadata_json = 100;
-}
-
-message Artifact {
-  string id = 1;
-  ResourceRef resource = 2;
-  string producer_type = 10;
-  string producer_id = 11;
-  google.protobuf.Timestamp created_at = 20;
   bytes metadata_json = 100;
 }
 

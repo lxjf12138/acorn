@@ -9,23 +9,26 @@ The system is organized around:
 - runtime Capability Descriptors
 - sandbox profiles and backends
 - MCP agent-surface adapters
-- Acorn-native control/state/resource/signal/event/governance APIs
+- Acorn-native control/state/view/resource/signal/event/governance APIs
 
 A Capability Service exposes a runtime Capability Descriptor describing:
 
 - Agent Surface
 - Control Surface
-- Signal Surface
 - State Surface
-- Observation Surface
+- View Surface
 - Resource Surface
+- Signal Surface
+- Observation Surface
 - Governance Surface
 - sandbox profiles, when applicable
 - implemented endpoints and transport addresses
 
 The first concrete Capability Service is `sandbox-service`.
 
-Sandbox workspace is owned by `sandbox-service`; it is not a global shared filesystem. Workspace files become `ResourceRef` only after explicit artifact/resource promotion.
+Control Plane owns session and workspace records. `sandbox-service` owns hosted workspaces and their internal files; they are not a global shared filesystem.
+
+Workspace files are not `ResourceRef`s by default. Users may browse or preview them through the Control Plane via the service's View Surface. Browse and preview are temporary and do not create `ResourceRef`s. Explicit export, download, upload, or cross-service transfer uses `ResourceRef`.
 
 Descriptors are generated from the running service and its configuration; they are not static source-of-truth manifests.
 

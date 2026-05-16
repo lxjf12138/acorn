@@ -47,6 +47,10 @@ func TestDescribeCapabilities(t *testing.T) {
 	if state.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL || !hasFeature(state, "workspace_state") {
 		t.Fatalf("unexpected state surface: %+v", state)
 	}
+	view := surfaceByName(descriptor, "view")
+	if view.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED || !hasFeature(view, "list_workspace_dir") || !hasFeature(view, "preview_workspace_file") {
+		t.Fatalf("unexpected view surface: %+v", view)
+	}
 	if status := surfaceStatus(descriptor, "resource"); status != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
 		t.Fatalf("unexpected resource surface status: %s", status)
 	}

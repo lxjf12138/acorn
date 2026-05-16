@@ -72,6 +72,14 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				},
 			},
 			{
+				Name:   "view",
+				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+				Features: []string{
+					"list_workspace_dir",
+					"preview_workspace_file",
+				},
+			},
+			{
 				Name:   "resource",
 				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
 			},

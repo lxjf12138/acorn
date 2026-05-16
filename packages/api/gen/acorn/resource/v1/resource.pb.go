@@ -10,7 +10,6 @@ import (
 	v1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -171,90 +170,6 @@ func (x *ResourceRef) GetMetadataJson() []byte {
 	return nil
 }
 
-type Artifact struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Resource      *ResourceRef           `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
-	ProducerType  string                 `protobuf:"bytes,10,opt,name=producer_type,json=producerType,proto3" json:"producer_type,omitempty"`
-	ProducerId    string                 `protobuf:"bytes,11,opt,name=producer_id,json=producerId,proto3" json:"producer_id,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Artifact) Reset() {
-	*x = Artifact{}
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Artifact) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Artifact) ProtoMessage() {}
-
-func (x *Artifact) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Artifact.ProtoReflect.Descriptor instead.
-func (*Artifact) Descriptor() ([]byte, []int) {
-	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *Artifact) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *Artifact) GetResource() *ResourceRef {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *Artifact) GetProducerType() string {
-	if x != nil {
-		return x.ProducerType
-	}
-	return ""
-}
-
-func (x *Artifact) GetProducerId() string {
-	if x != nil {
-		return x.ProducerId
-	}
-	return ""
-}
-
-func (x *Artifact) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *Artifact) GetMetadataJson() []byte {
-	if x != nil {
-		return x.MetadataJson
-	}
-	return nil
-}
-
 type ListResourcesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scope         *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -268,7 +183,7 @@ type ListResourcesRequest struct {
 
 func (x *ListResourcesRequest) Reset() {
 	*x = ListResourcesRequest{}
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -280,7 +195,7 @@ func (x *ListResourcesRequest) String() string {
 func (*ListResourcesRequest) ProtoMessage() {}
 
 func (x *ListResourcesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -293,7 +208,7 @@ func (x *ListResourcesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResourcesRequest.ProtoReflect.Descriptor instead.
 func (*ListResourcesRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{2}
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ListResourcesRequest) GetScope() *v1.Scope {
@@ -341,7 +256,7 @@ type ListResourcesResponse struct {
 
 func (x *ListResourcesResponse) Reset() {
 	*x = ListResourcesResponse{}
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[3]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -353,7 +268,7 @@ func (x *ListResourcesResponse) String() string {
 func (*ListResourcesResponse) ProtoMessage() {}
 
 func (x *ListResourcesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[3]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +281,7 @@ func (x *ListResourcesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResourcesResponse.ProtoReflect.Descriptor instead.
 func (*ListResourcesResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{3}
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListResourcesResponse) GetResources() []*ResourceRef {
@@ -387,7 +302,7 @@ var File_acorn_resource_v1_resource_proto protoreflect.FileDescriptor
 
 const file_acorn_resource_v1_resource_proto_rawDesc = "" +
 	"\n" +
-	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x82\x03\n" +
+	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\"\x82\x03\n" +
 	"\vResourceRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
 	"\x03uri\x18\x02 \x01(\tR\x03uri\x12\x12\n" +
@@ -406,16 +321,6 @@ const file_acorn_resource_v1_resource_proto_rawDesc = "" +
 	"\bowner_id\x18\x15 \x01(\tR\aownerId\x12\x18\n" +
 	"\aversion\x18\x1e \x01(\tR\aversion\x12!\n" +
 	"\fcontent_hash\x18\x1f \x01(\tR\vcontentHash\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xfc\x01\n" +
-	"\bArtifact\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12:\n" +
-	"\bresource\x18\x02 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\bresource\x12#\n" +
-	"\rproducer_type\x18\n" +
-	" \x01(\tR\fproducerType\x12\x1f\n" +
-	"\vproducer_id\x18\v \x01(\tR\n" +
-	"producerId\x129\n" +
-	"\n" +
-	"created_at\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xc4\x01\n" +
 	"\x14ListResourcesRequest\x12,\n" +
 	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\x1d\n" +
@@ -443,31 +348,27 @@ func file_acorn_resource_v1_resource_proto_rawDescGZIP() []byte {
 	return file_acorn_resource_v1_resource_proto_rawDescData
 }
 
-var file_acorn_resource_v1_resource_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_acorn_resource_v1_resource_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_acorn_resource_v1_resource_proto_goTypes = []any{
 	(*ResourceRef)(nil),           // 0: acorn.resource.v1.ResourceRef
-	(*Artifact)(nil),              // 1: acorn.resource.v1.Artifact
-	(*ListResourcesRequest)(nil),  // 2: acorn.resource.v1.ListResourcesRequest
-	(*ListResourcesResponse)(nil), // 3: acorn.resource.v1.ListResourcesResponse
-	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
-	(*v1.Scope)(nil),              // 5: acorn.common.v1.Scope
-	(*v1.PageRequest)(nil),        // 6: acorn.common.v1.PageRequest
-	(*v1.PageResponse)(nil),       // 7: acorn.common.v1.PageResponse
+	(*ListResourcesRequest)(nil),  // 1: acorn.resource.v1.ListResourcesRequest
+	(*ListResourcesResponse)(nil), // 2: acorn.resource.v1.ListResourcesResponse
+	(*v1.Scope)(nil),              // 3: acorn.common.v1.Scope
+	(*v1.PageRequest)(nil),        // 4: acorn.common.v1.PageRequest
+	(*v1.PageResponse)(nil),       // 5: acorn.common.v1.PageResponse
 }
 var file_acorn_resource_v1_resource_proto_depIdxs = []int32{
-	0, // 0: acorn.resource.v1.Artifact.resource:type_name -> acorn.resource.v1.ResourceRef
-	4, // 1: acorn.resource.v1.Artifact.created_at:type_name -> google.protobuf.Timestamp
-	5, // 2: acorn.resource.v1.ListResourcesRequest.scope:type_name -> acorn.common.v1.Scope
-	6, // 3: acorn.resource.v1.ListResourcesRequest.page:type_name -> acorn.common.v1.PageRequest
-	0, // 4: acorn.resource.v1.ListResourcesResponse.resources:type_name -> acorn.resource.v1.ResourceRef
-	7, // 5: acorn.resource.v1.ListResourcesResponse.page:type_name -> acorn.common.v1.PageResponse
-	2, // 6: acorn.resource.v1.ResourceService.ListResources:input_type -> acorn.resource.v1.ListResourcesRequest
-	3, // 7: acorn.resource.v1.ResourceService.ListResources:output_type -> acorn.resource.v1.ListResourcesResponse
-	7, // [7:8] is the sub-list for method output_type
-	6, // [6:7] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	3, // 0: acorn.resource.v1.ListResourcesRequest.scope:type_name -> acorn.common.v1.Scope
+	4, // 1: acorn.resource.v1.ListResourcesRequest.page:type_name -> acorn.common.v1.PageRequest
+	0, // 2: acorn.resource.v1.ListResourcesResponse.resources:type_name -> acorn.resource.v1.ResourceRef
+	5, // 3: acorn.resource.v1.ListResourcesResponse.page:type_name -> acorn.common.v1.PageResponse
+	1, // 4: acorn.resource.v1.ResourceService.ListResources:input_type -> acorn.resource.v1.ListResourcesRequest
+	2, // 5: acorn.resource.v1.ResourceService.ListResources:output_type -> acorn.resource.v1.ListResourcesResponse
+	5, // [5:6] is the sub-list for method output_type
+	4, // [4:5] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_acorn_resource_v1_resource_proto_init() }
@@ -481,7 +382,7 @@ func file_acorn_resource_v1_resource_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_acorn_resource_v1_resource_proto_rawDesc), len(file_acorn_resource_v1_resource_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
