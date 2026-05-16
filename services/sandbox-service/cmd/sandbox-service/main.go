@@ -8,6 +8,7 @@ import (
 
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/app"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
+	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/version"
@@ -33,8 +34,9 @@ func main() {
 	}, cfg.Log.Level)
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
+	descriptorSource := descriptor.NewSource()
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, logger)
+	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
 	grpcSrv := server.NewGRPCServer(cfg, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
