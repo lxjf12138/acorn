@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 )
 
 var ErrNotFound = errors.New("workspace record not found")
@@ -63,8 +65,11 @@ func (s *MemoryStore) GetBySession(_ context.Context, sessionID string) (Record,
 
 func clone(record Record) Record {
 	if record.CurrentHost != nil {
-		host := *record.CurrentHost
-		record.CurrentHost = &host
+		record.CurrentHost = &workspacev1.WorkspaceHostRef{
+			ServiceId:          record.CurrentHost.GetServiceId(),
+			ServiceWorkspaceId: record.CurrentHost.GetServiceWorkspaceId(),
+			SandboxProfileId:   record.CurrentHost.GetSandboxProfileId(),
+		}
 	}
 	if record.MetadataJSON != nil {
 		record.MetadataJSON = append([]byte(nil), record.MetadataJSON...)
