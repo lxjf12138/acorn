@@ -5,8 +5,7 @@ GO_MODULES := \
 	./services/sandbox-service \
 	./packages/core \
 	./packages/mcp \
-	./packages/signal \
-	./packages/provider-sdk-go
+	./packages/signal
 
 SERVICE_MODULES := \
 	./services/agent-control-plane \

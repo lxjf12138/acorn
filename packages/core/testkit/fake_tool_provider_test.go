@@ -7,9 +7,9 @@ import (
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
 )
 
-func TestFakeProviderEcho(t *testing.T) {
-	provider := NewFakeProviderWithEcho("fake-service")
-	result, err := provider.CallTool(context.Background(), &toolv1.ToolCallRequest{
+func TestFakeToolProviderEcho(t *testing.T) {
+	toolProvider := NewFakeToolProviderWithEcho("fake-service")
+	result, err := toolProvider.CallTool(context.Background(), &toolv1.ToolCallRequest{
 		TargetServiceId: "fake-service",
 		ToolName:        "fake.echo",
 		ArgumentsJson:   []byte(`{"text":"hello"}`),

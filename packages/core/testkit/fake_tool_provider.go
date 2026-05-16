@@ -6,14 +6,14 @@ import (
 	"sync"
 
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
-	providercore "github.com/lxjf12138/acorn/packages/core/provider"
 	toolcore "github.com/lxjf12138/acorn/packages/core/tool"
+	toolprovidercore "github.com/lxjf12138/acorn/packages/core/toolprovider"
 	"google.golang.org/protobuf/proto"
 )
 
 type ToolHandler func(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error)
 
-type FakeProvider struct {
+type FakeToolProvider struct {
 	mu        sync.RWMutex
 	id        string
 	kind      string
@@ -21,9 +21,9 @@ type FakeProvider struct {
 	handlers  map[string]ToolHandler
 }
 
-func NewFakeProvider(providerID string, kind string, tools []*toolv1.ToolSpec) *FakeProvider {
-	fp := &FakeProvider{
-		id:        providerID,
+func NewFakeToolProvider(toolProviderID string, kind string, tools []*toolv1.ToolSpec) *FakeToolProvider {
+	fp := &FakeToolProvider{
+		id:        toolProviderID,
 		kind:      kind,
 		toolSpecs: cloneToolSpecs(tools),
 		handlers:  make(map[string]ToolHandler),
@@ -32,8 +32,8 @@ func NewFakeProvider(providerID string, kind string, tools []*toolv1.ToolSpec) *
 	return fp
 }
 
-func NewFakeProviderWithEcho(providerID string) *FakeProvider {
-	return NewFakeProvider(providerID, "fake", []*toolv1.ToolSpec{
+func NewFakeToolProviderWithEcho(toolProviderID string) *FakeToolProvider {
+	return NewFakeToolProvider(toolProviderID, "fake", []*toolv1.ToolSpec{
 		{
 			Name:             "fake.echo",
 			Description:      "Echo back input text",
@@ -45,25 +45,25 @@ func NewFakeProviderWithEcho(providerID string) *FakeProvider {
 	})
 }
 
-func (f *FakeProvider) ID() string {
+func (f *FakeToolProvider) ID() string {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.id
 }
 
-func (f *FakeProvider) Type() string {
+func (f *FakeToolProvider) Type() string {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return f.kind
 }
 
-func (f *FakeProvider) ListTools(context.Context) ([]*toolv1.ToolSpec, error) {
+func (f *FakeToolProvider) ListTools(context.Context) ([]*toolv1.ToolSpec, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	return cloneToolSpecs(f.toolSpecs), nil
 }
 
-func (f *FakeProvider) CallTool(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error) {
+func (f *FakeToolProvider) CallTool(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error) {
 	f.mu.RLock()
 	handler, ok := f.handlers[req.GetToolName()]
 	f.mu.RUnlock()
@@ -73,13 +73,13 @@ func (f *FakeProvider) CallTool(ctx context.Context, req *toolv1.ToolCallRequest
 	return handler(ctx, proto.Clone(req).(*toolv1.ToolCallRequest))
 }
 
-func (f *FakeProvider) RegisterToolHandler(name string, handler ToolHandler) {
+func (f *FakeToolProvider) RegisterToolHandler(name string, handler ToolHandler) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.handlers[name] = handler
 }
 
-var _ providercore.Provider = (*FakeProvider)(nil)
+var _ toolprovidercore.ToolProvider = (*FakeToolProvider)(nil)
 
 func cloneToolSpecs(tools []*toolv1.ToolSpec) []*toolv1.ToolSpec {
 	out := make([]*toolv1.ToolSpec, 0, len(tools))

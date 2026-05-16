@@ -1,4 +1,4 @@
-package provider
+package toolprovider
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
 )
 
-type Provider interface {
+type ToolProvider interface {
 	ID() string
 	Type() string
 	ListTools(ctx context.Context) ([]*toolv1.ToolSpec, error)

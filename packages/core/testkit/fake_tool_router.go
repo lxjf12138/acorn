@@ -5,31 +5,31 @@ import (
 	"sync"
 
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
-	providercore "github.com/lxjf12138/acorn/packages/core/provider"
 	toolcore "github.com/lxjf12138/acorn/packages/core/tool"
+	toolprovidercore "github.com/lxjf12138/acorn/packages/core/toolprovider"
 )
 
 type FakeToolRouter struct {
-	mu        sync.RWMutex
-	providers map[string]providercore.Provider
+	mu            sync.RWMutex
+	toolProviders map[string]toolprovidercore.ToolProvider
 }
 
 func NewFakeToolRouter() *FakeToolRouter {
-	return &FakeToolRouter{providers: make(map[string]providercore.Provider)}
+	return &FakeToolRouter{toolProviders: make(map[string]toolprovidercore.ToolProvider)}
 }
 
-func (f *FakeToolRouter) AddProvider(provider providercore.Provider) {
+func (f *FakeToolRouter) AddToolProvider(provider toolprovidercore.ToolProvider) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.providers[provider.ID()] = provider
+	f.toolProviders[provider.ID()] = provider
 }
 
 func (f *FakeToolRouter) CallTool(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error) {
 	f.mu.RLock()
-	provider, ok := f.providers[req.GetTargetServiceId()]
+	provider, ok := f.toolProviders[req.GetTargetServiceId()]
 	f.mu.RUnlock()
 	if !ok {
-		return nil, providercore.ErrProviderNotFound
+		return nil, toolprovidercore.ErrToolProviderNotFound
 	}
 	return provider.CallTool(ctx, req)
 }

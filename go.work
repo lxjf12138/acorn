@@ -4,7 +4,6 @@ use (
 	./packages/api
 	./packages/core
 	./packages/mcp
-	./packages/provider-sdk-go
 	./packages/servicekit
 	./packages/signal
 	./services/agent-control-plane

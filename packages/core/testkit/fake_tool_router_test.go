@@ -7,9 +7,9 @@ import (
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
 )
 
-func TestFakeToolRouterRoutesToProvider(t *testing.T) {
+func TestFakeToolRouterRoutesToToolProvider(t *testing.T) {
 	router := NewFakeToolRouter()
-	router.AddProvider(NewFakeProviderWithEcho("fake-service"))
+	router.AddToolProvider(NewFakeToolProviderWithEcho("fake-service"))
 
 	result, err := router.CallTool(context.Background(), &toolv1.ToolCallRequest{
 		TargetServiceId: "fake-service",
