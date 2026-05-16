@@ -34,10 +34,11 @@ func main() {
 	}, cfg.Log.Level)
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
-	descriptorSource := descriptor.NewSource()
+	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version)
+	descriptorService := service.NewDescriptorService(descriptorSource)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
-	grpcSrv := server.NewGRPCServer(cfg, logger)
+	grpcSrv := server.NewGRPCServer(cfg, descriptorService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

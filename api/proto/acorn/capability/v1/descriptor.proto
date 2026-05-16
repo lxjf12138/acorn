@@ -25,6 +25,7 @@ message CapabilityDescriptor {
   repeated SurfaceDescriptor surfaces = 10;
   AgentSurfaceDescriptor agent_surface = 20;
   repeated SandboxProfile sandbox_profiles = 30;
+  repeated EndpointDescriptor endpoints = 40;
 
   bytes metadata_json = 100;
 }
@@ -42,9 +43,21 @@ message AgentSurfaceDescriptor {
 }
 
 message MCPAgentSurface {
-  string transport = 1;
-  string endpoint = 2;
-  repeated acorn.tool.v1.ToolSpec tools = 3;
+  ImplementationStatus status = 1;
+  string transport = 2;
+  string endpoint = 3;
+  repeated acorn.tool.v1.ToolSpec tools = 4;
+  bytes metadata_json = 100;
+}
+
+message EndpointDescriptor {
+  string name = 1;
+  string surface = 2;
+  string protocol = 3;
+  string transport = 4;
+  string address = 5;
+  string path = 6;
+  ImplementationStatus status = 10;
   bytes metadata_json = 100;
 }
 
@@ -65,7 +78,7 @@ message SandboxProfile {
 message GetCapabilityDescriptorRequest {}
 
 message GetCapabilityDescriptorResponse {
-  CapabilityDescriptor descriptor = 1;
+  CapabilityDescriptor capability_descriptor = 1;
 }
 
 service CapabilityDescriptorService {

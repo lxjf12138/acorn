@@ -21,9 +21,12 @@ A Capability Service exposes a runtime Capability Descriptor describing:
 - Resource Surface
 - Governance Surface
 - sandbox profiles, when applicable
+- implemented endpoints and transport addresses
 
 The first concrete Capability Service is `sandbox-service`.
 
 Sandbox workspace is owned by `sandbox-service`; it is not a global shared filesystem. Workspace files become `ResourceRef` only after explicit artifact/resource promotion.
+
+Descriptors are generated from the running service and its configuration; they are not static source-of-truth manifests.
 
 See [`docs/architecture.md`](docs/architecture.md).

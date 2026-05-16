@@ -434,7 +434,9 @@ governance hooks
 sandbox/backend profiles when applicable
 ```
 
-The descriptor may be generated from code registration. Static descriptors may be used for development, but runtime registration should reflect actual implemented surfaces.
+The descriptor should be generated from runtime configuration and code registration. It is not a static source-of-truth manifest.
+
+Endpoint descriptors should state which surface an endpoint serves, which protocol and transport it uses, where it can be reached, and whether it is declared, experimental, or implemented.
 
 ### 6.1 Example Descriptor
 
@@ -446,28 +448,42 @@ contract: acorn.sandbox
 version: dev
 
 endpoints:
-  control:
-    grpc: localhost:9001
-    http: localhost:8001
-  agent:
-    mcp:
-      transport: http
-      endpoint: http://localhost:8001/mcp
+  - name: control-http
+    surface: control
+    protocol: http
+    transport: http
+    address: localhost:8001
+    path: /capability/descriptor
+    status: implemented
+  - name: control-grpc
+    surface: control
+    protocol: grpc
+    transport: grpc
+    address: localhost:9001
+    path: /acorn.capability.v1.CapabilityDescriptorService/GetCapabilityDescriptor
+    status: implemented
+  - name: agent-mcp
+    surface: agent
+    protocol: mcp
+    transport: http
+    address: localhost:8001
+    path: /mcp
+    status: declared
 
 agent_surface:
-  protocol: mcp
-  tools:
-    - name: sandbox.exec
-    - name: sandbox.read_file
-    - name: sandbox.write_file
-    - name: sandbox.list_dir
-    - name: sandbox.present_files
+  status: declared
+  mcp:
+    - status: declared
+      transport: http
+      endpoint: /mcp
+      tools: []
 
 control_surface:
+  status: experimental
   features:
     - describe_capabilities
-    - create_workspace
-    - destroy_workspace
+    - health
+    - version
     - import_resource
     - create_artifact_from_path
     - export_resource

@@ -88,6 +88,7 @@ type CapabilityDescriptor struct {
 	Surfaces        []*SurfaceDescriptor    `protobuf:"bytes,10,rep,name=surfaces,proto3" json:"surfaces,omitempty"`
 	AgentSurface    *AgentSurfaceDescriptor `protobuf:"bytes,20,opt,name=agent_surface,json=agentSurface,proto3" json:"agent_surface,omitempty"`
 	SandboxProfiles []*SandboxProfile       `protobuf:"bytes,30,rep,name=sandbox_profiles,json=sandboxProfiles,proto3" json:"sandbox_profiles,omitempty"`
+	Endpoints       []*EndpointDescriptor   `protobuf:"bytes,40,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
 	MetadataJson    []byte                  `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -182,6 +183,13 @@ func (x *CapabilityDescriptor) GetAgentSurface() *AgentSurfaceDescriptor {
 func (x *CapabilityDescriptor) GetSandboxProfiles() []*SandboxProfile {
 	if x != nil {
 		return x.SandboxProfiles
+	}
+	return nil
+}
+
+func (x *CapabilityDescriptor) GetEndpoints() []*EndpointDescriptor {
+	if x != nil {
+		return x.Endpoints
 	}
 	return nil
 }
@@ -315,9 +323,10 @@ func (x *AgentSurfaceDescriptor) GetMcp() []*MCPAgentSurface {
 
 type MCPAgentSurface struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Transport     string                 `protobuf:"bytes,1,opt,name=transport,proto3" json:"transport,omitempty"`
-	Endpoint      string                 `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
-	Tools         []*v1.ToolSpec         `protobuf:"bytes,3,rep,name=tools,proto3" json:"tools,omitempty"`
+	Status        ImplementationStatus   `protobuf:"varint,1,opt,name=status,proto3,enum=acorn.capability.v1.ImplementationStatus" json:"status,omitempty"`
+	Transport     string                 `protobuf:"bytes,2,opt,name=transport,proto3" json:"transport,omitempty"`
+	Endpoint      string                 `protobuf:"bytes,3,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
+	Tools         []*v1.ToolSpec         `protobuf:"bytes,4,rep,name=tools,proto3" json:"tools,omitempty"`
 	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -353,6 +362,13 @@ func (*MCPAgentSurface) Descriptor() ([]byte, []int) {
 	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{3}
 }
 
+func (x *MCPAgentSurface) GetStatus() ImplementationStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ImplementationStatus_IMPLEMENTATION_STATUS_UNSPECIFIED
+}
+
 func (x *MCPAgentSurface) GetTransport() string {
 	if x != nil {
 		return x.Transport
@@ -381,6 +397,106 @@ func (x *MCPAgentSurface) GetMetadataJson() []byte {
 	return nil
 }
 
+type EndpointDescriptor struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Surface       string                 `protobuf:"bytes,2,opt,name=surface,proto3" json:"surface,omitempty"`
+	Protocol      string                 `protobuf:"bytes,3,opt,name=protocol,proto3" json:"protocol,omitempty"`
+	Transport     string                 `protobuf:"bytes,4,opt,name=transport,proto3" json:"transport,omitempty"`
+	Address       string                 `protobuf:"bytes,5,opt,name=address,proto3" json:"address,omitempty"`
+	Path          string                 `protobuf:"bytes,6,opt,name=path,proto3" json:"path,omitempty"`
+	Status        ImplementationStatus   `protobuf:"varint,10,opt,name=status,proto3,enum=acorn.capability.v1.ImplementationStatus" json:"status,omitempty"`
+	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndpointDescriptor) Reset() {
+	*x = EndpointDescriptor{}
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndpointDescriptor) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndpointDescriptor) ProtoMessage() {}
+
+func (x *EndpointDescriptor) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndpointDescriptor.ProtoReflect.Descriptor instead.
+func (*EndpointDescriptor) Descriptor() ([]byte, []int) {
+	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *EndpointDescriptor) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *EndpointDescriptor) GetSurface() string {
+	if x != nil {
+		return x.Surface
+	}
+	return ""
+}
+
+func (x *EndpointDescriptor) GetProtocol() string {
+	if x != nil {
+		return x.Protocol
+	}
+	return ""
+}
+
+func (x *EndpointDescriptor) GetTransport() string {
+	if x != nil {
+		return x.Transport
+	}
+	return ""
+}
+
+func (x *EndpointDescriptor) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *EndpointDescriptor) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *EndpointDescriptor) GetStatus() ImplementationStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ImplementationStatus_IMPLEMENTATION_STATUS_UNSPECIFIED
+}
+
+func (x *EndpointDescriptor) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
 type SandboxProfile struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -398,7 +514,7 @@ type SandboxProfile struct {
 
 func (x *SandboxProfile) Reset() {
 	*x = SandboxProfile{}
-	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[4]
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -410,7 +526,7 @@ func (x *SandboxProfile) String() string {
 func (*SandboxProfile) ProtoMessage() {}
 
 func (x *SandboxProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[4]
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -423,7 +539,7 @@ func (x *SandboxProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SandboxProfile.ProtoReflect.Descriptor instead.
 func (*SandboxProfile) Descriptor() ([]byte, []int) {
-	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{4}
+	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SandboxProfile) GetId() string {
@@ -497,7 +613,7 @@ type GetCapabilityDescriptorRequest struct {
 
 func (x *GetCapabilityDescriptorRequest) Reset() {
 	*x = GetCapabilityDescriptorRequest{}
-	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[5]
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -509,7 +625,7 @@ func (x *GetCapabilityDescriptorRequest) String() string {
 func (*GetCapabilityDescriptorRequest) ProtoMessage() {}
 
 func (x *GetCapabilityDescriptorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[5]
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,19 +638,19 @@ func (x *GetCapabilityDescriptorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCapabilityDescriptorRequest.ProtoReflect.Descriptor instead.
 func (*GetCapabilityDescriptorRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{5}
+	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{6}
 }
 
 type GetCapabilityDescriptorResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Descriptor_   *CapabilityDescriptor  `protobuf:"bytes,1,opt,name=descriptor,proto3" json:"descriptor,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	CapabilityDescriptor *CapabilityDescriptor  `protobuf:"bytes,1,opt,name=capability_descriptor,json=capabilityDescriptor,proto3" json:"capability_descriptor,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *GetCapabilityDescriptorResponse) Reset() {
 	*x = GetCapabilityDescriptorResponse{}
-	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[6]
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -546,7 +662,7 @@ func (x *GetCapabilityDescriptorResponse) String() string {
 func (*GetCapabilityDescriptorResponse) ProtoMessage() {}
 
 func (x *GetCapabilityDescriptorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[6]
+	mi := &file_acorn_capability_v1_descriptor_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -559,12 +675,12 @@ func (x *GetCapabilityDescriptorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCapabilityDescriptorResponse.ProtoReflect.Descriptor instead.
 func (*GetCapabilityDescriptorResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{6}
+	return file_acorn_capability_v1_descriptor_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *GetCapabilityDescriptorResponse) GetDescriptor_() *CapabilityDescriptor {
+func (x *GetCapabilityDescriptorResponse) GetCapabilityDescriptor() *CapabilityDescriptor {
 	if x != nil {
-		return x.Descriptor_
+		return x.CapabilityDescriptor
 	}
 	return nil
 }
@@ -573,7 +689,7 @@ var File_acorn_capability_v1_descriptor_proto protoreflect.FileDescriptor
 
 const file_acorn_capability_v1_descriptor_proto_rawDesc = "" +
 	"\n" +
-	"$acorn/capability/v1/descriptor.proto\x12\x13acorn.capability.v1\x1a\x18acorn/tool/v1/tool.proto\"\xcf\x03\n" +
+	"$acorn/capability/v1/descriptor.proto\x12\x13acorn.capability.v1\x1a\x18acorn/tool/v1/tool.proto\"\x96\x04\n" +
 	"\x14CapabilityDescriptor\x12\x1d\n" +
 	"\n" +
 	"service_id\x18\x01 \x01(\tR\tserviceId\x12\x12\n" +
@@ -585,7 +701,8 @@ const file_acorn_capability_v1_descriptor_proto_rawDesc = "" +
 	"\bsurfaces\x18\n" +
 	" \x03(\v2&.acorn.capability.v1.SurfaceDescriptorR\bsurfaces\x12P\n" +
 	"\ragent_surface\x18\x14 \x01(\v2+.acorn.capability.v1.AgentSurfaceDescriptorR\fagentSurface\x12N\n" +
-	"\x10sandbox_profiles\x18\x1e \x03(\v2#.acorn.capability.v1.SandboxProfileR\x0fsandboxProfiles\x12#\n" +
+	"\x10sandbox_profiles\x18\x1e \x03(\v2#.acorn.capability.v1.SandboxProfileR\x0fsandboxProfiles\x12E\n" +
+	"\tendpoints\x18( \x03(\v2'.acorn.capability.v1.EndpointDescriptorR\tendpoints\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xab\x01\n" +
 	"\x11SurfaceDescriptor\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12A\n" +
@@ -594,11 +711,22 @@ const file_acorn_capability_v1_descriptor_proto_rawDesc = "" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x93\x01\n" +
 	"\x16AgentSurfaceDescriptor\x12A\n" +
 	"\x06status\x18\x01 \x01(\x0e2).acorn.capability.v1.ImplementationStatusR\x06status\x126\n" +
-	"\x03mcp\x18\x02 \x03(\v2$.acorn.capability.v1.MCPAgentSurfaceR\x03mcp\"\x9f\x01\n" +
-	"\x0fMCPAgentSurface\x12\x1c\n" +
-	"\ttransport\x18\x01 \x01(\tR\ttransport\x12\x1a\n" +
-	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12-\n" +
-	"\x05tools\x18\x03 \x03(\v2\x17.acorn.tool.v1.ToolSpecR\x05tools\x12#\n" +
+	"\x03mcp\x18\x02 \x03(\v2$.acorn.capability.v1.MCPAgentSurfaceR\x03mcp\"\xe2\x01\n" +
+	"\x0fMCPAgentSurface\x12A\n" +
+	"\x06status\x18\x01 \x01(\x0e2).acorn.capability.v1.ImplementationStatusR\x06status\x12\x1c\n" +
+	"\ttransport\x18\x02 \x01(\tR\ttransport\x12\x1a\n" +
+	"\bendpoint\x18\x03 \x01(\tR\bendpoint\x12-\n" +
+	"\x05tools\x18\x04 \x03(\v2\x17.acorn.tool.v1.ToolSpecR\x05tools\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x92\x02\n" +
+	"\x12EndpointDescriptor\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x18\n" +
+	"\asurface\x18\x02 \x01(\tR\asurface\x12\x1a\n" +
+	"\bprotocol\x18\x03 \x01(\tR\bprotocol\x12\x1c\n" +
+	"\ttransport\x18\x04 \x01(\tR\ttransport\x12\x18\n" +
+	"\aaddress\x18\x05 \x01(\tR\aaddress\x12\x12\n" +
+	"\x04path\x18\x06 \x01(\tR\x04path\x12A\n" +
+	"\x06status\x18\n" +
+	" \x01(\x0e2).acorn.capability.v1.ImplementationStatusR\x06status\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xbf\x02\n" +
 	"\x0eSandboxProfile\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
@@ -611,11 +739,9 @@ const file_acorn_capability_v1_descriptor_proto_rawDesc = "" +
 	" \x01(\x0e2).acorn.capability.v1.ImplementationStatusR\x06status\x12\"\n" +
 	"\fcapabilities\x18\x14 \x03(\tR\fcapabilities\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\" \n" +
-	"\x1eGetCapabilityDescriptorRequest\"l\n" +
-	"\x1fGetCapabilityDescriptorResponse\x12I\n" +
-	"\n" +
-	"descriptor\x18\x01 \x01(\v2).acorn.capability.v1.CapabilityDescriptorR\n" +
-	"descriptor*\xd4\x01\n" +
+	"\x1eGetCapabilityDescriptorRequest\"\x81\x01\n" +
+	"\x1fGetCapabilityDescriptorResponse\x12^\n" +
+	"\x15capability_descriptor\x18\x01 \x01(\v2).acorn.capability.v1.CapabilityDescriptorR\x14capabilityDescriptor*\xd4\x01\n" +
 	"\x14ImplementationStatus\x12%\n" +
 	"!IMPLEMENTATION_STATUS_UNSPECIFIED\x10\x00\x12\"\n" +
 	"\x1eIMPLEMENTATION_STATUS_DISABLED\x10\x01\x12\"\n" +
@@ -638,35 +764,39 @@ func file_acorn_capability_v1_descriptor_proto_rawDescGZIP() []byte {
 }
 
 var file_acorn_capability_v1_descriptor_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_acorn_capability_v1_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_acorn_capability_v1_descriptor_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_acorn_capability_v1_descriptor_proto_goTypes = []any{
 	(ImplementationStatus)(0),               // 0: acorn.capability.v1.ImplementationStatus
 	(*CapabilityDescriptor)(nil),            // 1: acorn.capability.v1.CapabilityDescriptor
 	(*SurfaceDescriptor)(nil),               // 2: acorn.capability.v1.SurfaceDescriptor
 	(*AgentSurfaceDescriptor)(nil),          // 3: acorn.capability.v1.AgentSurfaceDescriptor
 	(*MCPAgentSurface)(nil),                 // 4: acorn.capability.v1.MCPAgentSurface
-	(*SandboxProfile)(nil),                  // 5: acorn.capability.v1.SandboxProfile
-	(*GetCapabilityDescriptorRequest)(nil),  // 6: acorn.capability.v1.GetCapabilityDescriptorRequest
-	(*GetCapabilityDescriptorResponse)(nil), // 7: acorn.capability.v1.GetCapabilityDescriptorResponse
-	(*v1.ToolSpec)(nil),                     // 8: acorn.tool.v1.ToolSpec
+	(*EndpointDescriptor)(nil),              // 5: acorn.capability.v1.EndpointDescriptor
+	(*SandboxProfile)(nil),                  // 6: acorn.capability.v1.SandboxProfile
+	(*GetCapabilityDescriptorRequest)(nil),  // 7: acorn.capability.v1.GetCapabilityDescriptorRequest
+	(*GetCapabilityDescriptorResponse)(nil), // 8: acorn.capability.v1.GetCapabilityDescriptorResponse
+	(*v1.ToolSpec)(nil),                     // 9: acorn.tool.v1.ToolSpec
 }
 var file_acorn_capability_v1_descriptor_proto_depIdxs = []int32{
 	2,  // 0: acorn.capability.v1.CapabilityDescriptor.surfaces:type_name -> acorn.capability.v1.SurfaceDescriptor
 	3,  // 1: acorn.capability.v1.CapabilityDescriptor.agent_surface:type_name -> acorn.capability.v1.AgentSurfaceDescriptor
-	5,  // 2: acorn.capability.v1.CapabilityDescriptor.sandbox_profiles:type_name -> acorn.capability.v1.SandboxProfile
-	0,  // 3: acorn.capability.v1.SurfaceDescriptor.status:type_name -> acorn.capability.v1.ImplementationStatus
-	0,  // 4: acorn.capability.v1.AgentSurfaceDescriptor.status:type_name -> acorn.capability.v1.ImplementationStatus
-	4,  // 5: acorn.capability.v1.AgentSurfaceDescriptor.mcp:type_name -> acorn.capability.v1.MCPAgentSurface
-	8,  // 6: acorn.capability.v1.MCPAgentSurface.tools:type_name -> acorn.tool.v1.ToolSpec
-	0,  // 7: acorn.capability.v1.SandboxProfile.status:type_name -> acorn.capability.v1.ImplementationStatus
-	1,  // 8: acorn.capability.v1.GetCapabilityDescriptorResponse.descriptor:type_name -> acorn.capability.v1.CapabilityDescriptor
-	6,  // 9: acorn.capability.v1.CapabilityDescriptorService.GetCapabilityDescriptor:input_type -> acorn.capability.v1.GetCapabilityDescriptorRequest
-	7,  // 10: acorn.capability.v1.CapabilityDescriptorService.GetCapabilityDescriptor:output_type -> acorn.capability.v1.GetCapabilityDescriptorResponse
-	10, // [10:11] is the sub-list for method output_type
-	9,  // [9:10] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	6,  // 2: acorn.capability.v1.CapabilityDescriptor.sandbox_profiles:type_name -> acorn.capability.v1.SandboxProfile
+	5,  // 3: acorn.capability.v1.CapabilityDescriptor.endpoints:type_name -> acorn.capability.v1.EndpointDescriptor
+	0,  // 4: acorn.capability.v1.SurfaceDescriptor.status:type_name -> acorn.capability.v1.ImplementationStatus
+	0,  // 5: acorn.capability.v1.AgentSurfaceDescriptor.status:type_name -> acorn.capability.v1.ImplementationStatus
+	4,  // 6: acorn.capability.v1.AgentSurfaceDescriptor.mcp:type_name -> acorn.capability.v1.MCPAgentSurface
+	0,  // 7: acorn.capability.v1.MCPAgentSurface.status:type_name -> acorn.capability.v1.ImplementationStatus
+	9,  // 8: acorn.capability.v1.MCPAgentSurface.tools:type_name -> acorn.tool.v1.ToolSpec
+	0,  // 9: acorn.capability.v1.EndpointDescriptor.status:type_name -> acorn.capability.v1.ImplementationStatus
+	0,  // 10: acorn.capability.v1.SandboxProfile.status:type_name -> acorn.capability.v1.ImplementationStatus
+	1,  // 11: acorn.capability.v1.GetCapabilityDescriptorResponse.capability_descriptor:type_name -> acorn.capability.v1.CapabilityDescriptor
+	7,  // 12: acorn.capability.v1.CapabilityDescriptorService.GetCapabilityDescriptor:input_type -> acorn.capability.v1.GetCapabilityDescriptorRequest
+	8,  // 13: acorn.capability.v1.CapabilityDescriptorService.GetCapabilityDescriptor:output_type -> acorn.capability.v1.GetCapabilityDescriptorResponse
+	13, // [13:14] is the sub-list for method output_type
+	12, // [12:13] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_acorn_capability_v1_descriptor_proto_init() }
@@ -680,7 +810,7 @@ func file_acorn_capability_v1_descriptor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_acorn_capability_v1_descriptor_proto_rawDesc), len(file_acorn_capability_v1_descriptor_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
