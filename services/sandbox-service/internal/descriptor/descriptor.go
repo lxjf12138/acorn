@@ -73,7 +73,7 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 			},
 			{
 				Name:   "view",
-				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 				Features: []string{
 					"list_workspace_dir",
 					"preview_workspace_file",
@@ -172,6 +172,15 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				Address:   s.opts.HTTPAddr,
 				Path:      s.opts.MCPEndpoint,
 				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+			},
+			{
+				Name:      "workspace-view-grpc",
+				Surface:   "view",
+				Protocol:  "grpc",
+				Transport: "grpc",
+				Address:   s.opts.GRPCAddr,
+				Path:      "/acorn.sandbox.v1.WorkspaceViewService",
+				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 			},
 		},
 	}, nil

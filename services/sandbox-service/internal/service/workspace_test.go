@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
@@ -13,7 +15,7 @@ import (
 )
 
 func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	resp, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{})
 	if err != nil {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
@@ -25,10 +27,13 @@ func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
 	if resp.GetWorkspace().GetStatus() != workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE {
 		t.Fatalf("unexpected status: %s", resp.GetWorkspace().GetStatus())
 	}
+	if _, err := os.Stat(service.storeRootForTest(resp.GetWorkspace().GetRef().GetServiceWorkspaceId())); err != nil {
+		t.Fatalf("workspace root was not created: %v", err)
+	}
 }
 
 func TestWorkspaceServiceCreateHostedWorkspaceExplicitProfile(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	resp, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
 		SandboxProfileId: "local-docker",
 		DisplayName:      "docker workspace",
@@ -45,7 +50,7 @@ func TestWorkspaceServiceCreateHostedWorkspaceExplicitProfile(t *testing.T) {
 }
 
 func TestWorkspaceServiceCreateHostedWorkspaceUnknownProfile(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	_, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
 		SandboxProfileId: "missing",
 	})
@@ -55,7 +60,7 @@ func TestWorkspaceServiceCreateHostedWorkspaceUnknownProfile(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspace(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	created, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{})
 	if err != nil {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
@@ -72,7 +77,7 @@ func TestWorkspaceServiceGetHostedWorkspace(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	_, err := service.GetHostedWorkspace(context.Background(), &sandboxv1.GetHostedWorkspaceRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
@@ -80,7 +85,7 @@ func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	created, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
 		SandboxProfileId: "local-process",
 	})
@@ -118,7 +123,7 @@ func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceStateEmptyID(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	_, err := service.GetHostedWorkspaceState(context.Background(), &sandboxv1.GetHostedWorkspaceStateRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
@@ -126,7 +131,7 @@ func TestWorkspaceServiceGetHostedWorkspaceStateEmptyID(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceStateNotFound(t *testing.T) {
-	service := newTestWorkspaceService()
+	service := newTestWorkspaceService(t)
 	_, err := service.GetHostedWorkspaceState(context.Background(), &sandboxv1.GetHostedWorkspaceStateRequest{
 		ServiceWorkspaceId: "missing",
 	})
@@ -135,10 +140,16 @@ func TestWorkspaceServiceGetHostedWorkspaceStateNotFound(t *testing.T) {
 	}
 }
 
-func newTestWorkspaceService() *WorkspaceService {
+func newTestWorkspaceService(t *testing.T) *WorkspaceService {
+	root := t.TempDir()
 	return NewWorkspaceService(
 		"sandbox-service-id",
+		root,
 		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id"}),
 		workspacedomain.NewMemoryStore(),
 	)
+}
+
+func (s *WorkspaceService) storeRootForTest(workspaceID string) string {
+	return filepath.Join(s.rootPath, workspaceID)
 }

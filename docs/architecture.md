@@ -470,6 +470,12 @@ View results are bounded and temporary.
 Viewed content is not persisted in ResourceCatalog.
 ```
 
+`sandbox-service` currently implements `ListWorkspaceDir` and
+`PreviewWorkspaceFile` experimentally through `WorkspaceViewService`. The
+Control Plane forwards session-scoped workspace view requests to the current
+`WorkspaceHostRef` and validates returned path refs against the session's
+`WorkspaceRecord`.
+
 ### 6.4 Resource Surface
 
 User-facing and cross-service content exchange APIs.
@@ -720,8 +726,8 @@ api/proto/acorn/sandbox/v1/
   # HostedWorkspaceState
   # WorkspaceHostService
 
-  path.proto       # future WorkspacePathRef
-  view.proto       # future ListWorkspaceDir / PreviewWorkspaceFile
+  path.proto       # WorkspacePathRef
+  view.proto       # ListWorkspaceDir / PreviewWorkspaceFile
   transfer.proto   # future ImportResource / ExportWorkspacePath
 
 api/proto/acorn/resource/v1/
@@ -752,6 +758,7 @@ WorkspaceRecord / HostedWorkspace
 HostedWorkspaceState
 sandbox/v1 proto package split
 View Surface declared in CapabilityDescriptor
+Sandbox Workspace View Surface implementation
 Artifact removed from Phase 1 proto/code path
 ResourceRef / ResourceRecord contract
 Control Plane in-memory ResourceRecord store

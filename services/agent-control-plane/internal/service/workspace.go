@@ -147,6 +147,71 @@ func (s *WorkspaceService) GetSessionWorkspaceState(ctx context.Context, session
 	}, nil
 }
 
+func (s *WorkspaceService) ListSessionWorkspaceDir(ctx context.Context, sessionID string, userID string, path string, pageSize int32, pageToken string) (*sandboxv1.ListWorkspaceDirResponse, error) {
+	record, err := s.getWorkspaceRecordForView(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.sandboxClient.ListWorkspaceDir(ctx, sandboxclient.ListWorkspaceDirInput{
+		SessionID:          record.SessionID,
+		UserID:             userIDOrRecord(userID, record.OwnerUserID),
+		ServiceWorkspaceID: record.CurrentHost.GetServiceWorkspaceId(),
+		Path:               path,
+		PageSize:           pageSize,
+		PageToken:          pageToken,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWorkspacePathRef(resp.GetDirectory(), record.CurrentHost); err != nil {
+		return nil, err
+	}
+	for _, entry := range resp.GetEntries() {
+		if err := validateWorkspacePathRef(entry.GetRef(), record.CurrentHost); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
+}
+
+func (s *WorkspaceService) PreviewSessionWorkspaceFile(ctx context.Context, sessionID string, userID string, path string, maxBytes int64) (*sandboxv1.PreviewWorkspaceFileResponse, error) {
+	record, err := s.getWorkspaceRecordForView(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := s.sandboxClient.PreviewWorkspaceFile(ctx, sandboxclient.PreviewWorkspaceFileInput{
+		SessionID:          record.SessionID,
+		UserID:             userIDOrRecord(userID, record.OwnerUserID),
+		ServiceWorkspaceID: record.CurrentHost.GetServiceWorkspaceId(),
+		Path:               path,
+		MaxBytes:           maxBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWorkspacePathRef(resp.GetFile(), record.CurrentHost); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (s *WorkspaceService) getWorkspaceRecordForView(ctx context.Context, sessionID string) (workspacedomain.Record, error) {
+	if sessionID == "" {
+		return workspacedomain.Record{}, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+	record, ok, err := s.store.GetBySession(ctx, sessionID)
+	if err != nil {
+		return workspacedomain.Record{}, err
+	}
+	if !ok {
+		return workspacedomain.Record{}, status.Error(codes.NotFound, "workspace record not found for session")
+	}
+	if record.CurrentHost == nil || record.CurrentHost.GetServiceWorkspaceId() == "" {
+		return workspacedomain.Record{}, status.Error(codes.FailedPrecondition, "workspace record has no current host")
+	}
+	return record, nil
+}
+
 func validateHostedWorkspaceState(state *sandboxv1.HostedWorkspaceState, expectedRef *workspacev1.WorkspaceHostRef) error {
 	if state == nil {
 		return status.Error(codes.Internal, "sandbox host returned empty workspace state")
@@ -168,6 +233,36 @@ func validateHostedWorkspaceState(state *sandboxv1.HostedWorkspaceState, expecte
 		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected sandbox_profile_id: %s", ref.GetSandboxProfileId())
 	}
 	return nil
+}
+
+func validateWorkspacePathRef(ref *sandboxv1.WorkspacePathRef, expectedRef *workspacev1.WorkspaceHostRef) error {
+	if ref == nil {
+		return status.Error(codes.Internal, "sandbox host returned workspace path without ref")
+	}
+	if expectedRef == nil {
+		return status.Error(codes.FailedPrecondition, "workspace record has no current host")
+	}
+	workspaceRef := ref.GetWorkspace()
+	if workspaceRef == nil {
+		return status.Error(codes.Internal, "sandbox host returned workspace path without workspace ref")
+	}
+	if workspaceRef.GetServiceId() != expectedRef.GetServiceId() {
+		return status.Errorf(codes.Internal, "sandbox host returned path for unexpected service_id: %s", workspaceRef.GetServiceId())
+	}
+	if workspaceRef.GetServiceWorkspaceId() != expectedRef.GetServiceWorkspaceId() {
+		return status.Errorf(codes.Internal, "sandbox host returned path for unexpected service_workspace_id: %s", workspaceRef.GetServiceWorkspaceId())
+	}
+	if workspaceRef.GetSandboxProfileId() != expectedRef.GetSandboxProfileId() {
+		return status.Errorf(codes.Internal, "sandbox host returned path for unexpected sandbox_profile_id: %s", workspaceRef.GetSandboxProfileId())
+	}
+	return nil
+}
+
+func userIDOrRecord(userID string, ownerUserID string) string {
+	if userID != "" {
+		return userID
+	}
+	return ownerUserID
 }
 
 func toProto(record workspacedomain.Record) *workspacev1.WorkspaceRecord {

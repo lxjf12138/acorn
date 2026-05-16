@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	nethttp "net/http"
+	"strconv"
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
@@ -57,6 +58,28 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		}
 		return writeSessionWorkspaceStateJSON(ctx, nethttp.StatusOK, sessionState)
 	})
+	router.GET("/sessions/{session_id}/workspace/files", func(ctx khttp.Context) error {
+		pageSize, err := parseInt32Query(ctx.Query().Get("page_size"), "page_size")
+		if err != nil {
+			return err
+		}
+		resp, err := workspaceService.ListSessionWorkspaceDir(ctx, ctx.Vars().Get("session_id"), ownerUserID(ctx), ctx.Query().Get("path"), pageSize, ctx.Query().Get("page_token"))
+		if err != nil {
+			return err
+		}
+		return writeProtoJSON(ctx, nethttp.StatusOK, resp)
+	})
+	router.GET("/sessions/{session_id}/workspace/files/preview", func(ctx khttp.Context) error {
+		maxBytes, err := parseInt64Query(ctx.Query().Get("max_bytes"), "max_bytes")
+		if err != nil {
+			return err
+		}
+		resp, err := workspaceService.PreviewSessionWorkspaceFile(ctx, ctx.Vars().Get("session_id"), ownerUserID(ctx), ctx.Query().Get("path"), maxBytes)
+		if err != nil {
+			return err
+		}
+		return writeProtoJSON(ctx, nethttp.StatusOK, resp)
+	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
 		if err := readProtoJSON(ctx, &req); err != nil {
@@ -100,6 +123,28 @@ func ownerUserID(ctx khttp.Context) string {
 		return userID
 	}
 	return "dev-user"
+}
+
+func parseInt32Query(value string, name string) (int32, error) {
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "invalid %s", name)
+	}
+	return int32(parsed), nil
+}
+
+func parseInt64Query(value string, name string) (int64, error) {
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "invalid %s", name)
+	}
+	return parsed, nil
 }
 
 func readProtoJSON(ctx khttp.Context, msg proto.Message) error {

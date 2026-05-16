@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Service Service `json:"service" yaml:"service"`
 	Server  Server  `json:"server" yaml:"server"`
+	Sandbox Sandbox `json:"sandbox" yaml:"sandbox"`
 	Log     Log     `json:"log" yaml:"log"`
 }
 
@@ -40,6 +41,10 @@ type GRPC struct {
 
 type Log struct {
 	Level string `json:"level" yaml:"level"`
+}
+
+type Sandbox struct {
+	WorkspaceRoot string `json:"workspace_root" yaml:"workspace_root"`
 }
 
 func Load(path string) (*Config, error) {
@@ -89,6 +94,9 @@ func (c *Config) Validate() error {
 	}
 	if _, err := time.ParseDuration(c.Server.GRPC.Timeout); err != nil {
 		return fmt.Errorf("parse server.grpc.timeout: %w", err)
+	}
+	if c.Sandbox.WorkspaceRoot == "" {
+		c.Sandbox.WorkspaceRoot = "/tmp/acorn/sandbox/workspaces"
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"

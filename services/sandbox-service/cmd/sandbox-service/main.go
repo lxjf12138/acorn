@@ -39,10 +39,11 @@ func main() {
 	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version)
 	descriptorService := service.NewDescriptorService(descriptorSource)
 	workspaceStore := workspacedomain.NewMemoryStore()
-	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore)
+	workspaceService := service.NewWorkspaceService(cfg.Service.ID, cfg.Sandbox.WorkspaceRoot, descriptorSource, workspaceStore)
+	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
-	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, logger)
+	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

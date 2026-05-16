@@ -49,7 +49,7 @@ func TestDescribeCapabilities(t *testing.T) {
 		t.Fatalf("unexpected state surface: %+v", state)
 	}
 	view := surfaceByName(descriptor, "view")
-	if view.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED || !hasFeature(view, "list_workspace_dir") || !hasFeature(view, "preview_workspace_file") {
+	if view.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL || !hasFeature(view, "list_workspace_dir") || !hasFeature(view, "preview_workspace_file") {
 		t.Fatalf("unexpected view surface: %+v", view)
 	}
 	if status := surfaceStatus(descriptor, "resource"); status != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
@@ -63,6 +63,9 @@ func TestDescribeCapabilities(t *testing.T) {
 	}
 	if endpoint := endpointByName(descriptor, "workspace-host-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceHostService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected workspace host gRPC endpoint: %+v", endpoint)
+	}
+	if endpoint := endpointByName(descriptor, "workspace-view-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceViewService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
+		t.Fatalf("unexpected workspace view gRPC endpoint: %+v", endpoint)
 	}
 }
 

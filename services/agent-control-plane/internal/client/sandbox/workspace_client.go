@@ -14,13 +14,33 @@ type WorkspaceHostClient interface {
 	CreateHostedWorkspace(ctx context.Context, sessionID string, ownerUserID string, sandboxProfileID string, displayName string) (*sandboxv1.HostedWorkspace, error)
 	GetHostedWorkspace(ctx context.Context, serviceWorkspaceID string) (*sandboxv1.HostedWorkspace, error)
 	GetHostedWorkspaceState(ctx context.Context, sessionID string, ownerUserID string, serviceWorkspaceID string) (*sandboxv1.HostedWorkspaceState, error)
+	ListWorkspaceDir(ctx context.Context, input ListWorkspaceDirInput) (*sandboxv1.ListWorkspaceDirResponse, error)
+	PreviewWorkspaceFile(ctx context.Context, input PreviewWorkspaceFileInput) (*sandboxv1.PreviewWorkspaceFileResponse, error)
 	Close() error
+}
+
+type ListWorkspaceDirInput struct {
+	SessionID          string
+	UserID             string
+	ServiceWorkspaceID string
+	Path               string
+	PageSize           int32
+	PageToken          string
+}
+
+type PreviewWorkspaceFileInput struct {
+	SessionID          string
+	UserID             string
+	ServiceWorkspaceID string
+	Path               string
+	MaxBytes           int64
 }
 
 type GRPCWorkspaceHostClient struct {
 	serviceID string
 	conn      *grpc.ClientConn
 	client    sandboxv1.WorkspaceHostServiceClient
+	view      sandboxv1.WorkspaceViewServiceClient
 }
 
 func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHostClient, error) {
@@ -32,6 +52,7 @@ func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHo
 		serviceID: serviceID,
 		conn:      conn,
 		client:    sandboxv1.NewWorkspaceHostServiceClient(conn),
+		view:      sandboxv1.NewWorkspaceViewServiceClient(conn),
 	}, nil
 }
 
@@ -77,6 +98,33 @@ func (c *GRPCWorkspaceHostClient) GetHostedWorkspaceState(ctx context.Context, s
 		return nil, err
 	}
 	return resp.GetState(), nil
+}
+
+func (c *GRPCWorkspaceHostClient) ListWorkspaceDir(ctx context.Context, input ListWorkspaceDirInput) (*sandboxv1.ListWorkspaceDirResponse, error) {
+	return c.view.ListWorkspaceDir(ctx, &sandboxv1.ListWorkspaceDirRequest{
+		Scope: &commonv1.Scope{
+			ServiceId: c.serviceID,
+			SessionId: input.SessionID,
+			UserId:    input.UserID,
+		},
+		ServiceWorkspaceId: input.ServiceWorkspaceID,
+		Path:               input.Path,
+		PageSize:           input.PageSize,
+		PageToken:          input.PageToken,
+	})
+}
+
+func (c *GRPCWorkspaceHostClient) PreviewWorkspaceFile(ctx context.Context, input PreviewWorkspaceFileInput) (*sandboxv1.PreviewWorkspaceFileResponse, error) {
+	return c.view.PreviewWorkspaceFile(ctx, &sandboxv1.PreviewWorkspaceFileRequest{
+		Scope: &commonv1.Scope{
+			ServiceId: c.serviceID,
+			SessionId: input.SessionID,
+			UserId:    input.UserID,
+		},
+		ServiceWorkspaceId: input.ServiceWorkspaceID,
+		Path:               input.Path,
+		MaxBytes:           input.MaxBytes,
+	})
 }
 
 func (c *GRPCWorkspaceHostClient) Close() error {

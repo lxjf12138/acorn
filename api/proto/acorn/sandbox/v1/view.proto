@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package acorn.sandbox.v1;
+
+import "acorn/common/v1/common.proto";
+import "acorn/sandbox/v1/path.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1;sandboxv1";
+
+message ListWorkspaceDirRequest {
+  acorn.common.v1.Scope scope = 1;
+
+  string service_workspace_id = 2;
+
+  // Workspace-relative POSIX path. Empty means workspace root.
+  string path = 3;
+
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message WorkspaceDirEntry {
+  string name = 1;
+  WorkspacePathRef ref = 2;
+  WorkspacePathKind kind = 3;
+  int64 size_bytes = 4;
+  google.protobuf.Timestamp modified_at = 5;
+}
+
+message ListWorkspaceDirResponse {
+  WorkspacePathRef directory = 1;
+  repeated WorkspaceDirEntry entries = 2;
+  string next_page_token = 3;
+}
+
+message PreviewWorkspaceFileRequest {
+  acorn.common.v1.Scope scope = 1;
+
+  string service_workspace_id = 2;
+
+  // Workspace-relative POSIX path.
+  string path = 3;
+
+  int64 max_bytes = 4;
+}
+
+message PreviewWorkspaceFileResponse {
+  WorkspacePathRef file = 1;
+
+  string mime_type = 2;
+
+  bytes preview_bytes = 3;
+
+  bool truncated = 4;
+
+  int64 size_bytes = 5;
+
+  google.protobuf.Timestamp modified_at = 6;
+}
+
+service WorkspaceViewService {
+  rpc ListWorkspaceDir(ListWorkspaceDirRequest) returns (ListWorkspaceDirResponse);
+  rpc PreviewWorkspaceFile(PreviewWorkspaceFileRequest) returns (PreviewWorkspaceFileResponse);
+}

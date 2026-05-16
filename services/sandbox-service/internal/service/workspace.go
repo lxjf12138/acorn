@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"time"
 
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
@@ -19,13 +21,15 @@ type WorkspaceService struct {
 	sandboxv1.UnimplementedWorkspaceHostServiceServer
 
 	serviceID string
+	rootPath  string
 	profiles  *descriptor.Source
 	store     workspacedomain.Store
 }
 
-func NewWorkspaceService(serviceID string, profiles *descriptor.Source, store workspacedomain.Store) *WorkspaceService {
+func NewWorkspaceService(serviceID string, rootPath string, profiles *descriptor.Source, store workspacedomain.Store) *WorkspaceService {
 	return &WorkspaceService{
 		serviceID: serviceID,
+		rootPath:  rootPath,
 		profiles:  profiles,
 		store:     store,
 	}
@@ -37,10 +41,17 @@ func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *sandb
 		return nil, err
 	}
 	now := time.Now().UTC()
+	workspaceID := workspacedomain.NewID()
+	rootPath := filepath.Join(s.rootPath, workspaceID)
+	if err := os.MkdirAll(rootPath, 0o700); err != nil {
+		return nil, status.Errorf(codes.Internal, "create workspace root: %v", err)
+	}
 	workspace, err := s.store.Create(ctx, workspacedomain.Workspace{
+		ID:               workspaceID,
 		SandboxProfileID: profile.GetId(),
 		DisplayName:      req.GetDisplayName(),
 		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
+		RootPath:         rootPath,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 		MetadataJSON:     req.GetMetadataJson(),

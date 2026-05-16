@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package acorn.sandbox.v1;
+
+import "acorn/workspace/v1/workspace.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1;sandboxv1";
+
+enum WorkspacePathKind {
+  WORKSPACE_PATH_KIND_UNSPECIFIED = 0;
+  WORKSPACE_PATH_KIND_FILE = 1;
+  WORKSPACE_PATH_KIND_DIRECTORY = 2;
+  WORKSPACE_PATH_KIND_SYMLINK = 3;
+  WORKSPACE_PATH_KIND_UNKNOWN = 4;
+}
+
+message WorkspacePathRef {
+  acorn.workspace.v1.WorkspaceHostRef workspace = 1;
+
+  // Workspace-relative POSIX path, without a leading slash. Empty means
+  // workspace root only for APIs that explicitly allow it.
+  string path = 2;
+
+  WorkspacePathKind kind = 3;
+
+  string display_name = 10;
+
+  bytes metadata_json = 100;
+}

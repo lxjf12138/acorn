@@ -13,5 +13,8 @@ server:
     advertise_addr: sandbox-service:9081
     timeout: 10s
 
+sandbox:
+  workspace_root: /tmp/acorn/sandbox/workspaces
+
 log:
   level: info

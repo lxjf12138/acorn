@@ -19,6 +19,16 @@ func TestConfigValidateAcceptsServiceIDAndName(t *testing.T) {
 	}
 }
 
+func TestConfigValidateDefaultsWorkspaceRoot(t *testing.T) {
+	cfg := validConfig()
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+	if cfg.Sandbox.WorkspaceRoot != "/tmp/acorn/sandbox/workspaces" {
+		t.Fatalf("unexpected workspace root: %q", cfg.Sandbox.WorkspaceRoot)
+	}
+}
+
 func validConfig() Config {
 	return Config{
 		Service: Service{

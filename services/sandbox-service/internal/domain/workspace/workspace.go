@@ -16,6 +16,7 @@ type Workspace struct {
 	SandboxProfileID string
 	DisplayName      string
 	Status           workspacev1.WorkspaceStatus
+	RootPath         string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	MetadataJSON     []byte

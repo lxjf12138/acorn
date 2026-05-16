@@ -7,18 +7,24 @@ import (
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
+	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type fakeWorkspaceHostClient struct {
-	err       error
-	stateErr  error
-	created   int
-	hosted    *sandboxv1.HostedWorkspace
-	state     *sandboxv1.HostedWorkspaceState
-	useHosted bool
+	err           error
+	stateErr      error
+	listErr       error
+	previewErr    error
+	created       int
+	hosted        *sandboxv1.HostedWorkspace
+	state         *sandboxv1.HostedWorkspaceState
+	listResp      *sandboxv1.ListWorkspaceDirResponse
+	previewResp   *sandboxv1.PreviewWorkspaceFileResponse
+	lastListInput sandboxclient.ListWorkspaceDirInput
+	useHosted     bool
 }
 
 func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*sandboxv1.HostedWorkspace, error) {
@@ -58,6 +64,48 @@ func (f *fakeWorkspaceHostClient) GetHostedWorkspaceState(_ context.Context, _ s
 		},
 		Status:  workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
 		Summary: "empty workspace",
+	}, nil
+}
+
+func (f *fakeWorkspaceHostClient) ListWorkspaceDir(_ context.Context, input sandboxclient.ListWorkspaceDirInput) (*sandboxv1.ListWorkspaceDirResponse, error) {
+	f.lastListInput = input
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	if f.listResp != nil {
+		return f.listResp, nil
+	}
+	return &sandboxv1.ListWorkspaceDirResponse{
+		Directory: &sandboxv1.WorkspacePathRef{
+			Workspace: &workspacev1.WorkspaceHostRef{
+				ServiceId:          "sandbox-service",
+				ServiceWorkspaceId: input.ServiceWorkspaceID,
+				SandboxProfileId:   "local-process",
+			},
+			Path: input.Path,
+			Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_DIRECTORY,
+		},
+	}, nil
+}
+
+func (f *fakeWorkspaceHostClient) PreviewWorkspaceFile(_ context.Context, input sandboxclient.PreviewWorkspaceFileInput) (*sandboxv1.PreviewWorkspaceFileResponse, error) {
+	if f.previewErr != nil {
+		return nil, f.previewErr
+	}
+	if f.previewResp != nil {
+		return f.previewResp, nil
+	}
+	return &sandboxv1.PreviewWorkspaceFileResponse{
+		File: &sandboxv1.WorkspacePathRef{
+			Workspace: &workspacev1.WorkspaceHostRef{
+				ServiceId:          "sandbox-service",
+				ServiceWorkspaceId: input.ServiceWorkspaceID,
+				SandboxProfileId:   "local-process",
+			},
+			Path: input.Path,
+			Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE,
+		},
+		PreviewBytes: []byte("preview"),
 	}, nil
 }
 
@@ -281,5 +329,107 @@ func TestWorkspaceServiceGetSessionWorkspaceStateRejectsMismatchedRef(t *testing
 				t.Fatalf("expected Internal, got %v", err)
 			}
 		})
+	}
+}
+
+func TestWorkspaceServiceListSessionWorkspaceDir(t *testing.T) {
+	client := &fakeWorkspaceHostClient{}
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	resp, err := service.ListSessionWorkspaceDir(context.Background(), "sess-1", "user-1", "src", 25, "0")
+	if err != nil {
+		t.Fatalf("ListSessionWorkspaceDir returned error: %v", err)
+	}
+	if resp.GetDirectory().GetPath() != "src" {
+		t.Fatalf("unexpected directory: %+v", resp.GetDirectory())
+	}
+	if client.lastListInput.ServiceWorkspaceID != "ws_sess-1" || client.lastListInput.Path != "src" || client.lastListInput.PageSize != 25 || client.lastListInput.PageToken != "0" {
+		t.Fatalf("unexpected list input: %+v", client.lastListInput)
+	}
+}
+
+func TestWorkspaceServiceListSessionWorkspaceDirMissingSession(t *testing.T) {
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), &fakeWorkspaceHostClient{}, "sandbox-service", "local-process")
+	_, err := service.ListSessionWorkspaceDir(context.Background(), "missing", "user-1", "", 0, "")
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceListSessionWorkspaceDirRejectsMismatchedRef(t *testing.T) {
+	tests := []struct {
+		name string
+		resp *sandboxv1.ListWorkspaceDirResponse
+	}{
+		{
+			name: "directory ref",
+			resp: &sandboxv1.ListWorkspaceDirResponse{
+				Directory: pathRef("other-service", "ws_sess-1", "local-process", ""),
+			},
+		},
+		{
+			name: "entry ref",
+			resp: &sandboxv1.ListWorkspaceDirResponse{
+				Directory: pathRef("sandbox-service", "ws_sess-1", "local-process", ""),
+				Entries: []*sandboxv1.WorkspaceDirEntry{
+					{Ref: pathRef("sandbox-service", "other-workspace", "local-process", "file.txt")},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeWorkspaceHostClient{listResp: tt.resp}
+			service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+			if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+				t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+			}
+			if _, err := service.ListSessionWorkspaceDir(context.Background(), "sess-1", "user-1", "", 0, ""); status.Code(err) != codes.Internal {
+				t.Fatalf("expected Internal, got %v", err)
+			}
+		})
+	}
+}
+
+func TestWorkspaceServicePreviewSessionWorkspaceFile(t *testing.T) {
+	client := &fakeWorkspaceHostClient{}
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	resp, err := service.PreviewSessionWorkspaceFile(context.Background(), "sess-1", "user-1", "report.txt", 64)
+	if err != nil {
+		t.Fatalf("PreviewSessionWorkspaceFile returned error: %v", err)
+	}
+	if resp.GetFile().GetPath() != "report.txt" || string(resp.GetPreviewBytes()) != "preview" {
+		t.Fatalf("unexpected preview: %+v", resp)
+	}
+}
+
+func TestWorkspaceServicePreviewSessionWorkspaceFileRejectsMismatchedRef(t *testing.T) {
+	client := &fakeWorkspaceHostClient{
+		previewResp: &sandboxv1.PreviewWorkspaceFileResponse{
+			File: pathRef("sandbox-service", "other-workspace", "local-process", "report.txt"),
+		},
+	}
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	if _, err := service.PreviewSessionWorkspaceFile(context.Background(), "sess-1", "user-1", "report.txt", 0); status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+}
+
+func pathRef(serviceID string, workspaceID string, profileID string, path string) *sandboxv1.WorkspacePathRef {
+	return &sandboxv1.WorkspacePathRef{
+		Workspace: &workspacev1.WorkspaceHostRef{
+			ServiceId:          serviceID,
+			ServiceWorkspaceId: workspaceID,
+			SandboxProfileId:   profileID,
+		},
+		Path: path,
 	}
 }
