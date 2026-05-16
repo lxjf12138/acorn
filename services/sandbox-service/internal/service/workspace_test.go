@@ -78,6 +78,62 @@ func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
 	}
 }
 
+func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
+	service := newTestWorkspaceService()
+	created, err := service.CreateHostedWorkspace(context.Background(), &workspacev1.CreateHostedWorkspaceRequest{
+		SandboxProfileId: "local-process",
+	})
+	if err != nil {
+		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
+	}
+	stateResp, err := service.GetHostedWorkspaceState(context.Background(), &workspacev1.GetHostedWorkspaceStateRequest{
+		ServiceWorkspaceId: created.GetWorkspace().GetRef().GetServiceWorkspaceId(),
+	})
+	if err != nil {
+		t.Fatalf("GetHostedWorkspaceState returned error: %v", err)
+	}
+	state := stateResp.GetState()
+	if state.GetRef().GetServiceId() != "sandbox-service" {
+		t.Fatalf("unexpected service id: %q", state.GetRef().GetServiceId())
+	}
+	if state.GetRef().GetServiceWorkspaceId() != created.GetWorkspace().GetRef().GetServiceWorkspaceId() {
+		t.Fatalf("unexpected service workspace id: %q", state.GetRef().GetServiceWorkspaceId())
+	}
+	if state.GetRef().GetSandboxProfileId() != "local-process" {
+		t.Fatalf("unexpected profile id: %q", state.GetRef().GetSandboxProfileId())
+	}
+	if state.GetStatus() != workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE {
+		t.Fatalf("unexpected status: %s", state.GetStatus())
+	}
+	if state.GetSummary() == "" {
+		t.Fatal("expected non-empty summary")
+	}
+	if len(state.GetFacts()) == 0 {
+		t.Fatal("expected facts")
+	}
+	if state.GetGeneratedAt() == nil {
+		t.Fatal("expected generated_at")
+	}
+}
+
+func TestWorkspaceServiceGetHostedWorkspaceStateEmptyID(t *testing.T) {
+	service := newTestWorkspaceService()
+	_, err := service.GetHostedWorkspaceState(context.Background(), &workspacev1.GetHostedWorkspaceStateRequest{})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceGetHostedWorkspaceStateNotFound(t *testing.T) {
+	service := newTestWorkspaceService()
+	_, err := service.GetHostedWorkspaceState(context.Background(), &workspacev1.GetHostedWorkspaceStateRequest{
+		ServiceWorkspaceId: "missing",
+	})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
 func newTestWorkspaceService() *WorkspaceService {
 	return NewWorkspaceService(
 		"sandbox-service",

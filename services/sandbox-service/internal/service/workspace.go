@@ -68,6 +68,22 @@ func (s *WorkspaceService) GetHostedWorkspace(ctx context.Context, req *workspac
 	}, nil
 }
 
+func (s *WorkspaceService) GetHostedWorkspaceState(ctx context.Context, req *workspacev1.GetHostedWorkspaceStateRequest) (*workspacev1.GetHostedWorkspaceStateResponse, error) {
+	if req.GetServiceWorkspaceId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "service_workspace_id is required")
+	}
+	workspace, err := s.store.Get(ctx, req.GetServiceWorkspaceId())
+	if errors.Is(err, workspacedomain.ErrNotFound) {
+		return nil, status.Error(codes.NotFound, "hosted workspace not found")
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "get hosted workspace state: %v", err)
+	}
+	return &workspacev1.GetHostedWorkspaceStateResponse{
+		State: s.toStateProto(workspace),
+	}, nil
+}
+
 func (s *WorkspaceService) resolveProfile(profileID string) (*capabilityv1.SandboxProfile, error) {
 	if profileID == "" {
 		profile, ok := s.profiles.DefaultSandboxProfile()
@@ -84,6 +100,29 @@ func (s *WorkspaceService) resolveProfile(profileID string) (*capabilityv1.Sandb
 		return nil, status.Errorf(codes.FailedPrecondition, "sandbox profile is disabled: %s", profileID)
 	}
 	return profile, nil
+}
+
+func (s *WorkspaceService) toStateProto(workspace workspacedomain.Workspace) *workspacev1.HostedWorkspaceState {
+	return &workspacev1.HostedWorkspaceState{
+		Ref: &workspacev1.WorkspaceHostRef{
+			ServiceId:          s.serviceID,
+			ServiceWorkspaceId: workspace.ID,
+			SandboxProfileId:   workspace.SandboxProfileID,
+		},
+		Status:  workspace.Status,
+		Summary: "empty workspace",
+		Facts: []*workspacev1.WorkspaceStateFact{
+			{
+				Key:   "profile",
+				Value: workspace.SandboxProfileID,
+			},
+			{
+				Key:   "workspace_status",
+				Value: workspace.Status.String(),
+			},
+		},
+		GeneratedAt: timestamppb.New(time.Now().UTC()),
+	}
 }
 
 func (s *WorkspaceService) toProto(workspace workspacedomain.Workspace) *workspacev1.HostedWorkspace {

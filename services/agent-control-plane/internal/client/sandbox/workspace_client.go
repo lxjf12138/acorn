@@ -13,6 +13,7 @@ import (
 type WorkspaceHostClient interface {
 	CreateHostedWorkspace(ctx context.Context, sessionID string, ownerUserID string, sandboxProfileID string, displayName string) (*workspacev1.HostedWorkspace, error)
 	GetHostedWorkspace(ctx context.Context, serviceWorkspaceID string) (*workspacev1.HostedWorkspace, error)
+	GetHostedWorkspaceState(ctx context.Context, sessionID string, ownerUserID string, serviceWorkspaceID string) (*workspacev1.HostedWorkspaceState, error)
 	Close() error
 }
 
@@ -61,6 +62,21 @@ func (c *GRPCWorkspaceHostClient) GetHostedWorkspace(ctx context.Context, servic
 		return nil, err
 	}
 	return resp.GetWorkspace(), nil
+}
+
+func (c *GRPCWorkspaceHostClient) GetHostedWorkspaceState(ctx context.Context, sessionID string, ownerUserID string, serviceWorkspaceID string) (*workspacev1.HostedWorkspaceState, error) {
+	resp, err := c.client.GetHostedWorkspaceState(ctx, &workspacev1.GetHostedWorkspaceStateRequest{
+		Scope: &commonv1.Scope{
+			ServiceId: c.serviceID,
+			SessionId: sessionID,
+			UserId:    ownerUserID,
+		},
+		ServiceWorkspaceId: serviceWorkspaceID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetState(), nil
 }
 
 func (c *GRPCWorkspaceHostClient) Close() error {

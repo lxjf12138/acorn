@@ -328,6 +328,150 @@ func (x *HostedWorkspace) GetMetadataJson() []byte {
 	return nil
 }
 
+type WorkspaceStateFact struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkspaceStateFact) Reset() {
+	*x = WorkspaceStateFact{}
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkspaceStateFact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkspaceStateFact) ProtoMessage() {}
+
+func (x *WorkspaceStateFact) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkspaceStateFact.ProtoReflect.Descriptor instead.
+func (*WorkspaceStateFact) Descriptor() ([]byte, []int) {
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *WorkspaceStateFact) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *WorkspaceStateFact) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+func (x *WorkspaceStateFact) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
+type HostedWorkspaceState struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ref           *WorkspaceHostRef      `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	Status        WorkspaceStatus        `protobuf:"varint,2,opt,name=status,proto3,enum=acorn.workspace.v1.WorkspaceStatus" json:"status,omitempty"`
+	Summary       string                 `protobuf:"bytes,10,opt,name=summary,proto3" json:"summary,omitempty"`
+	Facts         []*WorkspaceStateFact  `protobuf:"bytes,11,rep,name=facts,proto3" json:"facts,omitempty"`
+	GeneratedAt   *timestamppb.Timestamp `protobuf:"bytes,20,opt,name=generated_at,json=generatedAt,proto3" json:"generated_at,omitempty"`
+	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HostedWorkspaceState) Reset() {
+	*x = HostedWorkspaceState{}
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HostedWorkspaceState) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HostedWorkspaceState) ProtoMessage() {}
+
+func (x *HostedWorkspaceState) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HostedWorkspaceState.ProtoReflect.Descriptor instead.
+func (*HostedWorkspaceState) Descriptor() ([]byte, []int) {
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *HostedWorkspaceState) GetRef() *WorkspaceHostRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *HostedWorkspaceState) GetStatus() WorkspaceStatus {
+	if x != nil {
+		return x.Status
+	}
+	return WorkspaceStatus_WORKSPACE_STATUS_UNSPECIFIED
+}
+
+func (x *HostedWorkspaceState) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *HostedWorkspaceState) GetFacts() []*WorkspaceStateFact {
+	if x != nil {
+		return x.Facts
+	}
+	return nil
+}
+
+func (x *HostedWorkspaceState) GetGeneratedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.GeneratedAt
+	}
+	return nil
+}
+
+func (x *HostedWorkspaceState) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
 type CreateHostedWorkspaceRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Scope            *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -340,7 +484,7 @@ type CreateHostedWorkspaceRequest struct {
 
 func (x *CreateHostedWorkspaceRequest) Reset() {
 	*x = CreateHostedWorkspaceRequest{}
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[3]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +496,7 @@ func (x *CreateHostedWorkspaceRequest) String() string {
 func (*CreateHostedWorkspaceRequest) ProtoMessage() {}
 
 func (x *CreateHostedWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[3]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +509,7 @@ func (x *CreateHostedWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateHostedWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*CreateHostedWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{3}
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateHostedWorkspaceRequest) GetScope() *v1.Scope {
@@ -405,7 +549,7 @@ type CreateHostedWorkspaceResponse struct {
 
 func (x *CreateHostedWorkspaceResponse) Reset() {
 	*x = CreateHostedWorkspaceResponse{}
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[4]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -417,7 +561,7 @@ func (x *CreateHostedWorkspaceResponse) String() string {
 func (*CreateHostedWorkspaceResponse) ProtoMessage() {}
 
 func (x *CreateHostedWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[4]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -430,7 +574,7 @@ func (x *CreateHostedWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateHostedWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*CreateHostedWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{4}
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateHostedWorkspaceResponse) GetWorkspace() *HostedWorkspace {
@@ -450,7 +594,7 @@ type GetHostedWorkspaceRequest struct {
 
 func (x *GetHostedWorkspaceRequest) Reset() {
 	*x = GetHostedWorkspaceRequest{}
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[5]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -462,7 +606,7 @@ func (x *GetHostedWorkspaceRequest) String() string {
 func (*GetHostedWorkspaceRequest) ProtoMessage() {}
 
 func (x *GetHostedWorkspaceRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[5]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -475,7 +619,7 @@ func (x *GetHostedWorkspaceRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostedWorkspaceRequest.ProtoReflect.Descriptor instead.
 func (*GetHostedWorkspaceRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{5}
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *GetHostedWorkspaceRequest) GetScope() *v1.Scope {
@@ -501,7 +645,7 @@ type GetHostedWorkspaceResponse struct {
 
 func (x *GetHostedWorkspaceResponse) Reset() {
 	*x = GetHostedWorkspaceResponse{}
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[6]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +657,7 @@ func (x *GetHostedWorkspaceResponse) String() string {
 func (*GetHostedWorkspaceResponse) ProtoMessage() {}
 
 func (x *GetHostedWorkspaceResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[6]
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,12 +670,108 @@ func (x *GetHostedWorkspaceResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostedWorkspaceResponse.ProtoReflect.Descriptor instead.
 func (*GetHostedWorkspaceResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{6}
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *GetHostedWorkspaceResponse) GetWorkspace() *HostedWorkspace {
 	if x != nil {
 		return x.Workspace
+	}
+	return nil
+}
+
+type GetHostedWorkspaceStateRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Scope              *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	ServiceWorkspaceId string                 `protobuf:"bytes,2,opt,name=service_workspace_id,json=serviceWorkspaceId,proto3" json:"service_workspace_id,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *GetHostedWorkspaceStateRequest) Reset() {
+	*x = GetHostedWorkspaceStateRequest{}
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHostedWorkspaceStateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHostedWorkspaceStateRequest) ProtoMessage() {}
+
+func (x *GetHostedWorkspaceStateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHostedWorkspaceStateRequest.ProtoReflect.Descriptor instead.
+func (*GetHostedWorkspaceStateRequest) Descriptor() ([]byte, []int) {
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *GetHostedWorkspaceStateRequest) GetScope() *v1.Scope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *GetHostedWorkspaceStateRequest) GetServiceWorkspaceId() string {
+	if x != nil {
+		return x.ServiceWorkspaceId
+	}
+	return ""
+}
+
+type GetHostedWorkspaceStateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	State         *HostedWorkspaceState  `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetHostedWorkspaceStateResponse) Reset() {
+	*x = GetHostedWorkspaceStateResponse{}
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetHostedWorkspaceStateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetHostedWorkspaceStateResponse) ProtoMessage() {}
+
+func (x *GetHostedWorkspaceStateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_workspace_v1_workspace_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetHostedWorkspaceStateResponse.ProtoReflect.Descriptor instead.
+func (*GetHostedWorkspaceStateResponse) Descriptor() ([]byte, []int) {
+	return file_acorn_workspace_v1_workspace_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetHostedWorkspaceStateResponse) GetState() *HostedWorkspaceState {
+	if x != nil {
+		return x.State
 	}
 	return nil
 }
@@ -568,6 +808,18 @@ const file_acorn_workspace_v1_workspace_proto_rawDesc = "" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"a\n" +
+	"\x12WorkspaceStateFact\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xc7\x02\n" +
+	"\x14HostedWorkspaceState\x126\n" +
+	"\x03ref\x18\x01 \x01(\v2$.acorn.workspace.v1.WorkspaceHostRefR\x03ref\x12;\n" +
+	"\x06status\x18\x02 \x01(\x0e2#.acorn.workspace.v1.WorkspaceStatusR\x06status\x12\x18\n" +
+	"\asummary\x18\n" +
+	" \x01(\tR\asummary\x12<\n" +
+	"\x05facts\x18\v \x03(\v2&.acorn.workspace.v1.WorkspaceStateFactR\x05facts\x12=\n" +
+	"\fgenerated_at\x18\x14 \x01(\v2\x1a.google.protobuf.TimestampR\vgeneratedAt\x12#\n" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xc2\x01\n" +
 	"\x1cCreateHostedWorkspaceRequest\x12,\n" +
 	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12,\n" +
@@ -580,7 +832,12 @@ const file_acorn_workspace_v1_workspace_proto_rawDesc = "" +
 	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x120\n" +
 	"\x14service_workspace_id\x18\x02 \x01(\tR\x12serviceWorkspaceId\"_\n" +
 	"\x1aGetHostedWorkspaceResponse\x12A\n" +
-	"\tworkspace\x18\x01 \x01(\v2#.acorn.workspace.v1.HostedWorkspaceR\tworkspace*\xee\x01\n" +
+	"\tworkspace\x18\x01 \x01(\v2#.acorn.workspace.v1.HostedWorkspaceR\tworkspace\"\x80\x01\n" +
+	"\x1eGetHostedWorkspaceStateRequest\x12,\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x120\n" +
+	"\x14service_workspace_id\x18\x02 \x01(\tR\x12serviceWorkspaceId\"a\n" +
+	"\x1fGetHostedWorkspaceStateResponse\x12>\n" +
+	"\x05state\x18\x01 \x01(\v2(.acorn.workspace.v1.HostedWorkspaceStateR\x05state*\xee\x01\n" +
 	"\x0fWorkspaceStatus\x12 \n" +
 	"\x1cWORKSPACE_STATUS_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19WORKSPACE_STATUS_CREATING\x10\x01\x12\x1b\n" +
@@ -588,10 +845,11 @@ const file_acorn_workspace_v1_workspace_proto_rawDesc = "" +
 	"\x1cWORKSPACE_STATUS_UNAVAILABLE\x10\x03\x12\x1e\n" +
 	"\x1aWORKSPACE_STATUS_MIGRATING\x10\x04\x12\x1d\n" +
 	"\x19WORKSPACE_STATUS_ARCHIVED\x10\x05\x12\x1c\n" +
-	"\x18WORKSPACE_STATUS_DELETED\x10\x062\x89\x02\n" +
+	"\x18WORKSPACE_STATUS_DELETED\x10\x062\x8e\x03\n" +
 	"\x14WorkspaceHostService\x12|\n" +
 	"\x15CreateHostedWorkspace\x120.acorn.workspace.v1.CreateHostedWorkspaceRequest\x1a1.acorn.workspace.v1.CreateHostedWorkspaceResponse\x12s\n" +
-	"\x12GetHostedWorkspace\x12-.acorn.workspace.v1.GetHostedWorkspaceRequest\x1a..acorn.workspace.v1.GetHostedWorkspaceResponseBLZJgithub.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1;workspacev1b\x06proto3"
+	"\x12GetHostedWorkspace\x12-.acorn.workspace.v1.GetHostedWorkspaceRequest\x1a..acorn.workspace.v1.GetHostedWorkspaceResponse\x12\x82\x01\n" +
+	"\x17GetHostedWorkspaceState\x122.acorn.workspace.v1.GetHostedWorkspaceStateRequest\x1a3.acorn.workspace.v1.GetHostedWorkspaceStateResponseBLZJgithub.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1;workspacev1b\x06proto3"
 
 var (
 	file_acorn_workspace_v1_workspace_proto_rawDescOnce sync.Once
@@ -606,41 +864,53 @@ func file_acorn_workspace_v1_workspace_proto_rawDescGZIP() []byte {
 }
 
 var file_acorn_workspace_v1_workspace_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_acorn_workspace_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_acorn_workspace_v1_workspace_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_acorn_workspace_v1_workspace_proto_goTypes = []any{
-	(WorkspaceStatus)(0),                  // 0: acorn.workspace.v1.WorkspaceStatus
-	(*WorkspaceHostRef)(nil),              // 1: acorn.workspace.v1.WorkspaceHostRef
-	(*WorkspaceRecord)(nil),               // 2: acorn.workspace.v1.WorkspaceRecord
-	(*HostedWorkspace)(nil),               // 3: acorn.workspace.v1.HostedWorkspace
-	(*CreateHostedWorkspaceRequest)(nil),  // 4: acorn.workspace.v1.CreateHostedWorkspaceRequest
-	(*CreateHostedWorkspaceResponse)(nil), // 5: acorn.workspace.v1.CreateHostedWorkspaceResponse
-	(*GetHostedWorkspaceRequest)(nil),     // 6: acorn.workspace.v1.GetHostedWorkspaceRequest
-	(*GetHostedWorkspaceResponse)(nil),    // 7: acorn.workspace.v1.GetHostedWorkspaceResponse
-	(*timestamppb.Timestamp)(nil),         // 8: google.protobuf.Timestamp
-	(*v1.Scope)(nil),                      // 9: acorn.common.v1.Scope
+	(WorkspaceStatus)(0),                    // 0: acorn.workspace.v1.WorkspaceStatus
+	(*WorkspaceHostRef)(nil),                // 1: acorn.workspace.v1.WorkspaceHostRef
+	(*WorkspaceRecord)(nil),                 // 2: acorn.workspace.v1.WorkspaceRecord
+	(*HostedWorkspace)(nil),                 // 3: acorn.workspace.v1.HostedWorkspace
+	(*WorkspaceStateFact)(nil),              // 4: acorn.workspace.v1.WorkspaceStateFact
+	(*HostedWorkspaceState)(nil),            // 5: acorn.workspace.v1.HostedWorkspaceState
+	(*CreateHostedWorkspaceRequest)(nil),    // 6: acorn.workspace.v1.CreateHostedWorkspaceRequest
+	(*CreateHostedWorkspaceResponse)(nil),   // 7: acorn.workspace.v1.CreateHostedWorkspaceResponse
+	(*GetHostedWorkspaceRequest)(nil),       // 8: acorn.workspace.v1.GetHostedWorkspaceRequest
+	(*GetHostedWorkspaceResponse)(nil),      // 9: acorn.workspace.v1.GetHostedWorkspaceResponse
+	(*GetHostedWorkspaceStateRequest)(nil),  // 10: acorn.workspace.v1.GetHostedWorkspaceStateRequest
+	(*GetHostedWorkspaceStateResponse)(nil), // 11: acorn.workspace.v1.GetHostedWorkspaceStateResponse
+	(*timestamppb.Timestamp)(nil),           // 12: google.protobuf.Timestamp
+	(*v1.Scope)(nil),                        // 13: acorn.common.v1.Scope
 }
 var file_acorn_workspace_v1_workspace_proto_depIdxs = []int32{
 	0,  // 0: acorn.workspace.v1.WorkspaceRecord.status:type_name -> acorn.workspace.v1.WorkspaceStatus
 	1,  // 1: acorn.workspace.v1.WorkspaceRecord.current_host:type_name -> acorn.workspace.v1.WorkspaceHostRef
-	8,  // 2: acorn.workspace.v1.WorkspaceRecord.created_at:type_name -> google.protobuf.Timestamp
-	8,  // 3: acorn.workspace.v1.WorkspaceRecord.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 2: acorn.workspace.v1.WorkspaceRecord.created_at:type_name -> google.protobuf.Timestamp
+	12, // 3: acorn.workspace.v1.WorkspaceRecord.updated_at:type_name -> google.protobuf.Timestamp
 	1,  // 4: acorn.workspace.v1.HostedWorkspace.ref:type_name -> acorn.workspace.v1.WorkspaceHostRef
 	0,  // 5: acorn.workspace.v1.HostedWorkspace.status:type_name -> acorn.workspace.v1.WorkspaceStatus
-	8,  // 6: acorn.workspace.v1.HostedWorkspace.created_at:type_name -> google.protobuf.Timestamp
-	8,  // 7: acorn.workspace.v1.HostedWorkspace.updated_at:type_name -> google.protobuf.Timestamp
-	9,  // 8: acorn.workspace.v1.CreateHostedWorkspaceRequest.scope:type_name -> acorn.common.v1.Scope
-	3,  // 9: acorn.workspace.v1.CreateHostedWorkspaceResponse.workspace:type_name -> acorn.workspace.v1.HostedWorkspace
-	9,  // 10: acorn.workspace.v1.GetHostedWorkspaceRequest.scope:type_name -> acorn.common.v1.Scope
-	3,  // 11: acorn.workspace.v1.GetHostedWorkspaceResponse.workspace:type_name -> acorn.workspace.v1.HostedWorkspace
-	4,  // 12: acorn.workspace.v1.WorkspaceHostService.CreateHostedWorkspace:input_type -> acorn.workspace.v1.CreateHostedWorkspaceRequest
-	6,  // 13: acorn.workspace.v1.WorkspaceHostService.GetHostedWorkspace:input_type -> acorn.workspace.v1.GetHostedWorkspaceRequest
-	5,  // 14: acorn.workspace.v1.WorkspaceHostService.CreateHostedWorkspace:output_type -> acorn.workspace.v1.CreateHostedWorkspaceResponse
-	7,  // 15: acorn.workspace.v1.WorkspaceHostService.GetHostedWorkspace:output_type -> acorn.workspace.v1.GetHostedWorkspaceResponse
-	14, // [14:16] is the sub-list for method output_type
-	12, // [12:14] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	12, // 6: acorn.workspace.v1.HostedWorkspace.created_at:type_name -> google.protobuf.Timestamp
+	12, // 7: acorn.workspace.v1.HostedWorkspace.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 8: acorn.workspace.v1.HostedWorkspaceState.ref:type_name -> acorn.workspace.v1.WorkspaceHostRef
+	0,  // 9: acorn.workspace.v1.HostedWorkspaceState.status:type_name -> acorn.workspace.v1.WorkspaceStatus
+	4,  // 10: acorn.workspace.v1.HostedWorkspaceState.facts:type_name -> acorn.workspace.v1.WorkspaceStateFact
+	12, // 11: acorn.workspace.v1.HostedWorkspaceState.generated_at:type_name -> google.protobuf.Timestamp
+	13, // 12: acorn.workspace.v1.CreateHostedWorkspaceRequest.scope:type_name -> acorn.common.v1.Scope
+	3,  // 13: acorn.workspace.v1.CreateHostedWorkspaceResponse.workspace:type_name -> acorn.workspace.v1.HostedWorkspace
+	13, // 14: acorn.workspace.v1.GetHostedWorkspaceRequest.scope:type_name -> acorn.common.v1.Scope
+	3,  // 15: acorn.workspace.v1.GetHostedWorkspaceResponse.workspace:type_name -> acorn.workspace.v1.HostedWorkspace
+	13, // 16: acorn.workspace.v1.GetHostedWorkspaceStateRequest.scope:type_name -> acorn.common.v1.Scope
+	5,  // 17: acorn.workspace.v1.GetHostedWorkspaceStateResponse.state:type_name -> acorn.workspace.v1.HostedWorkspaceState
+	6,  // 18: acorn.workspace.v1.WorkspaceHostService.CreateHostedWorkspace:input_type -> acorn.workspace.v1.CreateHostedWorkspaceRequest
+	8,  // 19: acorn.workspace.v1.WorkspaceHostService.GetHostedWorkspace:input_type -> acorn.workspace.v1.GetHostedWorkspaceRequest
+	10, // 20: acorn.workspace.v1.WorkspaceHostService.GetHostedWorkspaceState:input_type -> acorn.workspace.v1.GetHostedWorkspaceStateRequest
+	7,  // 21: acorn.workspace.v1.WorkspaceHostService.CreateHostedWorkspace:output_type -> acorn.workspace.v1.CreateHostedWorkspaceResponse
+	9,  // 22: acorn.workspace.v1.WorkspaceHostService.GetHostedWorkspace:output_type -> acorn.workspace.v1.GetHostedWorkspaceResponse
+	11, // 23: acorn.workspace.v1.WorkspaceHostService.GetHostedWorkspaceState:output_type -> acorn.workspace.v1.GetHostedWorkspaceStateResponse
+	21, // [21:24] is the sub-list for method output_type
+	18, // [18:21] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_acorn_workspace_v1_workspace_proto_init() }
@@ -654,7 +924,7 @@ func file_acorn_workspace_v1_workspace_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_acorn_workspace_v1_workspace_proto_rawDesc), len(file_acorn_workspace_v1_workspace_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

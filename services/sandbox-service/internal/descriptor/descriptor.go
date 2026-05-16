@@ -64,7 +64,10 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 			},
 			{
 				Name:   "state",
-				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+				Features: []string{
+					"workspace_state",
+				},
 			},
 			{
 				Name:   "resource",

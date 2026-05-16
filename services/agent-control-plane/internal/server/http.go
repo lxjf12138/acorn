@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	nethttp "net/http"
 
 	klog "github.com/go-kratos/kratos/v2/log"
@@ -44,6 +45,13 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		}
 		return writeProtoJSON(ctx, nethttp.StatusOK, record)
 	})
+	router.GET("/sessions/{session_id}/workspace/state", func(ctx khttp.Context) error {
+		sessionState, err := workspaceService.GetSessionWorkspaceState(ctx, ctx.Vars().Get("session_id"))
+		if err != nil {
+			return err
+		}
+		return writeSessionWorkspaceStateJSON(ctx, nethttp.StatusOK, sessionState)
+	})
 
 	return srv
 }
@@ -63,6 +71,32 @@ func writeProtoJSON(ctx khttp.Context, code int, msg proto.Message) error {
 		UseProtoNames:   true,
 		EmitUnpopulated: true,
 	}.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return ctx.Blob(code, "application/json", body)
+}
+
+func writeSessionWorkspaceStateJSON(ctx khttp.Context, code int, state *service.SessionWorkspaceState) error {
+	marshaler := protojson.MarshalOptions{
+		UseProtoNames:   true,
+		EmitUnpopulated: true,
+	}
+	workspaceJSON, err := marshaler.Marshal(state.Record)
+	if err != nil {
+		return err
+	}
+	stateJSON, err := marshaler.Marshal(state.State)
+	if err != nil {
+		return err
+	}
+	body, err := json.Marshal(struct {
+		Workspace json.RawMessage `json:"workspace"`
+		State     json.RawMessage `json:"state"`
+	}{
+		Workspace: workspaceJSON,
+		State:     stateJSON,
+	})
 	if err != nil {
 		return err
 	}

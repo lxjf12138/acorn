@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkspaceHostService_CreateHostedWorkspace_FullMethodName = "/acorn.workspace.v1.WorkspaceHostService/CreateHostedWorkspace"
-	WorkspaceHostService_GetHostedWorkspace_FullMethodName    = "/acorn.workspace.v1.WorkspaceHostService/GetHostedWorkspace"
+	WorkspaceHostService_CreateHostedWorkspace_FullMethodName   = "/acorn.workspace.v1.WorkspaceHostService/CreateHostedWorkspace"
+	WorkspaceHostService_GetHostedWorkspace_FullMethodName      = "/acorn.workspace.v1.WorkspaceHostService/GetHostedWorkspace"
+	WorkspaceHostService_GetHostedWorkspaceState_FullMethodName = "/acorn.workspace.v1.WorkspaceHostService/GetHostedWorkspaceState"
 )
 
 // WorkspaceHostServiceClient is the client API for WorkspaceHostService service.
@@ -29,6 +30,7 @@ const (
 type WorkspaceHostServiceClient interface {
 	CreateHostedWorkspace(ctx context.Context, in *CreateHostedWorkspaceRequest, opts ...grpc.CallOption) (*CreateHostedWorkspaceResponse, error)
 	GetHostedWorkspace(ctx context.Context, in *GetHostedWorkspaceRequest, opts ...grpc.CallOption) (*GetHostedWorkspaceResponse, error)
+	GetHostedWorkspaceState(ctx context.Context, in *GetHostedWorkspaceStateRequest, opts ...grpc.CallOption) (*GetHostedWorkspaceStateResponse, error)
 }
 
 type workspaceHostServiceClient struct {
@@ -59,12 +61,23 @@ func (c *workspaceHostServiceClient) GetHostedWorkspace(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *workspaceHostServiceClient) GetHostedWorkspaceState(ctx context.Context, in *GetHostedWorkspaceStateRequest, opts ...grpc.CallOption) (*GetHostedWorkspaceStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetHostedWorkspaceStateResponse)
+	err := c.cc.Invoke(ctx, WorkspaceHostService_GetHostedWorkspaceState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // WorkspaceHostServiceServer is the server API for WorkspaceHostService service.
 // All implementations must embed UnimplementedWorkspaceHostServiceServer
 // for forward compatibility.
 type WorkspaceHostServiceServer interface {
 	CreateHostedWorkspace(context.Context, *CreateHostedWorkspaceRequest) (*CreateHostedWorkspaceResponse, error)
 	GetHostedWorkspace(context.Context, *GetHostedWorkspaceRequest) (*GetHostedWorkspaceResponse, error)
+	GetHostedWorkspaceState(context.Context, *GetHostedWorkspaceStateRequest) (*GetHostedWorkspaceStateResponse, error)
 	mustEmbedUnimplementedWorkspaceHostServiceServer()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedWorkspaceHostServiceServer) CreateHostedWorkspace(context.Con
 }
 func (UnimplementedWorkspaceHostServiceServer) GetHostedWorkspace(context.Context, *GetHostedWorkspaceRequest) (*GetHostedWorkspaceResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetHostedWorkspace not implemented")
+}
+func (UnimplementedWorkspaceHostServiceServer) GetHostedWorkspaceState(context.Context, *GetHostedWorkspaceStateRequest) (*GetHostedWorkspaceStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetHostedWorkspaceState not implemented")
 }
 func (UnimplementedWorkspaceHostServiceServer) mustEmbedUnimplementedWorkspaceHostServiceServer() {}
 func (UnimplementedWorkspaceHostServiceServer) testEmbeddedByValue()                              {}
@@ -138,6 +154,24 @@ func _WorkspaceHostService_GetHostedWorkspace_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkspaceHostService_GetHostedWorkspaceState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetHostedWorkspaceStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkspaceHostServiceServer).GetHostedWorkspaceState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkspaceHostService_GetHostedWorkspaceState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkspaceHostServiceServer).GetHostedWorkspaceState(ctx, req.(*GetHostedWorkspaceStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // WorkspaceHostService_ServiceDesc is the grpc.ServiceDesc for WorkspaceHostService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var WorkspaceHostService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetHostedWorkspace",
 			Handler:    _WorkspaceHostService_GetHostedWorkspace_Handler,
+		},
+		{
+			MethodName: "GetHostedWorkspaceState",
+			Handler:    _WorkspaceHostService_GetHostedWorkspaceState_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

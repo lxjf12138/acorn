@@ -95,6 +95,31 @@ The control plane owns `WorkspaceRecord`. It stores session binding state and th
 
 Future workspace migration updates `WorkspaceRecord.current_host` while keeping the control-plane `WorkspaceRecord.id` stable. Export/import and bundle `ResourceRef` contracts are modeled later.
 
+### 2.2 Workspace State Surface
+
+The Workspace State Surface lets the control plane query the current service-exposed view of a hosted workspace:
+
+```text
+Session
+  -> WorkspaceRecord
+      -> current_host
+          -> sandbox-service GetHostedWorkspaceState
+```
+
+`HostedWorkspaceState` is owned and produced by `sandbox-service`. It is a status view, not runtime context. It is not responsible for model context selection, token budgeting, summary compression, or tool execution.
+
+The first state surface exposes only:
+
+```text
+workspace ref
+workspace status
+short summary
+small facts
+generated_at
+```
+
+It must not become a file index. File listing belongs to future bounded workspace file APIs. Artifact and `ResourceRef` creation belong to future explicit promotion APIs.
+
 ---
 
 ## 3. Core Architecture Principles

@@ -23,6 +23,11 @@ type WorkspaceService struct {
 	sandboxProfileID string
 }
 
+type SessionWorkspaceState struct {
+	Record *workspacev1.WorkspaceRecord      `json:"workspace"`
+	State  *workspacev1.HostedWorkspaceState `json:"state"`
+}
+
 func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
 	return &WorkspaceService{
 		store:            store,
@@ -109,6 +114,59 @@ func (s *WorkspaceService) GetSessionWorkspace(ctx context.Context, sessionID st
 		return nil, status.Error(codes.NotFound, "workspace record not found for session")
 	}
 	return toProto(record), nil
+}
+
+func (s *WorkspaceService) GetSessionWorkspaceState(ctx context.Context, sessionID string) (*SessionWorkspaceState, error) {
+	if sessionID == "" {
+		return nil, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+	record, ok, err := s.store.GetBySession(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, status.Error(codes.NotFound, "workspace record not found for session")
+	}
+	if record.CurrentHost == nil || record.CurrentHost.GetServiceWorkspaceId() == "" {
+		return nil, status.Error(codes.FailedPrecondition, "workspace record has no current host")
+	}
+	state, err := s.sandboxClient.GetHostedWorkspaceState(ctx, record.SessionID, record.OwnerUserID, record.CurrentHost.GetServiceWorkspaceId())
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, status.Error(codes.FailedPrecondition, "workspace host state unavailable")
+		}
+		return nil, err
+	}
+	if err := validateHostedWorkspaceState(state, record.CurrentHost); err != nil {
+		return nil, err
+	}
+	return &SessionWorkspaceState{
+		Record: toProto(record),
+		State:  state,
+	}, nil
+}
+
+func validateHostedWorkspaceState(state *workspacev1.HostedWorkspaceState, expectedRef *workspacev1.WorkspaceHostRef) error {
+	if state == nil {
+		return status.Error(codes.Internal, "sandbox host returned empty workspace state")
+	}
+	ref := state.GetRef()
+	if ref == nil {
+		return status.Error(codes.Internal, "sandbox host returned workspace state without ref")
+	}
+	if expectedRef == nil {
+		return status.Error(codes.FailedPrecondition, "workspace record has no current host")
+	}
+	if ref.GetServiceId() != expectedRef.GetServiceId() {
+		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected service_id: %s", ref.GetServiceId())
+	}
+	if ref.GetServiceWorkspaceId() != expectedRef.GetServiceWorkspaceId() {
+		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected service_workspace_id: %s", ref.GetServiceWorkspaceId())
+	}
+	if ref.GetSandboxProfileId() != expectedRef.GetSandboxProfileId() {
+		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected sandbox_profile_id: %s", ref.GetSandboxProfileId())
+	}
+	return nil
 }
 
 func toProto(record workspacedomain.Record) *workspacev1.WorkspaceRecord {

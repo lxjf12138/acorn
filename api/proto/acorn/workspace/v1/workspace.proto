@@ -43,6 +43,21 @@ message HostedWorkspace {
   bytes metadata_json = 100;
 }
 
+message WorkspaceStateFact {
+  string key = 1;
+  string value = 2;
+  bytes metadata_json = 100;
+}
+
+message HostedWorkspaceState {
+  WorkspaceHostRef ref = 1;
+  WorkspaceStatus status = 2;
+  string summary = 10;
+  repeated WorkspaceStateFact facts = 11;
+  google.protobuf.Timestamp generated_at = 20;
+  bytes metadata_json = 100;
+}
+
 message CreateHostedWorkspaceRequest {
   acorn.common.v1.Scope scope = 1;
   string sandbox_profile_id = 2;
@@ -63,7 +78,17 @@ message GetHostedWorkspaceResponse {
   HostedWorkspace workspace = 1;
 }
 
+message GetHostedWorkspaceStateRequest {
+  acorn.common.v1.Scope scope = 1;
+  string service_workspace_id = 2;
+}
+
+message GetHostedWorkspaceStateResponse {
+  HostedWorkspaceState state = 1;
+}
+
 service WorkspaceHostService {
   rpc CreateHostedWorkspace(CreateHostedWorkspaceRequest) returns (CreateHostedWorkspaceResponse);
   rpc GetHostedWorkspace(GetHostedWorkspaceRequest) returns (GetHostedWorkspaceResponse);
+  rpc GetHostedWorkspaceState(GetHostedWorkspaceStateRequest) returns (GetHostedWorkspaceStateResponse);
 }
