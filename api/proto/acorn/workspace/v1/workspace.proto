@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package acorn.workspace.v1;
+
+import "acorn/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1;workspacev1";
+
+enum WorkspaceStatus {
+  WORKSPACE_STATUS_UNSPECIFIED = 0;
+  WORKSPACE_STATUS_CREATING = 1;
+  WORKSPACE_STATUS_ACTIVE = 2;
+  WORKSPACE_STATUS_UNAVAILABLE = 3;
+  WORKSPACE_STATUS_MIGRATING = 4;
+  WORKSPACE_STATUS_ARCHIVED = 5;
+  WORKSPACE_STATUS_DELETED = 6;
+}
+
+message WorkspaceHostRef {
+  string service_id = 1;
+  string service_workspace_id = 2;
+  string sandbox_profile_id = 3;
+}
+
+message WorkspaceRecord {
+  string id = 1;
+  string session_id = 2;
+  string owner_user_id = 3;
+  WorkspaceStatus status = 4;
+  WorkspaceHostRef current_host = 5;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  bytes metadata_json = 100;
+}
+
+message HostedWorkspace {
+  WorkspaceHostRef ref = 1;
+  WorkspaceStatus status = 2;
+  string display_name = 3;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+  bytes metadata_json = 100;
+}
+
+message CreateHostedWorkspaceRequest {
+  acorn.common.v1.Scope scope = 1;
+  string sandbox_profile_id = 2;
+  string display_name = 3;
+  bytes metadata_json = 100;
+}
+
+message CreateHostedWorkspaceResponse {
+  HostedWorkspace workspace = 1;
+}
+
+message GetHostedWorkspaceRequest {
+  acorn.common.v1.Scope scope = 1;
+  string service_workspace_id = 2;
+}
+
+message GetHostedWorkspaceResponse {
+  HostedWorkspace workspace = 1;
+}
+
+service WorkspaceHostService {
+  rpc CreateHostedWorkspace(CreateHostedWorkspaceRequest) returns (CreateHostedWorkspaceResponse);
+  rpc GetHostedWorkspace(GetHostedWorkspaceRequest) returns (GetHostedWorkspaceResponse);
+}
