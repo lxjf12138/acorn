@@ -9,6 +9,7 @@ import (
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/app"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
+	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/server"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
@@ -35,6 +36,8 @@ func main() {
 	}, cfg.Log.Level)
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
+	resourceStore := resourcedomain.NewMemoryStore()
+	resourceService := service.NewResourceService(resourceStore)
 	workspaceStore := workspacedomain.NewMemoryStore()
 	workspaceClient, err := sandboxclient.NewGRPCWorkspaceHostClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr)
 	if err != nil {
@@ -43,7 +46,7 @@ func main() {
 	defer workspaceClient.Close()
 	workspaceService := service.NewWorkspaceService(workspaceStore, workspaceClient, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, logger)
+	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)

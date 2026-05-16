@@ -19,13 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ResourceService_ListResources_FullMethodName = "/acorn.resource.v1.ResourceService/ListResources"
+	ResourceService_RegisterResource_FullMethodName = "/acorn.resource.v1.ResourceService/RegisterResource"
+	ResourceService_GetResource_FullMethodName      = "/acorn.resource.v1.ResourceService/GetResource"
+	ResourceService_ListResources_FullMethodName    = "/acorn.resource.v1.ResourceService/ListResources"
 )
 
 // ResourceServiceClient is the client API for ResourceService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ResourceServiceClient interface {
+	RegisterResource(ctx context.Context, in *RegisterResourceRequest, opts ...grpc.CallOption) (*RegisterResourceResponse, error)
+	GetResource(ctx context.Context, in *GetResourceRequest, opts ...grpc.CallOption) (*GetResourceResponse, error)
 	ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error)
 }
 
@@ -35,6 +39,26 @@ type resourceServiceClient struct {
 
 func NewResourceServiceClient(cc grpc.ClientConnInterface) ResourceServiceClient {
 	return &resourceServiceClient{cc}
+}
+
+func (c *resourceServiceClient) RegisterResource(ctx context.Context, in *RegisterResourceRequest, opts ...grpc.CallOption) (*RegisterResourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterResourceResponse)
+	err := c.cc.Invoke(ctx, ResourceService_RegisterResource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *resourceServiceClient) GetResource(ctx context.Context, in *GetResourceRequest, opts ...grpc.CallOption) (*GetResourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetResourceResponse)
+	err := c.cc.Invoke(ctx, ResourceService_GetResource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *resourceServiceClient) ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error) {
@@ -51,6 +75,8 @@ func (c *resourceServiceClient) ListResources(ctx context.Context, in *ListResou
 // All implementations must embed UnimplementedResourceServiceServer
 // for forward compatibility.
 type ResourceServiceServer interface {
+	RegisterResource(context.Context, *RegisterResourceRequest) (*RegisterResourceResponse, error)
+	GetResource(context.Context, *GetResourceRequest) (*GetResourceResponse, error)
 	ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error)
 	mustEmbedUnimplementedResourceServiceServer()
 }
@@ -62,6 +88,12 @@ type ResourceServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedResourceServiceServer struct{}
 
+func (UnimplementedResourceServiceServer) RegisterResource(context.Context, *RegisterResourceRequest) (*RegisterResourceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RegisterResource not implemented")
+}
+func (UnimplementedResourceServiceServer) GetResource(context.Context, *GetResourceRequest) (*GetResourceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetResource not implemented")
+}
 func (UnimplementedResourceServiceServer) ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListResources not implemented")
 }
@@ -84,6 +116,42 @@ func RegisterResourceServiceServer(s grpc.ServiceRegistrar, srv ResourceServiceS
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&ResourceService_ServiceDesc, srv)
+}
+
+func _ResourceService_RegisterResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterResourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ResourceServiceServer).RegisterResource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ResourceService_RegisterResource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ResourceServiceServer).RegisterResource(ctx, req.(*RegisterResourceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ResourceService_GetResource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetResourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ResourceServiceServer).GetResource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ResourceService_GetResource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ResourceServiceServer).GetResource(ctx, req.(*GetResourceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _ResourceService_ListResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -111,6 +179,14 @@ var ResourceService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "acorn.resource.v1.ResourceService",
 	HandlerType: (*ResourceServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterResource",
+			Handler:    _ResourceService_RegisterResource_Handler,
+		},
+		{
+			MethodName: "GetResource",
+			Handler:    _ResourceService_GetResource_Handler,
+		},
 		{
 			MethodName: "ListResources",
 			Handler:    _ResourceService_ListResources_Handler,

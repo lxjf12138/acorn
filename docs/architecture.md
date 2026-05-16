@@ -276,7 +276,7 @@ A `WorkspacePathRef` is not a `ResourceRef`. It is meaningful only through the o
 
 ### 4.6 ResourceRef
 
-A platform-level content object reference.
+A lightweight platform-level content object reference.
 
 Examples:
 
@@ -291,24 +291,59 @@ workspace export bundle
 
 `ResourceRef` is the only cross-service content boundary.
 
+```text
+ResourceRef
+  id
+  authority_service_id
+  name
+  mime_type
+  size_bytes
+  content_hash
+  metadata_json
+```
+
+`ResourceRef` intentionally does not carry owner, session, source, visibility, or lifecycle governance fields. Those belong to `ResourceRecord`.
+
 ### 4.7 ResourceRecord
 
 A Control Plane object storing ResourceRef metadata, provenance, permissions, and lifecycle.
 
 ```text
 ResourceRecord
-  resource_ref
+  ref
   owner_user_id
   session_id
-  source_type
-  authority_service_id
+  source
   status
   visibility
   created_at
   updated_at
+  metadata_json
 ```
 
 Provenance belongs here in Phase 1. Acorn does not need a separate Artifact concept for exported user-facing outputs.
+
+```text
+ResourceSource
+  type: user_upload | sandbox_export | mail_attachment | browser_download | ...
+  source_service_id
+  workspace_record_id
+  service_workspace_id
+  source_path
+  run_id
+  tool_call_id
+  metadata_json
+```
+
+The Phase 1 `ResourceService` is metadata-only:
+
+```text
+RegisterResource
+GetResource
+ListResources
+```
+
+It does not upload, download, stream, import, or export bytes. Resource Gateway and service-specific transfer APIs are later layers.
 
 ---
 
@@ -684,7 +719,8 @@ api/proto/acorn/resource/v1/
   resource.proto
   # ResourceRef
   # ResourceRecord
-  # Resource Gateway API
+  # ResourceSource
+  # metadata-only ResourceService
 ```
 
 Ownership rule:
@@ -706,16 +742,31 @@ CapabilityDescriptor
 WorkspaceRecord / HostedWorkspace
 HostedWorkspaceState
 sandbox/v1 proto package split
+View Surface declared in CapabilityDescriptor
+Artifact removed from Phase 1 proto/code path
+ResourceRef / ResourceRecord contract
+Control Plane in-memory ResourceRecord store
+Control Plane resource metadata HTTP API
 ```
 
-Next planned documentation-to-code sequence:
+Next planned code sequence:
 
 ```text
-PR 1: Add View Surface to CapabilityDescriptor
-PR 2: Add sandbox WorkspacePathRef + ListWorkspaceDir / PreviewWorkspaceFile
-PR 3: Add ResourceRef / ResourceRecord foundation
-PR 4: Add ExportWorkspacePath / ImportResource
-PR 5: Remove or deprecate Artifact proto and sandbox artifact placeholder
+PR 1: Workspace View Surface implementation
+  - WorkspacePathRef
+  - ListWorkspaceDir
+  - PreviewWorkspaceFile
+  - Control Plane view forwarding
+  - No ResourceRef creation
+
+PR 2: Workspace Resource Transfer
+  - ImportResource
+  - ExportWorkspacePath
+  - Export creates ResourceRef
+
+PR 3: Upload / Download Gateway
+  - User upload -> ResourceRef
+  - ResourceRef download through Control Plane
 ```
 
 ---

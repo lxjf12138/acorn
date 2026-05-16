@@ -10,6 +10,7 @@ import (
 	v1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,24 +23,123 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ResourceStatus int32
+
+const (
+	ResourceStatus_RESOURCE_STATUS_UNSPECIFIED ResourceStatus = 0
+	ResourceStatus_RESOURCE_STATUS_PENDING     ResourceStatus = 1
+	ResourceStatus_RESOURCE_STATUS_AVAILABLE   ResourceStatus = 2
+	ResourceStatus_RESOURCE_STATUS_UNAVAILABLE ResourceStatus = 3
+	ResourceStatus_RESOURCE_STATUS_DELETED     ResourceStatus = 4
+)
+
+// Enum value maps for ResourceStatus.
+var (
+	ResourceStatus_name = map[int32]string{
+		0: "RESOURCE_STATUS_UNSPECIFIED",
+		1: "RESOURCE_STATUS_PENDING",
+		2: "RESOURCE_STATUS_AVAILABLE",
+		3: "RESOURCE_STATUS_UNAVAILABLE",
+		4: "RESOURCE_STATUS_DELETED",
+	}
+	ResourceStatus_value = map[string]int32{
+		"RESOURCE_STATUS_UNSPECIFIED": 0,
+		"RESOURCE_STATUS_PENDING":     1,
+		"RESOURCE_STATUS_AVAILABLE":   2,
+		"RESOURCE_STATUS_UNAVAILABLE": 3,
+		"RESOURCE_STATUS_DELETED":     4,
+	}
+)
+
+func (x ResourceStatus) Enum() *ResourceStatus {
+	p := new(ResourceStatus)
+	*p = x
+	return p
+}
+
+func (x ResourceStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResourceStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_acorn_resource_v1_resource_proto_enumTypes[0].Descriptor()
+}
+
+func (ResourceStatus) Type() protoreflect.EnumType {
+	return &file_acorn_resource_v1_resource_proto_enumTypes[0]
+}
+
+func (x ResourceStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResourceStatus.Descriptor instead.
+func (ResourceStatus) EnumDescriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{0}
+}
+
+type ResourceVisibility int32
+
+const (
+	ResourceVisibility_RESOURCE_VISIBILITY_UNSPECIFIED  ResourceVisibility = 0
+	ResourceVisibility_RESOURCE_VISIBILITY_INTERNAL     ResourceVisibility = 1
+	ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE ResourceVisibility = 2
+)
+
+// Enum value maps for ResourceVisibility.
+var (
+	ResourceVisibility_name = map[int32]string{
+		0: "RESOURCE_VISIBILITY_UNSPECIFIED",
+		1: "RESOURCE_VISIBILITY_INTERNAL",
+		2: "RESOURCE_VISIBILITY_USER_VISIBLE",
+	}
+	ResourceVisibility_value = map[string]int32{
+		"RESOURCE_VISIBILITY_UNSPECIFIED":  0,
+		"RESOURCE_VISIBILITY_INTERNAL":     1,
+		"RESOURCE_VISIBILITY_USER_VISIBLE": 2,
+	}
+)
+
+func (x ResourceVisibility) Enum() *ResourceVisibility {
+	p := new(ResourceVisibility)
+	*p = x
+	return p
+}
+
+func (x ResourceVisibility) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResourceVisibility) Descriptor() protoreflect.EnumDescriptor {
+	return file_acorn_resource_v1_resource_proto_enumTypes[1].Descriptor()
+}
+
+func (ResourceVisibility) Type() protoreflect.EnumType {
+	return &file_acorn_resource_v1_resource_proto_enumTypes[1]
+}
+
+func (x ResourceVisibility) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResourceVisibility.Descriptor instead.
+func (ResourceVisibility) EnumDescriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{1}
+}
+
 type ResourceRef struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Uri           string                 `protobuf:"bytes,2,opt,name=uri,proto3" json:"uri,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	MimeType      string                 `protobuf:"bytes,5,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
-	Size          int64                  `protobuf:"varint,6,opt,name=size,proto3" json:"size,omitempty"`
-	Authority     string                 `protobuf:"bytes,10,opt,name=authority,proto3" json:"authority,omitempty"`
-	ServiceId     string                 `protobuf:"bytes,11,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
-	ProviderId    string                 `protobuf:"bytes,12,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
-	OwnerType     string                 `protobuf:"bytes,20,opt,name=owner_type,json=ownerType,proto3" json:"owner_type,omitempty"`
-	OwnerId       string                 `protobuf:"bytes,21,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
-	Version       string                 `protobuf:"bytes,30,opt,name=version,proto3" json:"version,omitempty"`
-	ContentHash   string                 `protobuf:"bytes,31,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
-	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// Service or resource authority that can provide bytes or metadata for this
+	// resource.
+	AuthorityServiceId string `protobuf:"bytes,2,opt,name=authority_service_id,json=authorityServiceId,proto3" json:"authority_service_id,omitempty"`
+	Name               string `protobuf:"bytes,10,opt,name=name,proto3" json:"name,omitempty"`
+	MimeType           string `protobuf:"bytes,11,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	SizeBytes          int64  `protobuf:"varint,12,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	ContentHash        string `protobuf:"bytes,13,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
+	MetadataJson       []byte `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ResourceRef) Reset() {
@@ -79,9 +179,9 @@ func (x *ResourceRef) GetId() string {
 	return ""
 }
 
-func (x *ResourceRef) GetUri() string {
+func (x *ResourceRef) GetAuthorityServiceId() string {
 	if x != nil {
-		return x.Uri
+		return x.AuthorityServiceId
 	}
 	return ""
 }
@@ -93,13 +193,6 @@ func (x *ResourceRef) GetName() string {
 	return ""
 }
 
-func (x *ResourceRef) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
 func (x *ResourceRef) GetMimeType() string {
 	if x != nil {
 		return x.MimeType
@@ -107,53 +200,11 @@ func (x *ResourceRef) GetMimeType() string {
 	return ""
 }
 
-func (x *ResourceRef) GetSize() int64 {
+func (x *ResourceRef) GetSizeBytes() int64 {
 	if x != nil {
-		return x.Size
+		return x.SizeBytes
 	}
 	return 0
-}
-
-func (x *ResourceRef) GetAuthority() string {
-	if x != nil {
-		return x.Authority
-	}
-	return ""
-}
-
-func (x *ResourceRef) GetServiceId() string {
-	if x != nil {
-		return x.ServiceId
-	}
-	return ""
-}
-
-func (x *ResourceRef) GetProviderId() string {
-	if x != nil {
-		return x.ProviderId
-	}
-	return ""
-}
-
-func (x *ResourceRef) GetOwnerType() string {
-	if x != nil {
-		return x.OwnerType
-	}
-	return ""
-}
-
-func (x *ResourceRef) GetOwnerId() string {
-	if x != nil {
-		return x.OwnerId
-	}
-	return ""
-}
-
-func (x *ResourceRef) GetVersion() string {
-	if x != nil {
-		return x.Version
-	}
-	return ""
 }
 
 func (x *ResourceRef) GetContentHash() string {
@@ -170,20 +221,467 @@ func (x *ResourceRef) GetMetadataJson() []byte {
 	return nil
 }
 
+type ResourceSource struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// user_upload | sandbox_export | mail_attachment | browser_download |
+	// document_export | workspace_bundle | generated_content
+	Type            string `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	SourceServiceId string `protobuf:"bytes,2,opt,name=source_service_id,json=sourceServiceId,proto3" json:"source_service_id,omitempty"`
+	// Optional control-plane workspace record id.
+	WorkspaceRecordId string `protobuf:"bytes,3,opt,name=workspace_record_id,json=workspaceRecordId,proto3" json:"workspace_record_id,omitempty"`
+	// Optional service-local workspace id.
+	ServiceWorkspaceId string `protobuf:"bytes,4,opt,name=service_workspace_id,json=serviceWorkspaceId,proto3" json:"service_workspace_id,omitempty"`
+	// Optional service-local source path or object id.
+	SourcePath    string `protobuf:"bytes,5,opt,name=source_path,json=sourcePath,proto3" json:"source_path,omitempty"`
+	RunId         string `protobuf:"bytes,10,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	ToolCallId    string `protobuf:"bytes,11,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
+	MetadataJson  []byte `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceSource) Reset() {
+	*x = ResourceSource{}
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceSource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceSource) ProtoMessage() {}
+
+func (x *ResourceSource) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceSource.ProtoReflect.Descriptor instead.
+func (*ResourceSource) Descriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ResourceSource) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetSourceServiceId() string {
+	if x != nil {
+		return x.SourceServiceId
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetWorkspaceRecordId() string {
+	if x != nil {
+		return x.WorkspaceRecordId
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetServiceWorkspaceId() string {
+	if x != nil {
+		return x.ServiceWorkspaceId
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetSourcePath() string {
+	if x != nil {
+		return x.SourcePath
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
+	}
+	return ""
+}
+
+func (x *ResourceSource) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
+type ResourceRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ref           *ResourceRef           `protobuf:"bytes,1,opt,name=ref,proto3" json:"ref,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,10,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,11,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Source        *ResourceSource        `protobuf:"bytes,20,opt,name=source,proto3" json:"source,omitempty"`
+	Status        ResourceStatus         `protobuf:"varint,30,opt,name=status,proto3,enum=acorn.resource.v1.ResourceStatus" json:"status,omitempty"`
+	Visibility    ResourceVisibility     `protobuf:"varint,31,opt,name=visibility,proto3,enum=acorn.resource.v1.ResourceVisibility" json:"visibility,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,40,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,41,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceRecord) Reset() {
+	*x = ResourceRecord{}
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceRecord) ProtoMessage() {}
+
+func (x *ResourceRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceRecord.ProtoReflect.Descriptor instead.
+func (*ResourceRecord) Descriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ResourceRecord) GetRef() *ResourceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *ResourceRecord) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *ResourceRecord) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *ResourceRecord) GetSource() *ResourceSource {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *ResourceRecord) GetStatus() ResourceStatus {
+	if x != nil {
+		return x.Status
+	}
+	return ResourceStatus_RESOURCE_STATUS_UNSPECIFIED
+}
+
+func (x *ResourceRecord) GetVisibility() ResourceVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return ResourceVisibility_RESOURCE_VISIBILITY_UNSPECIFIED
+}
+
+func (x *ResourceRecord) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *ResourceRecord) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *ResourceRecord) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
+type RegisterResourceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	Ref           *ResourceRef           `protobuf:"bytes,2,opt,name=ref,proto3" json:"ref,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,10,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,11,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Source        *ResourceSource        `protobuf:"bytes,20,opt,name=source,proto3" json:"source,omitempty"`
+	Visibility    ResourceVisibility     `protobuf:"varint,30,opt,name=visibility,proto3,enum=acorn.resource.v1.ResourceVisibility" json:"visibility,omitempty"`
+	MetadataJson  []byte                 `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterResourceRequest) Reset() {
+	*x = RegisterResourceRequest{}
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterResourceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterResourceRequest) ProtoMessage() {}
+
+func (x *RegisterResourceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterResourceRequest.ProtoReflect.Descriptor instead.
+func (*RegisterResourceRequest) Descriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *RegisterResourceRequest) GetScope() *v1.Scope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *RegisterResourceRequest) GetRef() *ResourceRef {
+	if x != nil {
+		return x.Ref
+	}
+	return nil
+}
+
+func (x *RegisterResourceRequest) GetOwnerUserId() string {
+	if x != nil {
+		return x.OwnerUserId
+	}
+	return ""
+}
+
+func (x *RegisterResourceRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RegisterResourceRequest) GetSource() *ResourceSource {
+	if x != nil {
+		return x.Source
+	}
+	return nil
+}
+
+func (x *RegisterResourceRequest) GetVisibility() ResourceVisibility {
+	if x != nil {
+		return x.Visibility
+	}
+	return ResourceVisibility_RESOURCE_VISIBILITY_UNSPECIFIED
+}
+
+func (x *RegisterResourceRequest) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
+type RegisterResourceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Resource      *ResourceRecord        `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterResourceResponse) Reset() {
+	*x = RegisterResourceResponse{}
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterResourceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterResourceResponse) ProtoMessage() {}
+
+func (x *RegisterResourceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterResourceResponse.ProtoReflect.Descriptor instead.
+func (*RegisterResourceResponse) Descriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RegisterResourceResponse) GetResource() *ResourceRecord {
+	if x != nil {
+		return x.Resource
+	}
+	return nil
+}
+
+type GetResourceRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Scope         *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetResourceRequest) Reset() {
+	*x = GetResourceRequest{}
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetResourceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetResourceRequest) ProtoMessage() {}
+
+func (x *GetResourceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetResourceRequest.ProtoReflect.Descriptor instead.
+func (*GetResourceRequest) Descriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetResourceRequest) GetScope() *v1.Scope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *GetResourceRequest) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
+type GetResourceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Resource      *ResourceRecord        `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetResourceResponse) Reset() {
+	*x = GetResourceResponse{}
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetResourceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetResourceResponse) ProtoMessage() {}
+
+func (x *GetResourceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetResourceResponse.ProtoReflect.Descriptor instead.
+func (*GetResourceResponse) Descriptor() ([]byte, []int) {
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetResourceResponse) GetResource() *ResourceRecord {
+	if x != nil {
+		return x.Resource
+	}
+	return nil
+}
+
 type ListResourcesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Scope         *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
-	OwnerType     string                 `protobuf:"bytes,2,opt,name=owner_type,json=ownerType,proto3" json:"owner_type,omitempty"`
-	OwnerId       string                 `protobuf:"bytes,3,opt,name=owner_id,json=ownerId,proto3" json:"owner_id,omitempty"`
-	Type          string                 `protobuf:"bytes,4,opt,name=type,proto3" json:"type,omitempty"`
-	Page          *v1.PageRequest        `protobuf:"bytes,10,opt,name=page,proto3" json:"page,omitempty"`
+	OwnerUserId   string                 `protobuf:"bytes,10,opt,name=owner_user_id,json=ownerUserId,proto3" json:"owner_user_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,11,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Status        ResourceStatus         `protobuf:"varint,20,opt,name=status,proto3,enum=acorn.resource.v1.ResourceStatus" json:"status,omitempty"`
+	Visibility    ResourceVisibility     `protobuf:"varint,21,opt,name=visibility,proto3,enum=acorn.resource.v1.ResourceVisibility" json:"visibility,omitempty"`
+	PageSize      int32                  `protobuf:"varint,30,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,31,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListResourcesRequest) Reset() {
 	*x = ListResourcesRequest{}
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -195,7 +693,7 @@ func (x *ListResourcesRequest) String() string {
 func (*ListResourcesRequest) ProtoMessage() {}
 
 func (x *ListResourcesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[1]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -208,7 +706,7 @@ func (x *ListResourcesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResourcesRequest.ProtoReflect.Descriptor instead.
 func (*ListResourcesRequest) Descriptor() ([]byte, []int) {
-	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{1}
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListResourcesRequest) GetScope() *v1.Scope {
@@ -218,45 +716,59 @@ func (x *ListResourcesRequest) GetScope() *v1.Scope {
 	return nil
 }
 
-func (x *ListResourcesRequest) GetOwnerType() string {
+func (x *ListResourcesRequest) GetOwnerUserId() string {
 	if x != nil {
-		return x.OwnerType
+		return x.OwnerUserId
 	}
 	return ""
 }
 
-func (x *ListResourcesRequest) GetOwnerId() string {
+func (x *ListResourcesRequest) GetSessionId() string {
 	if x != nil {
-		return x.OwnerId
+		return x.SessionId
 	}
 	return ""
 }
 
-func (x *ListResourcesRequest) GetType() string {
+func (x *ListResourcesRequest) GetStatus() ResourceStatus {
 	if x != nil {
-		return x.Type
+		return x.Status
 	}
-	return ""
+	return ResourceStatus_RESOURCE_STATUS_UNSPECIFIED
 }
 
-func (x *ListResourcesRequest) GetPage() *v1.PageRequest {
+func (x *ListResourcesRequest) GetVisibility() ResourceVisibility {
 	if x != nil {
-		return x.Page
+		return x.Visibility
 	}
-	return nil
+	return ResourceVisibility_RESOURCE_VISIBILITY_UNSPECIFIED
+}
+
+func (x *ListResourcesRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListResourcesRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
 }
 
 type ListResourcesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resources     []*ResourceRef         `protobuf:"bytes,1,rep,name=resources,proto3" json:"resources,omitempty"`
-	Page          *v1.PageResponse       `protobuf:"bytes,2,opt,name=page,proto3" json:"page,omitempty"`
+	Resources     []*ResourceRecord      `protobuf:"bytes,1,rep,name=resources,proto3" json:"resources,omitempty"`
+	NextPageToken string                 `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListResourcesResponse) Reset() {
 	*x = ListResourcesResponse{}
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +780,7 @@ func (x *ListResourcesResponse) String() string {
 func (*ListResourcesResponse) ProtoMessage() {}
 
 func (x *ListResourcesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_acorn_resource_v1_resource_proto_msgTypes[2]
+	mi := &file_acorn_resource_v1_resource_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,59 +793,115 @@ func (x *ListResourcesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResourcesResponse.ProtoReflect.Descriptor instead.
 func (*ListResourcesResponse) Descriptor() ([]byte, []int) {
-	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{2}
+	return file_acorn_resource_v1_resource_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *ListResourcesResponse) GetResources() []*ResourceRef {
+func (x *ListResourcesResponse) GetResources() []*ResourceRecord {
 	if x != nil {
 		return x.Resources
 	}
 	return nil
 }
 
-func (x *ListResourcesResponse) GetPage() *v1.PageResponse {
+func (x *ListResourcesResponse) GetNextPageToken() string {
 	if x != nil {
-		return x.Page
+		return x.NextPageToken
 	}
-	return nil
+	return ""
 }
 
 var File_acorn_resource_v1_resource_proto protoreflect.FileDescriptor
 
 const file_acorn_resource_v1_resource_proto_rawDesc = "" +
 	"\n" +
-	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\"\x82\x03\n" +
+	" acorn/resource/v1/resource.proto\x12\x11acorn.resource.v1\x1a\x1cacorn/common/v1/common.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe7\x01\n" +
 	"\vResourceRef\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
-	"\x03uri\x18\x02 \x01(\tR\x03uri\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\x12\x12\n" +
-	"\x04type\x18\x04 \x01(\tR\x04type\x12\x1b\n" +
-	"\tmime_type\x18\x05 \x01(\tR\bmimeType\x12\x12\n" +
-	"\x04size\x18\x06 \x01(\x03R\x04size\x12\x1c\n" +
-	"\tauthority\x18\n" +
-	" \x01(\tR\tauthority\x12\x1d\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
+	"\x14authority_service_id\x18\x02 \x01(\tR\x12authorityServiceId\x12\x12\n" +
+	"\x04name\x18\n" +
+	" \x01(\tR\x04name\x12\x1b\n" +
+	"\tmime_type\x18\v \x01(\tR\bmimeType\x12\x1d\n" +
 	"\n" +
-	"service_id\x18\v \x01(\tR\tserviceId\x12\x1f\n" +
-	"\vprovider_id\x18\f \x01(\tR\n" +
-	"providerId\x12\x1d\n" +
+	"size_bytes\x18\f \x01(\x03R\tsizeBytes\x12!\n" +
+	"\fcontent_hash\x18\r \x01(\tR\vcontentHash\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xb1\x02\n" +
+	"\x0eResourceSource\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12*\n" +
+	"\x11source_service_id\x18\x02 \x01(\tR\x0fsourceServiceId\x12.\n" +
+	"\x13workspace_record_id\x18\x03 \x01(\tR\x11workspaceRecordId\x120\n" +
+	"\x14service_workspace_id\x18\x04 \x01(\tR\x12serviceWorkspaceId\x12\x1f\n" +
+	"\vsource_path\x18\x05 \x01(\tR\n" +
+	"sourcePath\x12\x15\n" +
+	"\x06run_id\x18\n" +
+	" \x01(\tR\x05runId\x12 \n" +
+	"\ftool_call_id\x18\v \x01(\tR\n" +
+	"toolCallId\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xdd\x03\n" +
+	"\x0eResourceRecord\x120\n" +
+	"\x03ref\x18\x01 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\x03ref\x12\"\n" +
+	"\rowner_user_id\x18\n" +
+	" \x01(\tR\vownerUserId\x12\x1d\n" +
 	"\n" +
-	"owner_type\x18\x14 \x01(\tR\townerType\x12\x19\n" +
-	"\bowner_id\x18\x15 \x01(\tR\aownerId\x12\x18\n" +
-	"\aversion\x18\x1e \x01(\tR\aversion\x12!\n" +
-	"\fcontent_hash\x18\x1f \x01(\tR\vcontentHash\x12#\n" +
-	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xc4\x01\n" +
+	"session_id\x18\v \x01(\tR\tsessionId\x129\n" +
+	"\x06source\x18\x14 \x01(\v2!.acorn.resource.v1.ResourceSourceR\x06source\x129\n" +
+	"\x06status\x18\x1e \x01(\x0e2!.acorn.resource.v1.ResourceStatusR\x06status\x12E\n" +
+	"\n" +
+	"visibility\x18\x1f \x01(\x0e2%.acorn.resource.v1.ResourceVisibilityR\n" +
+	"visibility\x129\n" +
+	"\n" +
+	"created_at\x18( \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18) \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\xe3\x02\n" +
+	"\x17RegisterResourceRequest\x12,\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x120\n" +
+	"\x03ref\x18\x02 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\x03ref\x12\"\n" +
+	"\rowner_user_id\x18\n" +
+	" \x01(\tR\vownerUserId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\v \x01(\tR\tsessionId\x129\n" +
+	"\x06source\x18\x14 \x01(\v2!.acorn.resource.v1.ResourceSourceR\x06source\x12E\n" +
+	"\n" +
+	"visibility\x18\x1e \x01(\x0e2%.acorn.resource.v1.ResourceVisibilityR\n" +
+	"visibility\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"Y\n" +
+	"\x18RegisterResourceResponse\x12=\n" +
+	"\bresource\x18\x01 \x01(\v2!.acorn.resource.v1.ResourceRecordR\bresource\"c\n" +
+	"\x12GetResourceRequest\x12,\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\x1f\n" +
+	"\vresource_id\x18\x02 \x01(\tR\n" +
+	"resourceId\"T\n" +
+	"\x13GetResourceResponse\x12=\n" +
+	"\bresource\x18\x01 \x01(\v2!.acorn.resource.v1.ResourceRecordR\bresource\"\xc5\x02\n" +
 	"\x14ListResourcesRequest\x12,\n" +
-	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\x1d\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x12\"\n" +
+	"\rowner_user_id\x18\n" +
+	" \x01(\tR\vownerUserId\x12\x1d\n" +
 	"\n" +
-	"owner_type\x18\x02 \x01(\tR\townerType\x12\x19\n" +
-	"\bowner_id\x18\x03 \x01(\tR\aownerId\x12\x12\n" +
-	"\x04type\x18\x04 \x01(\tR\x04type\x120\n" +
-	"\x04page\x18\n" +
-	" \x01(\v2\x1c.acorn.common.v1.PageRequestR\x04page\"\x88\x01\n" +
-	"\x15ListResourcesResponse\x12<\n" +
-	"\tresources\x18\x01 \x03(\v2\x1e.acorn.resource.v1.ResourceRefR\tresources\x121\n" +
-	"\x04page\x18\x02 \x01(\v2\x1d.acorn.common.v1.PageResponseR\x04page2u\n" +
-	"\x0fResourceService\x12b\n" +
+	"session_id\x18\v \x01(\tR\tsessionId\x129\n" +
+	"\x06status\x18\x14 \x01(\x0e2!.acorn.resource.v1.ResourceStatusR\x06status\x12E\n" +
+	"\n" +
+	"visibility\x18\x15 \x01(\x0e2%.acorn.resource.v1.ResourceVisibilityR\n" +
+	"visibility\x12\x1b\n" +
+	"\tpage_size\x18\x1e \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x1f \x01(\tR\tpageToken\"\x80\x01\n" +
+	"\x15ListResourcesResponse\x12?\n" +
+	"\tresources\x18\x01 \x03(\v2!.acorn.resource.v1.ResourceRecordR\tresources\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken*\xab\x01\n" +
+	"\x0eResourceStatus\x12\x1f\n" +
+	"\x1bRESOURCE_STATUS_UNSPECIFIED\x10\x00\x12\x1b\n" +
+	"\x17RESOURCE_STATUS_PENDING\x10\x01\x12\x1d\n" +
+	"\x19RESOURCE_STATUS_AVAILABLE\x10\x02\x12\x1f\n" +
+	"\x1bRESOURCE_STATUS_UNAVAILABLE\x10\x03\x12\x1b\n" +
+	"\x17RESOURCE_STATUS_DELETED\x10\x04*\x81\x01\n" +
+	"\x12ResourceVisibility\x12#\n" +
+	"\x1fRESOURCE_VISIBILITY_UNSPECIFIED\x10\x00\x12 \n" +
+	"\x1cRESOURCE_VISIBILITY_INTERNAL\x10\x01\x12$\n" +
+	" RESOURCE_VISIBILITY_USER_VISIBLE\x10\x022\xc0\x02\n" +
+	"\x0fResourceService\x12k\n" +
+	"\x10RegisterResource\x12*.acorn.resource.v1.RegisterResourceRequest\x1a+.acorn.resource.v1.RegisterResourceResponse\x12\\\n" +
+	"\vGetResource\x12%.acorn.resource.v1.GetResourceRequest\x1a&.acorn.resource.v1.GetResourceResponse\x12b\n" +
 	"\rListResources\x12'.acorn.resource.v1.ListResourcesRequest\x1a(.acorn.resource.v1.ListResourcesResponseBJZHgithub.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1;resourcev1b\x06proto3"
 
 var (
@@ -348,27 +916,52 @@ func file_acorn_resource_v1_resource_proto_rawDescGZIP() []byte {
 	return file_acorn_resource_v1_resource_proto_rawDescData
 }
 
-var file_acorn_resource_v1_resource_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_acorn_resource_v1_resource_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_acorn_resource_v1_resource_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_acorn_resource_v1_resource_proto_goTypes = []any{
-	(*ResourceRef)(nil),           // 0: acorn.resource.v1.ResourceRef
-	(*ListResourcesRequest)(nil),  // 1: acorn.resource.v1.ListResourcesRequest
-	(*ListResourcesResponse)(nil), // 2: acorn.resource.v1.ListResourcesResponse
-	(*v1.Scope)(nil),              // 3: acorn.common.v1.Scope
-	(*v1.PageRequest)(nil),        // 4: acorn.common.v1.PageRequest
-	(*v1.PageResponse)(nil),       // 5: acorn.common.v1.PageResponse
+	(ResourceStatus)(0),              // 0: acorn.resource.v1.ResourceStatus
+	(ResourceVisibility)(0),          // 1: acorn.resource.v1.ResourceVisibility
+	(*ResourceRef)(nil),              // 2: acorn.resource.v1.ResourceRef
+	(*ResourceSource)(nil),           // 3: acorn.resource.v1.ResourceSource
+	(*ResourceRecord)(nil),           // 4: acorn.resource.v1.ResourceRecord
+	(*RegisterResourceRequest)(nil),  // 5: acorn.resource.v1.RegisterResourceRequest
+	(*RegisterResourceResponse)(nil), // 6: acorn.resource.v1.RegisterResourceResponse
+	(*GetResourceRequest)(nil),       // 7: acorn.resource.v1.GetResourceRequest
+	(*GetResourceResponse)(nil),      // 8: acorn.resource.v1.GetResourceResponse
+	(*ListResourcesRequest)(nil),     // 9: acorn.resource.v1.ListResourcesRequest
+	(*ListResourcesResponse)(nil),    // 10: acorn.resource.v1.ListResourcesResponse
+	(*timestamppb.Timestamp)(nil),    // 11: google.protobuf.Timestamp
+	(*v1.Scope)(nil),                 // 12: acorn.common.v1.Scope
 }
 var file_acorn_resource_v1_resource_proto_depIdxs = []int32{
-	3, // 0: acorn.resource.v1.ListResourcesRequest.scope:type_name -> acorn.common.v1.Scope
-	4, // 1: acorn.resource.v1.ListResourcesRequest.page:type_name -> acorn.common.v1.PageRequest
-	0, // 2: acorn.resource.v1.ListResourcesResponse.resources:type_name -> acorn.resource.v1.ResourceRef
-	5, // 3: acorn.resource.v1.ListResourcesResponse.page:type_name -> acorn.common.v1.PageResponse
-	1, // 4: acorn.resource.v1.ResourceService.ListResources:input_type -> acorn.resource.v1.ListResourcesRequest
-	2, // 5: acorn.resource.v1.ResourceService.ListResources:output_type -> acorn.resource.v1.ListResourcesResponse
-	5, // [5:6] is the sub-list for method output_type
-	4, // [4:5] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	2,  // 0: acorn.resource.v1.ResourceRecord.ref:type_name -> acorn.resource.v1.ResourceRef
+	3,  // 1: acorn.resource.v1.ResourceRecord.source:type_name -> acorn.resource.v1.ResourceSource
+	0,  // 2: acorn.resource.v1.ResourceRecord.status:type_name -> acorn.resource.v1.ResourceStatus
+	1,  // 3: acorn.resource.v1.ResourceRecord.visibility:type_name -> acorn.resource.v1.ResourceVisibility
+	11, // 4: acorn.resource.v1.ResourceRecord.created_at:type_name -> google.protobuf.Timestamp
+	11, // 5: acorn.resource.v1.ResourceRecord.updated_at:type_name -> google.protobuf.Timestamp
+	12, // 6: acorn.resource.v1.RegisterResourceRequest.scope:type_name -> acorn.common.v1.Scope
+	2,  // 7: acorn.resource.v1.RegisterResourceRequest.ref:type_name -> acorn.resource.v1.ResourceRef
+	3,  // 8: acorn.resource.v1.RegisterResourceRequest.source:type_name -> acorn.resource.v1.ResourceSource
+	1,  // 9: acorn.resource.v1.RegisterResourceRequest.visibility:type_name -> acorn.resource.v1.ResourceVisibility
+	4,  // 10: acorn.resource.v1.RegisterResourceResponse.resource:type_name -> acorn.resource.v1.ResourceRecord
+	12, // 11: acorn.resource.v1.GetResourceRequest.scope:type_name -> acorn.common.v1.Scope
+	4,  // 12: acorn.resource.v1.GetResourceResponse.resource:type_name -> acorn.resource.v1.ResourceRecord
+	12, // 13: acorn.resource.v1.ListResourcesRequest.scope:type_name -> acorn.common.v1.Scope
+	0,  // 14: acorn.resource.v1.ListResourcesRequest.status:type_name -> acorn.resource.v1.ResourceStatus
+	1,  // 15: acorn.resource.v1.ListResourcesRequest.visibility:type_name -> acorn.resource.v1.ResourceVisibility
+	4,  // 16: acorn.resource.v1.ListResourcesResponse.resources:type_name -> acorn.resource.v1.ResourceRecord
+	5,  // 17: acorn.resource.v1.ResourceService.RegisterResource:input_type -> acorn.resource.v1.RegisterResourceRequest
+	7,  // 18: acorn.resource.v1.ResourceService.GetResource:input_type -> acorn.resource.v1.GetResourceRequest
+	9,  // 19: acorn.resource.v1.ResourceService.ListResources:input_type -> acorn.resource.v1.ListResourcesRequest
+	6,  // 20: acorn.resource.v1.ResourceService.RegisterResource:output_type -> acorn.resource.v1.RegisterResourceResponse
+	8,  // 21: acorn.resource.v1.ResourceService.GetResource:output_type -> acorn.resource.v1.GetResourceResponse
+	10, // 22: acorn.resource.v1.ResourceService.ListResources:output_type -> acorn.resource.v1.ListResourcesResponse
+	20, // [20:23] is the sub-list for method output_type
+	17, // [17:20] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_acorn_resource_v1_resource_proto_init() }
@@ -381,13 +974,14 @@ func file_acorn_resource_v1_resource_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_acorn_resource_v1_resource_proto_rawDesc), len(file_acorn_resource_v1_resource_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   3,
+			NumEnums:      2,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_acorn_resource_v1_resource_proto_goTypes,
 		DependencyIndexes: file_acorn_resource_v1_resource_proto_depIdxs,
+		EnumInfos:         file_acorn_resource_v1_resource_proto_enumTypes,
 		MessageInfos:      file_acorn_resource_v1_resource_proto_msgTypes,
 	}.Build()
 	File_acorn_resource_v1_resource_proto = out.File

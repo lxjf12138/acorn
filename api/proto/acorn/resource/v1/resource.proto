@@ -3,39 +3,123 @@ syntax = "proto3";
 package acorn.resource.v1;
 
 import "acorn/common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1;resourcev1";
 
 message ResourceRef {
   string id = 1;
-  string uri = 2;
-  string name = 3;
-  string type = 4;
-  string mime_type = 5;
-  int64 size = 6;
-  string authority = 10;
-  string service_id = 11;
-  string provider_id = 12;
-  string owner_type = 20;
-  string owner_id = 21;
-  string version = 30;
-  string content_hash = 31;
+
+  // Service or resource authority that can provide bytes or metadata for this
+  // resource.
+  string authority_service_id = 2;
+
+  string name = 10;
+  string mime_type = 11;
+  int64 size_bytes = 12;
+  string content_hash = 13;
+
   bytes metadata_json = 100;
+}
+
+enum ResourceStatus {
+  RESOURCE_STATUS_UNSPECIFIED = 0;
+  RESOURCE_STATUS_PENDING = 1;
+  RESOURCE_STATUS_AVAILABLE = 2;
+  RESOURCE_STATUS_UNAVAILABLE = 3;
+  RESOURCE_STATUS_DELETED = 4;
+}
+
+enum ResourceVisibility {
+  RESOURCE_VISIBILITY_UNSPECIFIED = 0;
+  RESOURCE_VISIBILITY_INTERNAL = 1;
+  RESOURCE_VISIBILITY_USER_VISIBLE = 2;
+}
+
+message ResourceSource {
+  // user_upload | sandbox_export | mail_attachment | browser_download |
+  // document_export | workspace_bundle | generated_content
+  string type = 1;
+
+  string source_service_id = 2;
+
+  // Optional control-plane workspace record id.
+  string workspace_record_id = 3;
+
+  // Optional service-local workspace id.
+  string service_workspace_id = 4;
+
+  // Optional service-local source path or object id.
+  string source_path = 5;
+
+  string run_id = 10;
+  string tool_call_id = 11;
+
+  bytes metadata_json = 100;
+}
+
+message ResourceRecord {
+  ResourceRef ref = 1;
+
+  string owner_user_id = 10;
+  string session_id = 11;
+
+  ResourceSource source = 20;
+  ResourceStatus status = 30;
+  ResourceVisibility visibility = 31;
+
+  google.protobuf.Timestamp created_at = 40;
+  google.protobuf.Timestamp updated_at = 41;
+
+  bytes metadata_json = 100;
+}
+
+message RegisterResourceRequest {
+  acorn.common.v1.Scope scope = 1;
+  ResourceRef ref = 2;
+
+  string owner_user_id = 10;
+  string session_id = 11;
+
+  ResourceSource source = 20;
+  ResourceVisibility visibility = 30;
+
+  bytes metadata_json = 100;
+}
+
+message RegisterResourceResponse {
+  ResourceRecord resource = 1;
+}
+
+message GetResourceRequest {
+  acorn.common.v1.Scope scope = 1;
+  string resource_id = 2;
+}
+
+message GetResourceResponse {
+  ResourceRecord resource = 1;
 }
 
 message ListResourcesRequest {
   acorn.common.v1.Scope scope = 1;
-  string owner_type = 2;
-  string owner_id = 3;
-  string type = 4;
-  acorn.common.v1.PageRequest page = 10;
+
+  string owner_user_id = 10;
+  string session_id = 11;
+
+  ResourceStatus status = 20;
+  ResourceVisibility visibility = 21;
+
+  int32 page_size = 30;
+  string page_token = 31;
 }
 
 message ListResourcesResponse {
-  repeated ResourceRef resources = 1;
-  acorn.common.v1.PageResponse page = 2;
+  repeated ResourceRecord resources = 1;
+  string next_page_token = 2;
 }
 
 service ResourceService {
+  rpc RegisterResource(RegisterResourceRequest) returns (RegisterResourceResponse);
+  rpc GetResource(GetResourceRequest) returns (GetResourceResponse);
   rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse);
 }
