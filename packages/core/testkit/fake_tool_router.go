@@ -26,12 +26,12 @@ func (f *FakeToolRouter) AddToolProvider(provider toolprovidercore.ToolProvider)
 
 func (f *FakeToolRouter) CallTool(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error) {
 	f.mu.RLock()
-	provider, ok := f.toolProviders[req.GetTargetServiceId()]
+	toolProvider, ok := f.toolProviders[req.GetTargetServiceId()]
 	f.mu.RUnlock()
 	if !ok {
 		return nil, toolprovidercore.ErrToolProviderNotFound
 	}
-	return provider.CallTool(ctx, req)
+	return toolProvider.CallTool(ctx, req)
 }
 
 var _ toolcore.Router = (*FakeToolRouter)(nil)

@@ -14,6 +14,7 @@ func NewLogger(info BuildInfo, level string) klog.Logger {
 		filtered,
 		"ts", klog.DefaultTimestamp,
 		"caller", klog.DefaultCaller,
+		"service.id", info.ID,
 		"service.name", info.Name,
 		"service.version", info.Version,
 	)

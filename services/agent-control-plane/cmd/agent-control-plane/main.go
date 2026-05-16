@@ -31,6 +31,7 @@ func main() {
 	}
 
 	logger := servicekit.NewLogger(servicekit.BuildInfo{
+		ID:      cfg.Service.ID,
 		Name:    cfg.Service.Name,
 		Version: version.Version,
 	}, cfg.Log.Level)
