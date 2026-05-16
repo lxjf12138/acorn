@@ -47,7 +47,7 @@ func main() {
 	workspaceService := service.NewWorkspaceService(workspaceStore, workspaceClient, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, logger)
-	grpcSrv := server.NewGRPCServer(cfg, logger)
+	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

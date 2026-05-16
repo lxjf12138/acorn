@@ -62,25 +62,25 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err := readProtoJSON(ctx, &req); err != nil {
 			return err
 		}
-		record, err := resourceService.RegisterResource(ctx, &req)
+		record, err := resourceService.RegisterRecord(ctx, &req)
 		if err != nil {
 			return err
 		}
-		return writeResourceRecordJSON(ctx, nethttp.StatusCreated, record)
+		return writeRegisterResourceJSON(ctx, nethttp.StatusCreated, record)
 	})
 	router.GET("/resources/{resource_id}", func(ctx khttp.Context) error {
-		record, err := resourceService.GetResource(ctx, ctx.Vars().Get("resource_id"))
+		record, err := resourceService.GetRecord(ctx, ctx.Vars().Get("resource_id"))
 		if err != nil {
 			return err
 		}
-		return writeResourceRecordJSON(ctx, nethttp.StatusOK, record)
+		return writeGetResourceJSON(ctx, nethttp.StatusOK, record)
 	})
 	router.GET("/resources", func(ctx khttp.Context) error {
 		filter, err := resourceFilterFromQuery(ctx)
 		if err != nil {
 			return err
 		}
-		records, err := resourceService.ListResources(ctx, filter)
+		records, err := resourceService.ListRecords(ctx, filter)
 		if err != nil {
 			return err
 		}
@@ -123,7 +123,11 @@ func writeProtoJSON(ctx khttp.Context, code int, msg proto.Message) error {
 	return ctx.Blob(code, "application/json", body)
 }
 
-func writeResourceRecordJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
+func writeRegisterResourceJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
+	return writeProtoJSON(ctx, code, &resourcev1.RegisterResourceResponse{Resource: record})
+}
+
+func writeGetResourceJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
 	return writeProtoJSON(ctx, code, &resourcev1.GetResourceResponse{Resource: record})
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"google.golang.org/grpc/codes"
@@ -12,7 +13,7 @@ import (
 
 func TestResourceServiceRegisterResource(t *testing.T) {
 	service := NewResourceService(resourcedomain.NewMemoryStore())
-	record, err := service.RegisterResource(context.Background(), &resourcev1.RegisterResourceRequest{
+	resp, err := service.RegisterResource(context.Background(), &resourcev1.RegisterResourceRequest{
 		Ref: &resourcev1.ResourceRef{
 			AuthorityServiceId: "resource-store",
 			Name:               "report.pdf",
@@ -30,11 +31,33 @@ func TestResourceServiceRegisterResource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RegisterResource returned error: %v", err)
 	}
+	record := resp.GetResource()
 	if record.GetRef().GetId() == "" || record.GetRef().GetAuthorityServiceId() != "resource-store" {
 		t.Fatalf("unexpected resource ref: %+v", record.GetRef())
 	}
 	if record.GetSource().GetType() != "sandbox_export" {
 		t.Fatalf("unexpected source: %+v", record.GetSource())
+	}
+}
+
+func TestResourceServiceRegisterResourceUsesScopeDefaults(t *testing.T) {
+	service := NewResourceService(resourcedomain.NewMemoryStore())
+	resp, err := service.RegisterResource(context.Background(), &resourcev1.RegisterResourceRequest{
+		Scope: &commonv1.Scope{
+			UserId:    "user-from-scope",
+			SessionId: "session-from-scope",
+		},
+		Ref: &resourcev1.ResourceRef{
+			AuthorityServiceId: "resource-store",
+			Name:               "report.pdf",
+		},
+	})
+	if err != nil {
+		t.Fatalf("RegisterResource returned error: %v", err)
+	}
+	record := resp.GetResource()
+	if record.GetOwnerUserId() != "user-from-scope" || record.GetSessionId() != "session-from-scope" {
+		t.Fatalf("scope defaults were not used: %+v", record)
 	}
 }
 
@@ -48,9 +71,22 @@ func TestResourceServiceRejectsInvalidResource(t *testing.T) {
 	}
 }
 
+func TestResourceServiceRequiresOwnerUserID(t *testing.T) {
+	service := NewResourceService(resourcedomain.NewMemoryStore())
+	_, err := service.RegisterResource(context.Background(), &resourcev1.RegisterResourceRequest{
+		Ref: &resourcev1.ResourceRef{
+			AuthorityServiceId: "resource-store",
+			Name:               "report.pdf",
+		},
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
 func TestResourceServiceGetAndListResources(t *testing.T) {
 	service := NewResourceService(resourcedomain.NewMemoryStore())
-	created, err := service.RegisterResource(context.Background(), &resourcev1.RegisterResourceRequest{
+	created, err := service.RegisterRecord(context.Background(), &resourcev1.RegisterResourceRequest{
 		Ref: &resourcev1.ResourceRef{
 			AuthorityServiceId: "resource-store",
 			Name:               "report.pdf",
@@ -61,14 +97,14 @@ func TestResourceServiceGetAndListResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RegisterResource returned error: %v", err)
 	}
-	got, err := service.GetResource(context.Background(), created.GetRef().GetId())
+	got, err := service.GetRecord(context.Background(), created.GetRef().GetId())
 	if err != nil {
 		t.Fatalf("GetResource returned error: %v", err)
 	}
 	if got.GetRef().GetName() != "report.pdf" {
 		t.Fatalf("unexpected resource: %+v", got)
 	}
-	listed, err := service.ListResources(context.Background(), resourcedomain.Filter{
+	listed, err := service.ListRecords(context.Background(), resourcedomain.Filter{
 		OwnerUserID: "user-1",
 		SessionID:   "session-1",
 	})

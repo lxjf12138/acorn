@@ -13,7 +13,6 @@ func TestFakeResourceCatalogRegistersGetsAndListsResources(t *testing.T) {
 	catalog := NewFakeResourceCatalog()
 	record, err := catalog.Register(context.Background(), &resourcev1.ResourceRecord{
 		Ref: &resourcev1.ResourceRef{
-			Id:                 "res-1",
 			AuthorityServiceId: "resource-store",
 			Name:               "a.txt",
 			MimeType:           "text/plain",
@@ -27,11 +26,20 @@ func TestFakeResourceCatalogRegistersGetsAndListsResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Register returned error: %v", err)
 	}
-	if record.GetRef().GetName() != "a.txt" {
+	if record.GetRef().GetId() == "" || record.GetRef().GetName() != "a.txt" {
 		t.Fatalf("unexpected registered resource: %+v", record)
 	}
+	if record.GetStatus() != resourcev1.ResourceStatus_RESOURCE_STATUS_AVAILABLE {
+		t.Fatalf("unexpected status: %v", record.GetStatus())
+	}
+	if record.GetVisibility() != resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE {
+		t.Fatalf("unexpected visibility: %v", record.GetVisibility())
+	}
+	if record.GetCreatedAt() == nil || record.GetUpdatedAt() == nil {
+		t.Fatalf("timestamps were not filled: %+v", record)
+	}
 
-	got, err := catalog.Get(context.Background(), "res-1")
+	got, err := catalog.Get(context.Background(), record.GetRef().GetId())
 	if err != nil {
 		t.Fatalf("Get returned error: %v", err)
 	}
