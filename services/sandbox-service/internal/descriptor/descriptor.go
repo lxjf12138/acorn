@@ -35,8 +35,8 @@ func NewSourceFromConfig(cfg *conf.Config, version string) *Source {
 		ServiceID:   cfg.Service.Name,
 		DisplayName: "Local Sandbox Service",
 		Version:     version,
-		HTTPAddr:    cfg.Server.HTTP.Addr,
-		GRPCAddr:    cfg.Server.GRPC.Addr,
+		HTTPAddr:    cfg.Server.HTTP.AdvertiseAddr,
+		GRPCAddr:    cfg.Server.GRPC.AdvertiseAddr,
 	})
 }
 
@@ -164,6 +164,9 @@ func (o Options) withDefaults() Options {
 	}
 	if o.Version == "" {
 		o.Version = "dev"
+	}
+	if o.MCPEndpoint == "" {
+		o.MCPEndpoint = "/mcp"
 	}
 	return o
 }

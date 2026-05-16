@@ -438,6 +438,8 @@ The descriptor should be generated from runtime configuration and code registrat
 
 Endpoint descriptors should state which surface an endpoint serves, which protocol and transport it uses, where it can be reached, and whether it is declared, experimental, or implemented.
 
+Endpoint addresses are advertised addresses for callers and registries. They are not necessarily the same as the service's bind/listen address, such as `0.0.0.0`.
+
 ### 6.1 Example Descriptor
 
 ```yaml

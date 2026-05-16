@@ -26,13 +26,15 @@ type Server struct {
 }
 
 type HTTP struct {
-	Addr    string `json:"addr" yaml:"addr"`
-	Timeout string `json:"timeout" yaml:"timeout"`
+	Addr          string `json:"addr" yaml:"addr"`
+	AdvertiseAddr string `json:"advertise_addr" yaml:"advertise_addr"`
+	Timeout       string `json:"timeout" yaml:"timeout"`
 }
 
 type GRPC struct {
-	Addr    string `json:"addr" yaml:"addr"`
-	Timeout string `json:"timeout" yaml:"timeout"`
+	Addr          string `json:"addr" yaml:"addr"`
+	AdvertiseAddr string `json:"advertise_addr" yaml:"advertise_addr"`
+	Timeout       string `json:"timeout" yaml:"timeout"`
 }
 
 type Log struct {
@@ -69,8 +71,14 @@ func (c *Config) Validate() error {
 	if c.Server.HTTP.Addr == "" {
 		return fmt.Errorf("server.http.addr is required")
 	}
+	if c.Server.HTTP.AdvertiseAddr == "" {
+		c.Server.HTTP.AdvertiseAddr = c.Server.HTTP.Addr
+	}
 	if c.Server.GRPC.Addr == "" {
 		return fmt.Errorf("server.grpc.addr is required")
+	}
+	if c.Server.GRPC.AdvertiseAddr == "" {
+		c.Server.GRPC.AdvertiseAddr = c.Server.GRPC.Addr
 	}
 	if _, err := time.ParseDuration(c.Server.HTTP.Timeout); err != nil {
 		return fmt.Errorf("parse server.http.timeout: %w", err)

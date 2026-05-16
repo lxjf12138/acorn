@@ -5,9 +5,11 @@ service:
 server:
   http:
     addr: 0.0.0.0:8081
+    advertise_addr: sandbox-service:8081
     timeout: 10s
   grpc:
     addr: 0.0.0.0:9081
+    advertise_addr: sandbox-service:9081
     timeout: 10s
 
 log:

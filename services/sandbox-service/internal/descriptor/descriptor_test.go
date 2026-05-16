@@ -9,11 +9,10 @@ import (
 
 func TestDescribeCapabilities(t *testing.T) {
 	source := NewSource(Options{
-		ServiceID:   "sandbox.local.test",
-		Version:     "test",
-		HTTPAddr:    "127.0.0.1:8081",
-		GRPCAddr:    "127.0.0.1:9081",
-		MCPEndpoint: "/mcp",
+		ServiceID: "sandbox.local.test",
+		Version:   "test",
+		HTTPAddr:  "sandbox-service:8081",
+		GRPCAddr:  "sandbox-service:9081",
 	})
 	descriptor, err := source.DescribeCapabilities(context.Background())
 	if err != nil {
@@ -43,10 +42,10 @@ func TestDescribeCapabilities(t *testing.T) {
 	if status := surfaceStatus(descriptor, "resource"); status != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
 		t.Fatalf("unexpected resource surface status: %s", status)
 	}
-	if endpoint := endpointByName(descriptor, "control-http"); endpoint.GetAddress() != "127.0.0.1:8081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {
+	if endpoint := endpointByName(descriptor, "control-http"); endpoint.GetAddress() != "sandbox-service:8081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {
 		t.Fatalf("unexpected control HTTP endpoint: %+v", endpoint)
 	}
-	if endpoint := endpointByName(descriptor, "control-grpc"); endpoint.GetAddress() != "127.0.0.1:9081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {
+	if endpoint := endpointByName(descriptor, "control-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {
 		t.Fatalf("unexpected control gRPC endpoint: %+v", endpoint)
 	}
 }
