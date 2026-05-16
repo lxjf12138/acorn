@@ -7,10 +7,9 @@ import (
 	"mime"
 	"net/http"
 	"os"
-	"path/filepath"
+	pathpkg "path"
 	"sort"
 	"strconv"
-	"strings"
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
@@ -55,7 +54,7 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 	if err != nil {
 		return nil, err
 	}
-	absPath, err := lexicalWorkspacePath(workspace.RootPath, relPath)
+	absPath, err := pathdomain.LexicalWorkspacePath(workspace.RootPath, relPath)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace path")
 	}
@@ -69,7 +68,7 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 	if info.Mode()&os.ModeSymlink != 0 {
 		return nil, status.Error(codes.PermissionDenied, "workspace directory view does not follow symlinks")
 	}
-	resolvedPath, err := resolveExistingWorkspacePath(workspace.RootPath, absPath)
+	resolvedPath, err := pathdomain.ResolveExistingWorkspacePath(workspace.RootPath, absPath)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, "workspace path escapes workspace root")
 	}
@@ -127,7 +126,7 @@ func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sa
 	if err != nil {
 		return nil, err
 	}
-	absPath, err := lexicalWorkspacePath(workspace.RootPath, relPath)
+	absPath, err := pathdomain.LexicalWorkspacePath(workspace.RootPath, relPath)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid workspace path")
 	}
@@ -141,7 +140,7 @@ func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sa
 	if info.Mode()&os.ModeSymlink != 0 {
 		return nil, status.Error(codes.PermissionDenied, "workspace file preview does not follow symlinks")
 	}
-	resolvedPath, err := resolveExistingWorkspacePath(workspace.RootPath, absPath)
+	resolvedPath, err := pathdomain.ResolveExistingWorkspacePath(workspace.RootPath, absPath)
 	if err != nil {
 		return nil, status.Error(codes.PermissionDenied, "workspace path escapes workspace root")
 	}
@@ -206,44 +205,6 @@ func (s *WorkspaceViewService) pathRef(workspace workspacedomain.Workspace, relP
 		Kind:        kind,
 		DisplayName: displayNameForPath(relPath),
 	}
-}
-
-func lexicalWorkspacePath(root string, rel string) (string, error) {
-	if root == "" {
-		return "", pathdomain.ErrInvalidPath
-	}
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return "", err
-	}
-	absPath := filepath.Join(absRoot, filepath.FromSlash(rel))
-	absPath, err = filepath.Abs(absPath)
-	if err != nil {
-		return "", err
-	}
-	if absPath != absRoot && !strings.HasPrefix(absPath, absRoot+string(os.PathSeparator)) {
-		return "", pathdomain.ErrInvalidPath
-	}
-	return absPath, nil
-}
-
-func resolveExistingWorkspacePath(root string, absPath string) (string, error) {
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return "", err
-	}
-	resolvedRoot, err := filepath.EvalSymlinks(absRoot)
-	if err != nil {
-		return "", err
-	}
-	resolvedPath, err := filepath.EvalSymlinks(absPath)
-	if err != nil {
-		return "", err
-	}
-	if resolvedPath != resolvedRoot && !strings.HasPrefix(resolvedPath, resolvedRoot+string(os.PathSeparator)) {
-		return "", pathdomain.ErrInvalidPath
-	}
-	return resolvedPath, nil
 }
 
 func parsePageToken(token string) (int, error) {
@@ -315,7 +276,7 @@ func joinRelativePath(parent string, name string) string {
 }
 
 func detectMimeType(relPath string, preview []byte) string {
-	if mimeType := mime.TypeByExtension(filepath.Ext(relPath)); mimeType != "" {
+	if mimeType := mime.TypeByExtension(pathpkg.Ext(relPath)); mimeType != "" {
 		return mimeType
 	}
 	if len(preview) == 0 {
@@ -328,5 +289,5 @@ func displayNameForPath(relPath string) string {
 	if relPath == "" {
 		return ""
 	}
-	return filepath.Base(relPath)
+	return pathpkg.Base(relPath)
 }

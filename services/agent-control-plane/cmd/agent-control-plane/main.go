@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 	defer workspaceClient.Close()
-	workspaceService := service.NewWorkspaceService(workspaceStore, workspaceClient, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
+	workspaceService := service.NewWorkspaceServiceWithResources(workspaceStore, workspaceClient, resourceService, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)

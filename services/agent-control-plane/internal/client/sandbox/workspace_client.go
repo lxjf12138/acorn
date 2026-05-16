@@ -16,6 +16,7 @@ type WorkspaceHostClient interface {
 	GetHostedWorkspaceState(ctx context.Context, sessionID string, ownerUserID string, serviceWorkspaceID string) (*sandboxv1.HostedWorkspaceState, error)
 	ListWorkspaceDir(ctx context.Context, input ListWorkspaceDirInput) (*sandboxv1.ListWorkspaceDirResponse, error)
 	PreviewWorkspaceFile(ctx context.Context, input PreviewWorkspaceFileInput) (*sandboxv1.PreviewWorkspaceFileResponse, error)
+	ExportWorkspacePath(ctx context.Context, input ExportWorkspacePathInput) (*sandboxv1.ExportWorkspacePathResponse, error)
 	Close() error
 }
 
@@ -36,11 +37,21 @@ type PreviewWorkspaceFileInput struct {
 	MaxBytes           int64
 }
 
+type ExportWorkspacePathInput struct {
+	SessionID          string
+	UserID             string
+	ServiceWorkspaceID string
+	Path               string
+	ResourceName       string
+	MimeType           string
+}
+
 type GRPCWorkspaceHostClient struct {
 	serviceID string
 	conn      *grpc.ClientConn
 	client    sandboxv1.WorkspaceHostServiceClient
 	view      sandboxv1.WorkspaceViewServiceClient
+	transfer  sandboxv1.WorkspaceTransferServiceClient
 }
 
 func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHostClient, error) {
@@ -53,6 +64,7 @@ func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHo
 		conn:      conn,
 		client:    sandboxv1.NewWorkspaceHostServiceClient(conn),
 		view:      sandboxv1.NewWorkspaceViewServiceClient(conn),
+		transfer:  sandboxv1.NewWorkspaceTransferServiceClient(conn),
 	}, nil
 }
 
@@ -124,6 +136,20 @@ func (c *GRPCWorkspaceHostClient) PreviewWorkspaceFile(ctx context.Context, inpu
 		ServiceWorkspaceId: input.ServiceWorkspaceID,
 		Path:               input.Path,
 		MaxBytes:           input.MaxBytes,
+	})
+}
+
+func (c *GRPCWorkspaceHostClient) ExportWorkspacePath(ctx context.Context, input ExportWorkspacePathInput) (*sandboxv1.ExportWorkspacePathResponse, error) {
+	return c.transfer.ExportWorkspacePath(ctx, &sandboxv1.ExportWorkspacePathRequest{
+		Scope: &commonv1.Scope{
+			ServiceId: c.serviceID,
+			SessionId: input.SessionID,
+			UserId:    input.UserID,
+		},
+		ServiceWorkspaceId: input.ServiceWorkspaceID,
+		Path:               input.Path,
+		ResourceName:       input.ResourceName,
+		MimeType:           input.MimeType,
 	})
 }
 

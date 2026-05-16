@@ -80,6 +80,17 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		}
 		return writeProtoJSON(ctx, nethttp.StatusOK, resp)
 	})
+	router.POST("/sessions/{session_id}/workspace/files/export", func(ctx khttp.Context) error {
+		req, err := readExportWorkspacePathRequest(ctx)
+		if err != nil {
+			return err
+		}
+		record, err := workspaceService.ExportSessionWorkspacePath(ctx, ctx.Vars().Get("session_id"), req.UserID, req.Path, req.ResourceName, req.MimeType)
+		if err != nil {
+			return err
+		}
+		return writeGetResourceJSON(ctx, nethttp.StatusCreated, record)
+	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
 		if err := readProtoJSON(ctx, &req); err != nil {
@@ -155,6 +166,30 @@ func readProtoJSON(ctx khttp.Context, msg proto.Message) error {
 	return protojson.UnmarshalOptions{
 		DiscardUnknown: true,
 	}.Unmarshal(body, msg)
+}
+
+type exportWorkspacePathRequest struct {
+	Path         string `json:"path"`
+	ResourceName string `json:"resource_name"`
+	MimeType     string `json:"mime_type"`
+	UserID       string `json:"user_id"`
+}
+
+func readExportWorkspacePathRequest(ctx khttp.Context) (exportWorkspacePathRequest, error) {
+	var req exportWorkspacePathRequest
+	body, err := io.ReadAll(ctx.Request().Body)
+	if err != nil {
+		return req, err
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			return req, status.Error(codes.InvalidArgument, "invalid export request JSON")
+		}
+	}
+	if req.UserID == "" {
+		req.UserID = ownerUserID(ctx)
+	}
+	return req, nil
 }
 
 func writeProtoJSON(ctx khttp.Context, code int, msg proto.Message) error {

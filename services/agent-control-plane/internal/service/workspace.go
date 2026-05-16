@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
+	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
@@ -20,6 +22,7 @@ type WorkspaceService struct {
 	mu               sync.Mutex
 	store            workspacedomain.Store
 	sandboxClient    sandboxclient.WorkspaceHostClient
+	resourceService  *ResourceService
 	sandboxServiceID string
 	sandboxProfileID string
 }
@@ -30,9 +33,14 @@ type SessionWorkspaceState struct {
 }
 
 func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
+	return NewWorkspaceServiceWithResources(store, sandboxClient, nil, sandboxServiceID, sandboxProfileID)
+}
+
+func NewWorkspaceServiceWithResources(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
 	return &WorkspaceService{
 		store:            store,
 		sandboxClient:    sandboxClient,
+		resourceService:  resourceService,
 		sandboxServiceID: sandboxServiceID,
 		sandboxProfileID: sandboxProfileID,
 	}
@@ -193,6 +201,56 @@ func (s *WorkspaceService) PreviewSessionWorkspaceFile(ctx context.Context, sess
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessionID string, userID string, path string, resourceName string, mimeType string) (*resourcev1.ResourceRecord, error) {
+	if s.resourceService == nil {
+		return nil, status.Error(codes.FailedPrecondition, "resource service is not configured")
+	}
+	record, err := s.getWorkspaceRecordForView(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	ownerUserID := userIDOrRecord(userID, record.OwnerUserID)
+	resp, err := s.sandboxClient.ExportWorkspacePath(ctx, sandboxclient.ExportWorkspacePathInput{
+		SessionID:          record.SessionID,
+		UserID:             ownerUserID,
+		ServiceWorkspaceID: record.CurrentHost.GetServiceWorkspaceId(),
+		Path:               path,
+		ResourceName:       resourceName,
+		MimeType:           mimeType,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWorkspacePathRef(resp.GetSource(), record.CurrentHost); err != nil {
+		return nil, err
+	}
+	resourceRef := resp.GetResource()
+	if resourceRef == nil {
+		return nil, status.Error(codes.Internal, "sandbox export returned empty resource ref")
+	}
+	if resourceRef.GetAuthorityServiceId() != record.CurrentHost.GetServiceId() {
+		return nil, status.Errorf(codes.Internal, "sandbox export returned resource for unexpected authority_service_id: %s", resourceRef.GetAuthorityServiceId())
+	}
+	return s.resourceService.RegisterRecord(ctx, &resourcev1.RegisterResourceRequest{
+		Scope: &commonv1.Scope{
+			SessionId: record.SessionID,
+			UserId:    ownerUserID,
+			ServiceId: record.CurrentHost.GetServiceId(),
+		},
+		Ref:         resourceRef,
+		OwnerUserId: ownerUserID,
+		SessionId:   record.SessionID,
+		Source: &resourcev1.ResourceSource{
+			Type:               "sandbox_export",
+			SourceServiceId:    record.CurrentHost.GetServiceId(),
+			WorkspaceRecordId:  record.ID,
+			ServiceWorkspaceId: record.CurrentHost.GetServiceWorkspaceId(),
+			SourcePath:         resp.GetSource().GetPath(),
+		},
+		Visibility: resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE,
+	})
 }
 
 func (s *WorkspaceService) getWorkspaceRecordForView(ctx context.Context, sessionID string) (workspacedomain.Record, error) {

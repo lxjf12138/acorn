@@ -81,7 +81,10 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 			},
 			{
 				Name:   "resource",
-				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+				Features: []string{
+					"export_workspace_path",
+				},
 			},
 			{
 				Name:   "signal",
@@ -180,6 +183,15 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				Transport: "grpc",
 				Address:   s.opts.GRPCAddr,
 				Path:      "/acorn.sandbox.v1.WorkspaceViewService",
+				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+			},
+			{
+				Name:      "workspace-transfer-grpc",
+				Surface:   "resource",
+				Protocol:  "grpc",
+				Transport: "grpc",
+				Address:   s.opts.GRPCAddr,
+				Path:      "/acorn.sandbox.v1.WorkspaceTransferService",
 				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 			},
 		},

@@ -592,19 +592,19 @@ User
 
 No `ResourceRef` is created.
 
-### 7.4 User downloads workspace file
+### 7.4 User exports workspace file
 
 ```text
-User clicks download
+User explicitly exports a workspace file
   -> Control Plane
   -> sandbox-service ExportWorkspacePath
   -> ResourceRef
   -> ResourceRecord
-  -> Control Plane Resource Gateway
-  -> User downloads
 ```
 
-Export/download creates a `ResourceRef`.
+Export creates a `ResourceRef` and `ResourceRecord`.
+
+Actual byte download is handled by a separate Resource Download Gateway flow.
 
 ---
 
@@ -728,7 +728,7 @@ api/proto/acorn/sandbox/v1/
 
   path.proto       # WorkspacePathRef
   view.proto       # ListWorkspaceDir / PreviewWorkspaceFile
-  transfer.proto   # future ImportResource / ExportWorkspacePath
+  transfer.proto   # ExportWorkspacePath
 
 api/proto/acorn/resource/v1/
   resource.proto
@@ -766,19 +766,20 @@ Artifact removed from Phase 1 proto/code path
 ResourceRef / ResourceRecord contract
 Control Plane in-memory ResourceRecord store
 Control Plane resource metadata HTTP/gRPC API
+Workspace Resource Export foundation
+ExportWorkspacePath
+Control Plane workspace export forwarding
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: Workspace Resource Transfer
-  - ImportResource
-  - ExportWorkspacePath
-  - Export creates ResourceRef / ResourceRecord
-
-PR 2: Upload / Download Gateway
-  - User upload -> ResourceRef
+PR 1: Resource Download Gateway
   - ResourceRef download through Control Plane
+
+PR 2: ImportResource
+  - ResourceRef -> WorkspacePathRef
+  - Uses Resource Download Gateway / content API
 
 PR 3: Minimal Sandbox Exec
   - Execute inside existing HostedWorkspace

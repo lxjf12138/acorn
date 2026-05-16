@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package acorn.sandbox.v1;
+
+import "acorn/common/v1/common.proto";
+import "acorn/resource/v1/resource.proto";
+import "acorn/sandbox/v1/path.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1;sandboxv1";
+
+message ExportWorkspacePathRequest {
+  acorn.common.v1.Scope scope = 1;
+
+  string service_workspace_id = 2;
+
+  // Workspace-relative POSIX path.
+  string path = 3;
+
+  string resource_name = 10;
+  string mime_type = 11;
+
+  bytes metadata_json = 100;
+}
+
+message ExportWorkspacePathResponse {
+  WorkspacePathRef source = 1;
+  acorn.resource.v1.ResourceRef resource = 2;
+}
+
+service WorkspaceTransferService {
+  rpc ExportWorkspacePath(ExportWorkspacePathRequest) returns (ExportWorkspacePathResponse);
+}

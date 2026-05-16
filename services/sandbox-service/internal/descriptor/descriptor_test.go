@@ -52,8 +52,9 @@ func TestDescribeCapabilities(t *testing.T) {
 	if view.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL || !hasFeature(view, "list_workspace_dir") || !hasFeature(view, "preview_workspace_file") {
 		t.Fatalf("unexpected view surface: %+v", view)
 	}
-	if status := surfaceStatus(descriptor, "resource"); status != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
-		t.Fatalf("unexpected resource surface status: %s", status)
+	resource := surfaceByName(descriptor, "resource")
+	if resource.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL || !hasFeature(resource, "export_workspace_path") {
+		t.Fatalf("unexpected resource surface: %+v", resource)
 	}
 	if endpoint := endpointByName(descriptor, "control-http"); endpoint.GetAddress() != "sandbox-service:8081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {
 		t.Fatalf("unexpected control HTTP endpoint: %+v", endpoint)
@@ -66,6 +67,9 @@ func TestDescribeCapabilities(t *testing.T) {
 	}
 	if endpoint := endpointByName(descriptor, "workspace-view-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceViewService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected workspace view gRPC endpoint: %+v", endpoint)
+	}
+	if endpoint := endpointByName(descriptor, "workspace-transfer-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceTransferService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
+		t.Fatalf("unexpected workspace transfer gRPC endpoint: %+v", endpoint)
 	}
 }
 

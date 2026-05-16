@@ -9,6 +9,7 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/app"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
+	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
@@ -39,11 +40,13 @@ func main() {
 	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version)
 	descriptorService := service.NewDescriptorService(descriptorSource)
 	workspaceStore := workspacedomain.NewMemoryStore()
+	exportStore := exporteddomain.NewMemoryStore()
 	workspaceService := service.NewWorkspaceService(cfg.Service.ID, cfg.Sandbox.WorkspaceRoot, descriptorSource, workspaceStore)
 	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore)
+	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, exportStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
-	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, logger)
+	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

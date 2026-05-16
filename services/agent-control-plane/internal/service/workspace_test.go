@@ -5,26 +5,31 @@ import (
 	"errors"
 	"testing"
 
+	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
+	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type fakeWorkspaceHostClient struct {
-	err           error
-	stateErr      error
-	listErr       error
-	previewErr    error
-	created       int
-	hosted        *sandboxv1.HostedWorkspace
-	state         *sandboxv1.HostedWorkspaceState
-	listResp      *sandboxv1.ListWorkspaceDirResponse
-	previewResp   *sandboxv1.PreviewWorkspaceFileResponse
-	lastListInput sandboxclient.ListWorkspaceDirInput
-	useHosted     bool
+	err             error
+	stateErr        error
+	listErr         error
+	previewErr      error
+	exportErr       error
+	created         int
+	hosted          *sandboxv1.HostedWorkspace
+	state           *sandboxv1.HostedWorkspaceState
+	listResp        *sandboxv1.ListWorkspaceDirResponse
+	previewResp     *sandboxv1.PreviewWorkspaceFileResponse
+	exportResp      *sandboxv1.ExportWorkspacePathResponse
+	lastListInput   sandboxclient.ListWorkspaceDirInput
+	lastExportInput sandboxclient.ExportWorkspacePathInput
+	useHosted       bool
 }
 
 func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*sandboxv1.HostedWorkspace, error) {
@@ -106,6 +111,26 @@ func (f *fakeWorkspaceHostClient) PreviewWorkspaceFile(_ context.Context, input 
 			Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE,
 		},
 		PreviewBytes: []byte("preview"),
+	}, nil
+}
+
+func (f *fakeWorkspaceHostClient) ExportWorkspacePath(_ context.Context, input sandboxclient.ExportWorkspacePathInput) (*sandboxv1.ExportWorkspacePathResponse, error) {
+	f.lastExportInput = input
+	if f.exportErr != nil {
+		return nil, f.exportErr
+	}
+	if f.exportResp != nil {
+		return f.exportResp, nil
+	}
+	return &sandboxv1.ExportWorkspacePathResponse{
+		Source: pathRef("sandbox-service", input.ServiceWorkspaceID, "local-process", input.Path),
+		Resource: &resourcev1.ResourceRef{
+			Id:                 "res_1",
+			AuthorityServiceId: "sandbox-service",
+			Name:               input.ResourceName,
+			MimeType:           input.MimeType,
+			SizeBytes:          12,
+		},
 	}, nil
 }
 
@@ -420,6 +445,135 @@ func TestWorkspaceServicePreviewSessionWorkspaceFileRejectsMismatchedRef(t *test
 	}
 	if _, err := service.PreviewSessionWorkspaceFile(context.Background(), "sess-1", "user-1", "report.txt", 0); status.Code(err) != codes.Internal {
 		t.Fatalf("expected Internal, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceExportSessionWorkspacePath(t *testing.T) {
+	client := &fakeWorkspaceHostClient{}
+	resourceService := NewResourceService(resourcedomain.NewMemoryStore())
+	service := NewWorkspaceServiceWithResources(workspacedomain.NewMemoryStore(), client, resourceService, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "owner-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+
+	record, err := service.ExportSessionWorkspacePath(context.Background(), "sess-1", "user-1", "outputs/report.txt", "report.txt", "text/plain")
+	if err != nil {
+		t.Fatalf("ExportSessionWorkspacePath returned error: %v", err)
+	}
+	if client.lastExportInput.ServiceWorkspaceID != "ws_sess-1" || client.lastExportInput.Path != "outputs/report.txt" {
+		t.Fatalf("unexpected export input: %+v", client.lastExportInput)
+	}
+	if record.GetRef().GetId() != "res_1" || record.GetRef().GetAuthorityServiceId() != "sandbox-service" {
+		t.Fatalf("unexpected resource ref: %+v", record.GetRef())
+	}
+	if record.GetOwnerUserId() != "user-1" || record.GetSessionId() != "sess-1" {
+		t.Fatalf("unexpected resource owner/session: %+v", record)
+	}
+	if record.GetVisibility() != resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE {
+		t.Fatalf("unexpected resource visibility: %s", record.GetVisibility())
+	}
+	source := record.GetSource()
+	if source.GetType() != "sandbox_export" ||
+		source.GetSourceServiceId() != "sandbox-service" ||
+		source.GetServiceWorkspaceId() != "ws_sess-1" ||
+		source.GetSourcePath() != "outputs/report.txt" {
+		t.Fatalf("unexpected resource source: %+v", source)
+	}
+}
+
+func TestWorkspaceServiceExportSessionWorkspacePathMissingSession(t *testing.T) {
+	service := NewWorkspaceServiceWithResources(workspacedomain.NewMemoryStore(), &fakeWorkspaceHostClient{}, NewResourceService(resourcedomain.NewMemoryStore()), "sandbox-service", "local-process")
+	_, err := service.ExportSessionWorkspacePath(context.Background(), "missing", "user-1", "report.txt", "", "")
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceExportSessionWorkspacePathRequiresResourceService(t *testing.T) {
+	client := &fakeWorkspaceHostClient{}
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "owner-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	_, err := service.ExportSessionWorkspacePath(context.Background(), "sess-1", "user-1", "report.txt", "", "")
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceExportSessionWorkspacePathRejectsMismatchedSourceRef(t *testing.T) {
+	client := &fakeWorkspaceHostClient{
+		exportResp: &sandboxv1.ExportWorkspacePathResponse{
+			Source: pathRef("sandbox-service", "other-workspace", "local-process", "report.txt"),
+			Resource: &resourcev1.ResourceRef{
+				Id:                 "res_1",
+				AuthorityServiceId: "sandbox-service",
+				Name:               "report.txt",
+			},
+		},
+	}
+	service := NewWorkspaceServiceWithResources(workspacedomain.NewMemoryStore(), client, NewResourceService(resourcedomain.NewMemoryStore()), "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "owner-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	if _, err := service.ExportSessionWorkspacePath(context.Background(), "sess-1", "user-1", "report.txt", "", ""); status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceExportSessionWorkspacePathRejectsAuthorityMismatch(t *testing.T) {
+	client := &fakeWorkspaceHostClient{
+		exportResp: &sandboxv1.ExportWorkspacePathResponse{
+			Source: pathRef("sandbox-service", "ws_sess-1", "local-process", "report.txt"),
+			Resource: &resourcev1.ResourceRef{
+				Id:                 "res_1",
+				AuthorityServiceId: "other-service",
+				Name:               "report.txt",
+			},
+		},
+	}
+	service := NewWorkspaceServiceWithResources(workspacedomain.NewMemoryStore(), client, NewResourceService(resourcedomain.NewMemoryStore()), "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "owner-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	if _, err := service.ExportSessionWorkspacePath(context.Background(), "sess-1", "user-1", "report.txt", "", ""); status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceExportSessionWorkspacePathPropagatesErrors(t *testing.T) {
+	tests := []struct {
+		name       string
+		client     *fakeWorkspaceHostClient
+		wantStatus codes.Code
+	}{
+		{
+			name:       "sandbox export error",
+			client:     &fakeWorkspaceHostClient{exportErr: status.Error(codes.PermissionDenied, "denied")},
+			wantStatus: codes.PermissionDenied,
+		},
+		{
+			name: "resource registration error",
+			client: &fakeWorkspaceHostClient{exportResp: &sandboxv1.ExportWorkspacePathResponse{
+				Source: pathRef("sandbox-service", "ws_sess-1", "local-process", "report.txt"),
+				Resource: &resourcev1.ResourceRef{
+					Id:                 "res_1",
+					AuthorityServiceId: "sandbox-service",
+				},
+			}},
+			wantStatus: codes.InvalidArgument,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewWorkspaceServiceWithResources(workspacedomain.NewMemoryStore(), tt.client, NewResourceService(resourcedomain.NewMemoryStore()), "sandbox-service", "local-process")
+			if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "owner-1"); err != nil {
+				t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+			}
+			if _, err := service.ExportSessionWorkspacePath(context.Background(), "sess-1", "user-1", "report.txt", "", ""); status.Code(err) != tt.wantStatus {
+				t.Fatalf("expected %s, got %v", tt.wantStatus, err)
+			}
+		})
 	}
 }
 
