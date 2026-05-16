@@ -19,7 +19,7 @@ func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
 	}
 	ref := resp.GetWorkspace().GetRef()
-	if ref.GetServiceId() != "sandbox-service" || ref.GetServiceWorkspaceId() == "" || ref.GetSandboxProfileId() != "local-process" {
+	if ref.GetServiceId() != "sandbox-service-id" || ref.GetServiceWorkspaceId() == "" || ref.GetSandboxProfileId() != "local-process" {
 		t.Fatalf("unexpected workspace ref: %+v", ref)
 	}
 	if resp.GetWorkspace().GetStatus() != workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE {
@@ -94,7 +94,7 @@ func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
 		t.Fatalf("GetHostedWorkspaceState returned error: %v", err)
 	}
 	state := stateResp.GetState()
-	if state.GetRef().GetServiceId() != "sandbox-service" {
+	if state.GetRef().GetServiceId() != "sandbox-service-id" {
 		t.Fatalf("unexpected service id: %q", state.GetRef().GetServiceId())
 	}
 	if state.GetRef().GetServiceWorkspaceId() != created.GetWorkspace().GetRef().GetServiceWorkspaceId() {
@@ -137,8 +137,8 @@ func TestWorkspaceServiceGetHostedWorkspaceStateNotFound(t *testing.T) {
 
 func newTestWorkspaceService() *WorkspaceService {
 	return NewWorkspaceService(
-		"sandbox-service",
-		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service"}),
+		"sandbox-service-id",
+		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id"}),
 		workspacedomain.NewMemoryStore(),
 	)
 }

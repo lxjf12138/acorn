@@ -32,8 +32,8 @@ func NewSource(opts Options) *Source {
 
 func NewSourceFromConfig(cfg *conf.Config, version string) *Source {
 	return NewSource(Options{
-		ServiceID:   cfg.Service.Name,
-		DisplayName: "Local Sandbox Service",
+		ServiceID:   cfg.Service.ID,
+		DisplayName: cfg.Service.Name,
 		Version:     version,
 		HTTPAddr:    cfg.Server.HTTP.AdvertiseAddr,
 		GRPCAddr:    cfg.Server.GRPC.AdvertiseAddr,

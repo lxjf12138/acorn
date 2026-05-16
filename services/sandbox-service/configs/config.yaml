@@ -1,4 +1,5 @@
 service:
+  id: sandbox-service
   name: sandbox-service
   version: dev
 

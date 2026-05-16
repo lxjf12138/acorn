@@ -38,7 +38,7 @@ func main() {
 	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version)
 	descriptorService := service.NewDescriptorService(descriptorSource)
 	workspaceStore := workspacedomain.NewMemoryStore()
-	workspaceService := service.NewWorkspaceService(cfg.Service.Name, descriptorSource, workspaceStore)
+	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
 	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, logger)
@@ -47,7 +47,8 @@ func main() {
 
 	helper.Infow(
 		"msg", "starting service",
-		"service", cfg.Service.Name,
+		"service.id", cfg.Service.ID,
+		"service.name", cfg.Service.Name,
 		"http.addr", cfg.Server.HTTP.Addr,
 		"grpc.addr", cfg.Server.GRPC.Addr,
 	)

@@ -1,4 +1,5 @@
 service:
+  id: agent-control-plane
   name: agent-control-plane
   version: dev
 

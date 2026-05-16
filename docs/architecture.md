@@ -686,6 +686,15 @@ Descriptor is the basis for service discovery and capability routing.
 
 Endpoint addresses are advertised caller-facing addresses, not necessarily bind addresses such as `0.0.0.0`.
 
+Service identity is split from display naming:
+
+```text
+service.id   = stable routing and registry identity
+service.name = display/app name
+```
+
+`CapabilityDescriptor.service_id`, `WorkspaceHostRef.service_id`, and `ResourceRef.authority_service_id` use `service.id`.
+
 ---
 
 ## 11. Proto Package Ownership

@@ -16,6 +16,7 @@ type Config struct {
 }
 
 type Service struct {
+	ID      string `json:"id" yaml:"id"`
 	Name    string `json:"name" yaml:"name"`
 	Version string `json:"version" yaml:"version"`
 }
@@ -62,6 +63,9 @@ func Load(path string) (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if c.Service.ID == "" {
+		return fmt.Errorf("service.id is required")
+	}
 	if c.Service.Name == "" {
 		return fmt.Errorf("service.name is required")
 	}

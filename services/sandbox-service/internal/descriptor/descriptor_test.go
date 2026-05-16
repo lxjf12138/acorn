@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
+	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
 )
 
 func TestDescribeCapabilities(t *testing.T) {
@@ -62,6 +63,30 @@ func TestDescribeCapabilities(t *testing.T) {
 	}
 	if endpoint := endpointByName(descriptor, "workspace-host-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceHostService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected workspace host gRPC endpoint: %+v", endpoint)
+	}
+}
+
+func TestNewSourceFromConfigUsesServiceIDAndNameSeparately(t *testing.T) {
+	cfg := &conf.Config{
+		Service: conf.Service{
+			ID:   "sandbox-service-id",
+			Name: "Sandbox Display Name",
+		},
+		Server: conf.Server{
+			HTTP: conf.HTTP{AdvertiseAddr: "sandbox-service:8081"},
+			GRPC: conf.GRPC{AdvertiseAddr: "sandbox-service:9081"},
+		},
+	}
+	source := NewSourceFromConfig(cfg, "test")
+	descriptor, err := source.DescribeCapabilities(context.Background())
+	if err != nil {
+		t.Fatalf("DescribeCapabilities returned error: %v", err)
+	}
+	if descriptor.GetServiceId() != "sandbox-service-id" {
+		t.Fatalf("unexpected service id: %q", descriptor.GetServiceId())
+	}
+	if descriptor.GetDisplayName() != "Sandbox Display Name" {
+		t.Fatalf("unexpected display name: %q", descriptor.GetDisplayName())
 	}
 }
 

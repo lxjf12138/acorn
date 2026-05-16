@@ -53,7 +53,8 @@ func main() {
 
 	helper.Infow(
 		"msg", "starting service",
-		"service", cfg.Service.Name,
+		"service.id", cfg.Service.ID,
+		"service.name", cfg.Service.Name,
 		"http.addr", cfg.Server.HTTP.Addr,
 		"grpc.addr", cfg.Server.GRPC.Addr,
 	)
