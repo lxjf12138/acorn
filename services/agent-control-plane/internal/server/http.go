@@ -6,12 +6,14 @@ import (
 	klog "github.com/go-kratos/kratos/v2/log"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	"github.com/lxjf12138/acorn/packages/servicekit"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 )
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, logger klog.Logger) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, logger klog.Logger) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
@@ -28,6 +30,41 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, logge
 	router.GET("/version", func(ctx khttp.Context) error {
 		return ctx.JSON(nethttp.StatusOK, statusService.Version())
 	})
+	router.POST("/sessions/{session_id}/workspace", func(ctx khttp.Context) error {
+		record, err := workspaceService.CreateSessionWorkspace(ctx, ctx.Vars().Get("session_id"), ownerUserID(ctx))
+		if err != nil {
+			return err
+		}
+		return writeProtoJSON(ctx, nethttp.StatusOK, record)
+	})
+	router.GET("/sessions/{session_id}/workspace", func(ctx khttp.Context) error {
+		record, err := workspaceService.GetSessionWorkspace(ctx, ctx.Vars().Get("session_id"))
+		if err != nil {
+			return err
+		}
+		return writeProtoJSON(ctx, nethttp.StatusOK, record)
+	})
 
 	return srv
+}
+
+func ownerUserID(ctx khttp.Context) string {
+	if userID := ctx.Query().Get("user_id"); userID != "" {
+		return userID
+	}
+	if userID := ctx.Header().Get("X-User-ID"); userID != "" {
+		return userID
+	}
+	return "dev-user"
+}
+
+func writeProtoJSON(ctx khttp.Context, code int, msg proto.Message) error {
+	body, err := protojson.MarshalOptions{
+		UseProtoNames:   true,
+		EmitUnpopulated: true,
+	}.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	return ctx.Blob(code, "application/json", body)
 }

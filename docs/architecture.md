@@ -69,6 +69,32 @@ Mature memory system
 
 However, Phase 1 APIs must carry runtime-compatible identifiers such as `session_id`, `run_id`, `tool_call_id`, and `trace_id` so that a future Agent Runtime can attach without rewriting capability services.
 
+### 2.1 Workspace Foundation
+
+The Workspace Foundation PR establishes the first session-scoped workspace binding:
+
+```text
+Session
+  -> primary WorkspaceRecord
+
+WorkspaceRecord
+  -> current_host
+
+WorkspaceHostRef
+  -> service_id
+  -> service_workspace_id
+  -> sandbox_profile_id
+
+sandbox-service
+  -> HostedWorkspace
+```
+
+The control plane owns `WorkspaceRecord`. It stores session binding state and the current sandbox host reference, but it does not own files, raw paths, volumes, or sandbox instance lifecycle.
+
+`sandbox-service` owns `HostedWorkspace`. It owns the actual workspace state and will later own files, directories, backend volumes, and disposable sandbox instances. A sandbox instance is not a Phase 1 control-plane object; it is an implementation detail beneath a hosted workspace.
+
+Future workspace migration updates `WorkspaceRecord.current_host` while keeping the control-plane `WorkspaceRecord.id` stable. Export/import and bundle `ResourceRef` contracts are modeled later.
+
 ---
 
 ## 3. Core Architecture Principles

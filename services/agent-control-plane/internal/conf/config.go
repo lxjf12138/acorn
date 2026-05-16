@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Service Service `json:"service" yaml:"service"`
 	Server  Server  `json:"server" yaml:"server"`
+	Sandbox Sandbox `json:"sandbox" yaml:"sandbox"`
 	Log     Log     `json:"log" yaml:"log"`
 }
 
@@ -37,6 +38,12 @@ type GRPC struct {
 
 type Log struct {
 	Level string `json:"level" yaml:"level"`
+}
+
+type Sandbox struct {
+	ServiceID        string `json:"service_id" yaml:"service_id"`
+	GRPCAddr         string `json:"grpc_addr" yaml:"grpc_addr"`
+	DefaultProfileID string `json:"default_profile_id" yaml:"default_profile_id"`
 }
 
 func Load(path string) (*Config, error) {
@@ -77,6 +84,15 @@ func (c *Config) Validate() error {
 	}
 	if _, err := time.ParseDuration(c.Server.GRPC.Timeout); err != nil {
 		return fmt.Errorf("parse server.grpc.timeout: %w", err)
+	}
+	if c.Sandbox.ServiceID == "" {
+		return fmt.Errorf("sandbox.service_id is required")
+	}
+	if c.Sandbox.GRPCAddr == "" {
+		return fmt.Errorf("sandbox.grpc_addr is required")
+	}
+	if c.Sandbox.DefaultProfileID == "" {
+		return fmt.Errorf("sandbox.default_profile_id is required")
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"

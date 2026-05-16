@@ -10,5 +10,10 @@ server:
     addr: 0.0.0.0:9080
     timeout: 10s
 
+sandbox:
+  service_id: sandbox-service
+  grpc_addr: 127.0.0.1:9081
+  default_profile_id: local-process
+
 log:
   level: info
