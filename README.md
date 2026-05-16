@@ -1,15 +1,17 @@
 # Acorn
 
-Acorn is a service-oriented runtime architecture for AI agent capabilities.
+Acorn is a Phase 1 capability substrate for future AI agent runtimes.
 
 The system is organized around:
 
 - Cloud Agent Control Plane
 - independently deployable Capability Services
-- built-in runtime capabilities
-- external MCP tools and adapters
+- runtime Capability Descriptors
+- sandbox profiles and backends
+- MCP agent-surface adapters
+- Acorn-native control/state/resource/signal/event/governance APIs
 
-A Capability Service may expose:
+A Capability Service exposes a runtime Capability Descriptor describing:
 
 - Agent Surface
 - Control Surface
@@ -18,9 +20,10 @@ A Capability Service may expose:
 - Observation Surface
 - Resource Surface
 - Governance Surface
+- sandbox profiles, when applicable
 
 The first concrete Capability Service is `sandbox-service`.
 
-Sandbox workspace is owned by `sandbox-service`; it is not a global shared filesystem. Cross-service files flow through `ResourceRef`.
+Sandbox workspace is owned by `sandbox-service`; it is not a global shared filesystem. Workspace files become `ResourceRef` only after explicit artifact/resource promotion.
 
-See [`docs/acorn_architecture.md`](docs/acorn_architecture.md).
+See [`docs/architecture.md`](docs/architecture.md).
