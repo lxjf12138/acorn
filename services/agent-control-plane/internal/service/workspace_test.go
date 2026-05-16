@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
@@ -15,12 +16,12 @@ type fakeWorkspaceHostClient struct {
 	err       error
 	stateErr  error
 	created   int
-	hosted    *workspacev1.HostedWorkspace
-	state     *workspacev1.HostedWorkspaceState
+	hosted    *sandboxv1.HostedWorkspace
+	state     *sandboxv1.HostedWorkspaceState
 	useHosted bool
 }
 
-func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*workspacev1.HostedWorkspace, error) {
+func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*sandboxv1.HostedWorkspace, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -28,7 +29,7 @@ func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessi
 	if f.useHosted {
 		return f.hosted, nil
 	}
-	return &workspacev1.HostedWorkspace{
+	return &sandboxv1.HostedWorkspace{
 		Ref: &workspacev1.WorkspaceHostRef{
 			ServiceId:          "sandbox-service",
 			ServiceWorkspaceId: "ws_" + sessionID,
@@ -38,18 +39,18 @@ func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessi
 	}, nil
 }
 
-func (f *fakeWorkspaceHostClient) GetHostedWorkspace(context.Context, string) (*workspacev1.HostedWorkspace, error) {
+func (f *fakeWorkspaceHostClient) GetHostedWorkspace(context.Context, string) (*sandboxv1.HostedWorkspace, error) {
 	return nil, nil
 }
 
-func (f *fakeWorkspaceHostClient) GetHostedWorkspaceState(_ context.Context, _ string, _ string, serviceWorkspaceID string) (*workspacev1.HostedWorkspaceState, error) {
+func (f *fakeWorkspaceHostClient) GetHostedWorkspaceState(_ context.Context, _ string, _ string, serviceWorkspaceID string) (*sandboxv1.HostedWorkspaceState, error) {
 	if f.stateErr != nil {
 		return nil, f.stateErr
 	}
 	if f.state != nil {
 		return f.state, nil
 	}
-	return &workspacev1.HostedWorkspaceState{
+	return &sandboxv1.HostedWorkspaceState{
 		Ref: &workspacev1.WorkspaceHostRef{
 			ServiceId:          "sandbox-service",
 			ServiceWorkspaceId: serviceWorkspaceID,
@@ -127,7 +128,7 @@ func TestWorkspaceServiceSandboxFailureDoesNotCreateRecord(t *testing.T) {
 func TestWorkspaceServiceRejectsInvalidHostedWorkspace(t *testing.T) {
 	tests := []struct {
 		name   string
-		hosted *workspacev1.HostedWorkspace
+		hosted *sandboxv1.HostedWorkspace
 	}{
 		{
 			name:   "nil workspace",
@@ -135,32 +136,32 @@ func TestWorkspaceServiceRejectsInvalidHostedWorkspace(t *testing.T) {
 		},
 		{
 			name:   "missing ref",
-			hosted: &workspacev1.HostedWorkspace{},
+			hosted: &sandboxv1.HostedWorkspace{},
 		},
 		{
 			name: "missing service id",
-			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+			hosted: &sandboxv1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
 				ServiceWorkspaceId: "ws-1",
 				SandboxProfileId:   "local-process",
 			}},
 		},
 		{
 			name: "missing workspace id",
-			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+			hosted: &sandboxv1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
 				ServiceId:        "sandbox-service",
 				SandboxProfileId: "local-process",
 			}},
 		},
 		{
 			name: "missing profile id",
-			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+			hosted: &sandboxv1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
 				ServiceId:          "sandbox-service",
 				ServiceWorkspaceId: "ws-1",
 			}},
 		},
 		{
 			name: "unexpected service id",
-			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+			hosted: &sandboxv1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
 				ServiceId:          "other-service",
 				ServiceWorkspaceId: "ws-1",
 				SandboxProfileId:   "local-process",
@@ -168,7 +169,7 @@ func TestWorkspaceServiceRejectsInvalidHostedWorkspace(t *testing.T) {
 		},
 		{
 			name: "unexpected profile id",
-			hosted: &workspacev1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
+			hosted: &sandboxv1.HostedWorkspace{Ref: &workspacev1.WorkspaceHostRef{
 				ServiceId:          "sandbox-service",
 				ServiceWorkspaceId: "ws-1",
 				SandboxProfileId:   "local-docker",
@@ -266,7 +267,7 @@ func TestWorkspaceServiceGetSessionWorkspaceStateRejectsMismatchedRef(t *testing
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client := &fakeWorkspaceHostClient{
-				state: &workspacev1.HostedWorkspaceState{
+				state: &sandboxv1.HostedWorkspaceState{
 					Ref:     tt.ref,
 					Status:  workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
 					Summary: "empty workspace",

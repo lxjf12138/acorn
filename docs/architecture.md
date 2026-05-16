@@ -120,6 +120,26 @@ generated_at
 
 It must not become a file index. File listing belongs to future bounded workspace file APIs. Artifact and `ResourceRef` creation belong to future explicit promotion APIs.
 
+### 2.3 Proto Package Ownership
+
+Workspace proto packages follow service ownership:
+
+```text
+acorn.workspace.v1
+  WorkspaceRecord
+  WorkspaceHostRef
+  WorkspaceStatus
+
+acorn.sandbox.v1
+  HostedWorkspace
+  HostedWorkspaceState
+  WorkspaceHostService
+```
+
+`WorkspaceRecord` belongs to the control plane. `HostedWorkspace` belongs to `sandbox-service`. `WorkspaceHostRef` is the bridge between them and remains in `acorn.workspace.v1` because both sides need the same host binding shape.
+
+Future sandbox-specific APIs such as workspace path references, artifact promotion, export/import, and tool execution should live under `acorn.sandbox.v1` unless they become cross-service control-plane abstractions.
+
 ---
 
 ## 3. Core Architecture Principles

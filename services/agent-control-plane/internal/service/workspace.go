@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
@@ -24,8 +25,8 @@ type WorkspaceService struct {
 }
 
 type SessionWorkspaceState struct {
-	Record *workspacev1.WorkspaceRecord      `json:"workspace"`
-	State  *workspacev1.HostedWorkspaceState `json:"state"`
+	Record *workspacev1.WorkspaceRecord    `json:"workspace"`
+	State  *sandboxv1.HostedWorkspaceState `json:"state"`
 }
 
 func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
@@ -76,7 +77,7 @@ func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID
 	return toProto(record), nil
 }
 
-func validateHostedWorkspace(hosted *workspacev1.HostedWorkspace, expectedServiceID string, expectedProfileID string) error {
+func validateHostedWorkspace(hosted *sandboxv1.HostedWorkspace, expectedServiceID string, expectedProfileID string) error {
 	if hosted == nil {
 		return status.Error(codes.Internal, "sandbox host returned empty workspace")
 	}
@@ -146,7 +147,7 @@ func (s *WorkspaceService) GetSessionWorkspaceState(ctx context.Context, session
 	}, nil
 }
 
-func validateHostedWorkspaceState(state *workspacev1.HostedWorkspaceState, expectedRef *workspacev1.WorkspaceHostRef) error {
+func validateHostedWorkspaceState(state *sandboxv1.HostedWorkspaceState, expectedRef *workspacev1.WorkspaceHostRef) error {
 	if state == nil {
 		return status.Error(codes.Internal, "sandbox host returned empty workspace state")
 	}

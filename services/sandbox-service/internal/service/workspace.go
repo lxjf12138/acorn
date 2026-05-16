@@ -6,6 +6,7 @@ import (
 	"time"
 
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
+	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
@@ -15,7 +16,7 @@ import (
 )
 
 type WorkspaceService struct {
-	workspacev1.UnimplementedWorkspaceHostServiceServer
+	sandboxv1.UnimplementedWorkspaceHostServiceServer
 
 	serviceID string
 	profiles  *descriptor.Source
@@ -30,7 +31,7 @@ func NewWorkspaceService(serviceID string, profiles *descriptor.Source, store wo
 	}
 }
 
-func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *workspacev1.CreateHostedWorkspaceRequest) (*workspacev1.CreateHostedWorkspaceResponse, error) {
+func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *sandboxv1.CreateHostedWorkspaceRequest) (*sandboxv1.CreateHostedWorkspaceResponse, error) {
 	profile, err := s.resolveProfile(req.GetSandboxProfileId())
 	if err != nil {
 		return nil, err
@@ -47,12 +48,12 @@ func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *works
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "create hosted workspace: %v", err)
 	}
-	return &workspacev1.CreateHostedWorkspaceResponse{
+	return &sandboxv1.CreateHostedWorkspaceResponse{
 		Workspace: s.toProto(workspace),
 	}, nil
 }
 
-func (s *WorkspaceService) GetHostedWorkspace(ctx context.Context, req *workspacev1.GetHostedWorkspaceRequest) (*workspacev1.GetHostedWorkspaceResponse, error) {
+func (s *WorkspaceService) GetHostedWorkspace(ctx context.Context, req *sandboxv1.GetHostedWorkspaceRequest) (*sandboxv1.GetHostedWorkspaceResponse, error) {
 	if req.GetServiceWorkspaceId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "service_workspace_id is required")
 	}
@@ -63,12 +64,12 @@ func (s *WorkspaceService) GetHostedWorkspace(ctx context.Context, req *workspac
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "get hosted workspace: %v", err)
 	}
-	return &workspacev1.GetHostedWorkspaceResponse{
+	return &sandboxv1.GetHostedWorkspaceResponse{
 		Workspace: s.toProto(workspace),
 	}, nil
 }
 
-func (s *WorkspaceService) GetHostedWorkspaceState(ctx context.Context, req *workspacev1.GetHostedWorkspaceStateRequest) (*workspacev1.GetHostedWorkspaceStateResponse, error) {
+func (s *WorkspaceService) GetHostedWorkspaceState(ctx context.Context, req *sandboxv1.GetHostedWorkspaceStateRequest) (*sandboxv1.GetHostedWorkspaceStateResponse, error) {
 	if req.GetServiceWorkspaceId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "service_workspace_id is required")
 	}
@@ -79,7 +80,7 @@ func (s *WorkspaceService) GetHostedWorkspaceState(ctx context.Context, req *wor
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "get hosted workspace state: %v", err)
 	}
-	return &workspacev1.GetHostedWorkspaceStateResponse{
+	return &sandboxv1.GetHostedWorkspaceStateResponse{
 		State: s.toStateProto(workspace),
 	}, nil
 }
@@ -102,8 +103,8 @@ func (s *WorkspaceService) resolveProfile(profileID string) (*capabilityv1.Sandb
 	return profile, nil
 }
 
-func (s *WorkspaceService) toStateProto(workspace workspacedomain.Workspace) *workspacev1.HostedWorkspaceState {
-	return &workspacev1.HostedWorkspaceState{
+func (s *WorkspaceService) toStateProto(workspace workspacedomain.Workspace) *sandboxv1.HostedWorkspaceState {
+	return &sandboxv1.HostedWorkspaceState{
 		Ref: &workspacev1.WorkspaceHostRef{
 			ServiceId:          s.serviceID,
 			ServiceWorkspaceId: workspace.ID,
@@ -111,7 +112,7 @@ func (s *WorkspaceService) toStateProto(workspace workspacedomain.Workspace) *wo
 		},
 		Status:  workspace.Status,
 		Summary: "empty workspace",
-		Facts: []*workspacev1.WorkspaceStateFact{
+		Facts: []*sandboxv1.WorkspaceStateFact{
 			{
 				Key:   "profile",
 				Value: workspace.SandboxProfileID,
@@ -125,8 +126,8 @@ func (s *WorkspaceService) toStateProto(workspace workspacedomain.Workspace) *wo
 	}
 }
 
-func (s *WorkspaceService) toProto(workspace workspacedomain.Workspace) *workspacev1.HostedWorkspace {
-	return &workspacev1.HostedWorkspace{
+func (s *WorkspaceService) toProto(workspace workspacedomain.Workspace) *sandboxv1.HostedWorkspace {
+	return &sandboxv1.HostedWorkspace{
 		Ref: &workspacev1.WorkspaceHostRef{
 			ServiceId:          s.serviceID,
 			ServiceWorkspaceId: workspace.ID,

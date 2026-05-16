@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.2
 // - protoc             (unknown)
-// source: acorn/workspace/v1/workspace.proto
+// source: acorn/sandbox/v1/workspace.proto
 
-package workspacev1
+package sandboxv1
 
 import (
 	context "context"
@@ -19,9 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkspaceHostService_CreateHostedWorkspace_FullMethodName   = "/acorn.workspace.v1.WorkspaceHostService/CreateHostedWorkspace"
-	WorkspaceHostService_GetHostedWorkspace_FullMethodName      = "/acorn.workspace.v1.WorkspaceHostService/GetHostedWorkspace"
-	WorkspaceHostService_GetHostedWorkspaceState_FullMethodName = "/acorn.workspace.v1.WorkspaceHostService/GetHostedWorkspaceState"
+	WorkspaceHostService_CreateHostedWorkspace_FullMethodName   = "/acorn.sandbox.v1.WorkspaceHostService/CreateHostedWorkspace"
+	WorkspaceHostService_GetHostedWorkspace_FullMethodName      = "/acorn.sandbox.v1.WorkspaceHostService/GetHostedWorkspace"
+	WorkspaceHostService_GetHostedWorkspaceState_FullMethodName = "/acorn.sandbox.v1.WorkspaceHostService/GetHostedWorkspaceState"
 )
 
 // WorkspaceHostServiceClient is the client API for WorkspaceHostService service.
@@ -176,7 +176,7 @@ func _WorkspaceHostService_GetHostedWorkspaceState_Handler(srv interface{}, ctx 
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var WorkspaceHostService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "acorn.workspace.v1.WorkspaceHostService",
+	ServiceName: "acorn.sandbox.v1.WorkspaceHostService",
 	HandlerType: (*WorkspaceHostServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -193,5 +193,5 @@ var WorkspaceHostService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "acorn/workspace/v1/workspace.proto",
+	Metadata: "acorn/sandbox/v1/workspace.proto",
 }
