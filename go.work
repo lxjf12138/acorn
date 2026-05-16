@@ -3,9 +3,7 @@ go 1.26
 use (
 	./packages/api
 	./packages/core
-	./packages/mcp
 	./packages/servicekit
-	./packages/signal
 	./services/agent-control-plane
 	./services/sandbox-service
 )

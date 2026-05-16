@@ -3,9 +3,7 @@ GO_MODULES := \
 	./packages/servicekit \
 	./services/agent-control-plane \
 	./services/sandbox-service \
-	./packages/core \
-	./packages/mcp \
-	./packages/signal
+	./packages/core
 
 SERVICE_MODULES := \
 	./services/agent-control-plane \

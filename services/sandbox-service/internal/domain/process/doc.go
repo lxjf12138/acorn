@@ -1,5 +1,6 @@
 // Package process contains sandbox-service process domain boundaries.
 //
 // Processes are execution units inside a sandbox. Concrete execution backends
-// are intentionally outside this PR5 skeleton.
+// are intentionally deferred until workspace, view, and resource boundaries are
+// stable.
 package process
