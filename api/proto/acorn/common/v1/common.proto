@@ -24,6 +24,9 @@ message Scope {
   string service_id = 4;
   string provider_id = 5;
   string trace_id = 6;
+  string run_id = 7;
+  string turn_id = 8;
+  string tool_call_id = 9;
 }
 
 message PageRequest {

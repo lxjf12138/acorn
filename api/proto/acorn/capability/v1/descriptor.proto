@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package acorn.capability.v1;
+
+import "acorn/tool/v1/tool.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1;capabilityv1";
+
+enum ImplementationStatus {
+  IMPLEMENTATION_STATUS_UNSPECIFIED = 0;
+  IMPLEMENTATION_STATUS_DISABLED = 1;
+  IMPLEMENTATION_STATUS_DECLARED = 2;
+  IMPLEMENTATION_STATUS_EXPERIMENTAL = 3;
+  IMPLEMENTATION_STATUS_IMPLEMENTED = 4;
+}
+
+message CapabilityDescriptor {
+  string service_id = 1;
+  string kind = 2;
+  string contract = 3;
+  string version = 4;
+  string display_name = 5;
+  string description = 6;
+
+  repeated SurfaceDescriptor surfaces = 10;
+  AgentSurfaceDescriptor agent_surface = 20;
+  repeated SandboxProfile sandbox_profiles = 30;
+
+  bytes metadata_json = 100;
+}
+
+message SurfaceDescriptor {
+  string name = 1;
+  ImplementationStatus status = 2;
+  repeated string features = 3;
+  bytes metadata_json = 100;
+}
+
+message AgentSurfaceDescriptor {
+  ImplementationStatus status = 1;
+  repeated MCPAgentSurface mcp = 2;
+}
+
+message MCPAgentSurface {
+  string transport = 1;
+  string endpoint = 2;
+  repeated acorn.tool.v1.ToolSpec tools = 3;
+  bytes metadata_json = 100;
+}
+
+message SandboxProfile {
+  string id = 1;
+  string display_name = 2;
+  string implementation = 3;
+  string isolation = 4;
+  string os = 5;
+  bool default = 6;
+
+  ImplementationStatus status = 10;
+  repeated string capabilities = 20;
+
+  bytes metadata_json = 100;
+}
+
+message GetCapabilityDescriptorRequest {}
+
+message GetCapabilityDescriptorResponse {
+  CapabilityDescriptor descriptor = 1;
+}
+
+service CapabilityDescriptorService {
+  rpc GetCapabilityDescriptor(GetCapabilityDescriptorRequest) returns (GetCapabilityDescriptorResponse);
+}

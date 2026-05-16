@@ -10,3 +10,7 @@ type Catalog interface {
 	ListServices(ctx context.Context) ([]*capabilityv1.CapabilityService, error)
 	GetService(ctx context.Context, serviceID string) (*capabilityv1.CapabilityService, error)
 }
+
+type DescriptorSource interface {
+	DescribeCapabilities(ctx context.Context) (*capabilityv1.CapabilityDescriptor, error)
+}

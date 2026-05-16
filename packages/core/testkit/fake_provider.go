@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"sync"
 
-	providerv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/provider/v1"
 	toolv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/tool/v1"
 	providercore "github.com/lxjf12138/acorn/packages/core/provider"
 	toolcore "github.com/lxjf12138/acorn/packages/core/tool"
@@ -15,82 +14,53 @@ import (
 type ToolHandler func(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error)
 
 type FakeProvider struct {
-	mu       sync.RWMutex
-	manifest *providerv1.ProviderManifest
-	health   *providerv1.ProviderHealth
-	handlers map[string]ToolHandler
+	mu        sync.RWMutex
+	id        string
+	kind      string
+	toolSpecs []*toolv1.ToolSpec
+	handlers  map[string]ToolHandler
 }
 
-func NewFakeProvider(manifest *providerv1.ProviderManifest, health *providerv1.ProviderHealth) *FakeProvider {
+func NewFakeProvider(providerID string, kind string, tools []*toolv1.ToolSpec) *FakeProvider {
 	fp := &FakeProvider{
-		manifest: proto.Clone(manifest).(*providerv1.ProviderManifest),
-		health:   proto.Clone(health).(*providerv1.ProviderHealth),
-		handlers: make(map[string]ToolHandler),
+		id:        providerID,
+		kind:      kind,
+		toolSpecs: cloneToolSpecs(tools),
+		handlers:  make(map[string]ToolHandler),
 	}
 	fp.RegisterToolHandler("fake.echo", echoToolHandler)
 	return fp
 }
 
 func NewFakeProviderWithEcho(providerID string) *FakeProvider {
-	manifest := &providerv1.ProviderManifest{
-		Id:          providerID,
-		Type:        "fake",
-		Version:     "dev",
-		DisplayName: "Fake Provider",
-		AgentSurface: &providerv1.AgentSurface{
-			Protocol: "fake",
-			Tools: []*toolv1.ToolSpec{
-				{
-					Name:             "fake.echo",
-					Description:      "Echo back input text",
-					InputSchemaJson:  []byte(`{"type":"object","properties":{"text":{"type":"string"}}}`),
-					Risk:             "low",
-					SideEffect:       "none",
-					RequiresApproval: false,
-				},
-			},
+	return NewFakeProvider(providerID, "fake", []*toolv1.ToolSpec{
+		{
+			Name:             "fake.echo",
+			Description:      "Echo back input text",
+			InputSchemaJson:  []byte(`{"type":"object","properties":{"text":{"type":"string"}}}`),
+			Risk:             "low",
+			SideEffect:       "none",
+			RequiresApproval: false,
 		},
-	}
-	health := &providerv1.ProviderHealth{
-		ProviderId: providerID,
-		Status:     "healthy",
-	}
-	return NewFakeProvider(manifest, health)
+	})
 }
 
 func (f *FakeProvider) ID() string {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return f.manifest.GetId()
+	return f.id
 }
 
 func (f *FakeProvider) Type() string {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return f.manifest.GetType()
-}
-
-func (f *FakeProvider) Manifest(context.Context) (*providerv1.ProviderManifest, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-	return proto.Clone(f.manifest).(*providerv1.ProviderManifest), nil
-}
-
-func (f *FakeProvider) Health(context.Context) (*providerv1.ProviderHealth, error) {
-	f.mu.RLock()
-	defer f.mu.RUnlock()
-	return proto.Clone(f.health).(*providerv1.ProviderHealth), nil
+	return f.kind
 }
 
 func (f *FakeProvider) ListTools(context.Context) ([]*toolv1.ToolSpec, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	tools := f.manifest.GetAgentSurface().GetTools()
-	out := make([]*toolv1.ToolSpec, 0, len(tools))
-	for _, tool := range tools {
-		out = append(out, proto.Clone(tool).(*toolv1.ToolSpec))
-	}
-	return out, nil
+	return cloneToolSpecs(f.toolSpecs), nil
 }
 
 func (f *FakeProvider) CallTool(ctx context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error) {
@@ -110,6 +80,14 @@ func (f *FakeProvider) RegisterToolHandler(name string, handler ToolHandler) {
 }
 
 var _ providercore.Provider = (*FakeProvider)(nil)
+
+func cloneToolSpecs(tools []*toolv1.ToolSpec) []*toolv1.ToolSpec {
+	out := make([]*toolv1.ToolSpec, 0, len(tools))
+	for _, tool := range tools {
+		out = append(out, proto.Clone(tool).(*toolv1.ToolSpec))
+	}
+	return out
+}
 
 func echoToolHandler(_ context.Context, req *toolv1.ToolCallRequest) (*toolv1.ToolCallResult, error) {
 	type echoArgs struct {

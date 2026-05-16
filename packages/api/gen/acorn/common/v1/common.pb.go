@@ -157,6 +157,9 @@ type Scope struct {
 	ServiceId     string                 `protobuf:"bytes,4,opt,name=service_id,json=serviceId,proto3" json:"service_id,omitempty"`
 	ProviderId    string                 `protobuf:"bytes,5,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	TraceId       string                 `protobuf:"bytes,6,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	RunId         string                 `protobuf:"bytes,7,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	TurnId        string                 `protobuf:"bytes,8,opt,name=turn_id,json=turnId,proto3" json:"turn_id,omitempty"`
+	ToolCallId    string                 `protobuf:"bytes,9,opt,name=tool_call_id,json=toolCallId,proto3" json:"tool_call_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -229,6 +232,27 @@ func (x *Scope) GetProviderId() string {
 func (x *Scope) GetTraceId() string {
 	if x != nil {
 		return x.TraceId
+	}
+	return ""
+}
+
+func (x *Scope) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *Scope) GetTurnId() string {
+	if x != nil {
+		return x.TurnId
+	}
+	return ""
+}
+
+func (x *Scope) GetToolCallId() string {
+	if x != nil {
+		return x.ToolCallId
 	}
 	return ""
 }
@@ -342,7 +366,7 @@ const file_acorn_common_v1_common_proto_rawDesc = "" +
 	"\x05Actor\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\xb7\x01\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"\x89\x02\n" +
 	"\x05Scope\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x1d\n" +
@@ -352,7 +376,11 @@ const file_acorn_common_v1_common_proto_rawDesc = "" +
 	"service_id\x18\x04 \x01(\tR\tserviceId\x12\x1f\n" +
 	"\vprovider_id\x18\x05 \x01(\tR\n" +
 	"providerId\x12\x19\n" +
-	"\btrace_id\x18\x06 \x01(\tR\atraceId\"I\n" +
+	"\btrace_id\x18\x06 \x01(\tR\atraceId\x12\x15\n" +
+	"\x06run_id\x18\a \x01(\tR\x05runId\x12\x17\n" +
+	"\aturn_id\x18\b \x01(\tR\x06turnId\x12 \n" +
+	"\ftool_call_id\x18\t \x01(\tR\n" +
+	"toolCallId\"I\n" +
 	"\vPageRequest\x12\x1b\n" +
 	"\tpage_size\x18\x01 \x01(\x05R\bpageSize\x12\x1d\n" +
 	"\n" +
