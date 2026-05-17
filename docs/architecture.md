@@ -792,16 +792,22 @@ User Upload Gateway
 Control Plane local resource authority
 WorkspaceAttachment Foundation
 LocalFS local_path attachment for local_process
+SandboxBackend Foundation
+WorkspaceExecService
+local-process-dev backend
+Control Plane workspace exec forwarding
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: SandboxBackend + local-process-dev
-  - Execute inside existing HostedWorkspace
-  - Use WorkspaceAttachment instead of direct LocalFS root paths
-  - Generated files remain WorkspacePathRef until export/download
+PR 1: ProfileRegistry / Sandbox policy hardening
+  - Keep local-process-dev clearly marked as dev-only
+  - Prepare OS sandboxing, Docker, VM, or remote-agent backends
 ```
+
+`local-process-dev` executes host processes for development and is not a strong
+multi-tenant security boundary.
 
 ---
 

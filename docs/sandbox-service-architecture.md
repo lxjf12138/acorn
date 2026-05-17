@@ -626,11 +626,37 @@ Goal:
 Execute inside a sandbox without coupling exec to local directories.
 ```
 
+Status:
+
+```text
+Implemented as an experimental development backend.
+```
+
+Scope:
+
+```text
+Add internal domain/backend
+Add local-process-dev backend
+Add WorkspaceExecService.ExecWorkspaceCommand
+Control Plane forwards POST /sessions/{session_id}/workspace/exec
+Execution uses WorkspaceAttachment.LocalPath
+stdout / stderr byte limits and command timeout are enforced
+```
+
+Important warning:
+
+```text
+local-process-dev runs host processes for local development.
+It is not a strong multi-tenant security boundary.
+OS sandboxing, Docker, VM, and remote-agent backends are future profiles.
+```
+
 ---
 
 ## 11. Non-Goals For The Next PR
 
-The next PR should focus on SandboxBackend and local-process-dev execution.
+The next PR should focus on profile/backend policy hardening and execution
+operational semantics.
 Do not include:
 
 ```text
@@ -640,6 +666,6 @@ WorkspaceStore redesign
 Large config schema migration
 ```
 
-The next PR should use WorkspaceAttachment rather than reaching into LocalFS
-workspace roots directly. It should not change workspace view behavior or
-resource upload/download/import flows.
+Execution code should continue to use WorkspaceAttachment rather than reaching
+into LocalFS workspace roots directly. It should not change workspace view
+behavior or resource upload/download/import flows.

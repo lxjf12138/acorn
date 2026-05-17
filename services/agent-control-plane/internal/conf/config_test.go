@@ -39,7 +39,7 @@ func validConfig() Config {
 		Sandbox: Sandbox{
 			ServiceID:        "sandbox-service",
 			GRPCAddr:         "127.0.0.1:9081",
-			DefaultProfileID: "local-process",
+			DefaultProfileID: "local-process-dev",
 		},
 		Resource: Resource{
 			BlobRoot:       "/tmp/acorn/control-plane/resources",

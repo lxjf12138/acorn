@@ -58,6 +58,7 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 					"version",
 					"create_hosted_workspace",
 					"get_hosted_workspace",
+					"exec_workspace_command",
 				},
 			},
 			{
@@ -114,16 +115,17 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 		},
 		SandboxProfiles: []*capabilityv1.SandboxProfile{
 			{
-				Id:             "local-process",
-				DisplayName:    "Local Process Sandbox",
-				Implementation: "local-process",
+				Id:             "local-process-dev",
+				DisplayName:    "Local Process Dev Backend",
+				Implementation: "local-process-dev",
 				Isolation:      "process",
 				Os:             "host",
 				Default:        true,
-				Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+				Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 				Capabilities: []string{
 					"filesystem",
 					"exec",
+					"dev_only",
 				},
 			},
 			{
@@ -194,6 +196,15 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				Transport: "grpc",
 				Address:   s.opts.GRPCAddr,
 				Path:      "/acorn.sandbox.v1.WorkspaceTransferService",
+				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+			},
+			{
+				Name:      "workspace-exec-grpc",
+				Surface:   "control",
+				Protocol:  "grpc",
+				Transport: "grpc",
+				Address:   s.opts.GRPCAddr,
+				Path:      "/acorn.sandbox.v1.WorkspaceExecService",
 				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 			},
 			{

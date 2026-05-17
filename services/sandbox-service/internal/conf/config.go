@@ -44,8 +44,17 @@ type Log struct {
 }
 
 type Sandbox struct {
-	WorkspaceRoot    string `json:"workspace_root" yaml:"workspace_root"`
-	ResourceBlobRoot string `json:"resource_blob_root" yaml:"resource_blob_root"`
+	WorkspaceRoot    string       `json:"workspace_root" yaml:"workspace_root"`
+	ResourceBlobRoot string       `json:"resource_blob_root" yaml:"resource_blob_root"`
+	LocalProcess     LocalProcess `json:"local_process" yaml:"local_process"`
+}
+
+type LocalProcess struct {
+	Enabled               bool  `json:"enabled" yaml:"enabled"`
+	DefaultTimeoutSeconds int64 `json:"default_timeout_seconds" yaml:"default_timeout_seconds"`
+	MaxTimeoutSeconds     int64 `json:"max_timeout_seconds" yaml:"max_timeout_seconds"`
+	MaxStdoutBytes        int64 `json:"max_stdout_bytes" yaml:"max_stdout_bytes"`
+	MaxStderrBytes        int64 `json:"max_stderr_bytes" yaml:"max_stderr_bytes"`
 }
 
 func Load(path string) (*Config, error) {
@@ -101,6 +110,18 @@ func (c *Config) Validate() error {
 	}
 	if c.Sandbox.ResourceBlobRoot == "" {
 		c.Sandbox.ResourceBlobRoot = "/tmp/acorn/sandbox/resources"
+	}
+	if c.Sandbox.LocalProcess.DefaultTimeoutSeconds <= 0 {
+		c.Sandbox.LocalProcess.DefaultTimeoutSeconds = 30
+	}
+	if c.Sandbox.LocalProcess.MaxTimeoutSeconds <= 0 {
+		c.Sandbox.LocalProcess.MaxTimeoutSeconds = 120
+	}
+	if c.Sandbox.LocalProcess.MaxStdoutBytes <= 0 {
+		c.Sandbox.LocalProcess.MaxStdoutBytes = 1024 * 1024
+	}
+	if c.Sandbox.LocalProcess.MaxStderrBytes <= 0 {
+		c.Sandbox.LocalProcess.MaxStderrBytes = 1024 * 1024
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"

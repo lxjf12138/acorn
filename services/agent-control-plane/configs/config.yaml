@@ -14,7 +14,7 @@ server:
 sandbox:
   service_id: sandbox-service
   grpc_addr: 127.0.0.1:9081
-  default_profile_id: local-process
+  default_profile_id: local-process-dev
 
 resource:
   blob_root: /tmp/acorn/control-plane/resources

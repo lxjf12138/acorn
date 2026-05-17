@@ -8,6 +8,7 @@ import (
 	"io"
 	nethttp "net/http"
 	"strconv"
+	"time"
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
@@ -108,6 +109,27 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 			return err
 		}
 		return httpx.WriteProtoJSON(ctx, nethttp.StatusCreated, resp)
+	})
+	router.POST("/sessions/{session_id}/workspace/exec", func(ctx khttp.Context) error {
+		req, err := readExecWorkspaceCommandRequest(ctx)
+		if err != nil {
+			return err
+		}
+		resp, err := workspaceService.ExecSessionWorkspaceCommand(ctx, service.ExecSessionWorkspaceCommandInput{
+			SessionID:      ctx.Vars().Get("session_id"),
+			UserID:         req.UserID,
+			Command:        req.Command,
+			Args:           req.Args,
+			CWD:            req.CWD,
+			Env:            req.Env,
+			Timeout:        req.Timeout,
+			MaxStdoutBytes: req.MaxStdoutBytes,
+			MaxStderrBytes: req.MaxStderrBytes,
+		})
+		if err != nil {
+			return err
+		}
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, resp)
 	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
@@ -224,6 +246,17 @@ type readCloser struct {
 	io.Closer
 }
 
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	out := make(map[string]string, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
 func ownerUserID(ctx khttp.Context) string {
 	if userID := ctx.Query().Get("user_id"); userID != "" {
 		return userID
@@ -268,6 +301,67 @@ type importResourceRequest struct {
 	DestinationPath string `json:"destination_path"`
 	ConflictPolicy  string `json:"conflict_policy"`
 	UserID          string `json:"user_id"`
+}
+
+type execWorkspaceCommandRequest struct {
+	Command        string            `json:"command"`
+	Args           []string          `json:"args"`
+	CWD            string            `json:"cwd"`
+	Env            map[string]string `json:"env"`
+	TimeoutSeconds int64             `json:"timeout_seconds"`
+	MaxStdoutBytes int64             `json:"max_stdout_bytes"`
+	MaxStderrBytes int64             `json:"max_stderr_bytes"`
+	UserID         string            `json:"user_id"`
+}
+
+func readExecWorkspaceCommandRequest(ctx khttp.Context) (struct {
+	Command        string
+	Args           []string
+	CWD            string
+	Env            map[string]string
+	Timeout        time.Duration
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
+	UserID         string
+}, error) {
+	var raw execWorkspaceCommandRequest
+	out := struct {
+		Command        string
+		Args           []string
+		CWD            string
+		Env            map[string]string
+		Timeout        time.Duration
+		MaxStdoutBytes int64
+		MaxStderrBytes int64
+		UserID         string
+	}{}
+	body, err := io.ReadAll(ctx.Request().Body)
+	if err != nil {
+		return out, err
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &raw); err != nil {
+			return out, status.Error(codes.InvalidArgument, "invalid exec request JSON")
+		}
+	}
+	if raw.Command == "" {
+		return out, status.Error(codes.InvalidArgument, "command is required")
+	}
+	if raw.TimeoutSeconds < 0 {
+		return out, status.Error(codes.InvalidArgument, "timeout_seconds must be non-negative")
+	}
+	out.Command = raw.Command
+	out.Args = append([]string(nil), raw.Args...)
+	out.CWD = raw.CWD
+	out.Env = cloneStringMap(raw.Env)
+	out.Timeout = time.Duration(raw.TimeoutSeconds) * time.Second
+	out.MaxStdoutBytes = raw.MaxStdoutBytes
+	out.MaxStderrBytes = raw.MaxStderrBytes
+	out.UserID = raw.UserID
+	if out.UserID == "" {
+		out.UserID = ownerUserID(ctx)
+	}
+	return out, nil
 }
 
 func readImportResourceRequest(ctx khttp.Context) (struct {

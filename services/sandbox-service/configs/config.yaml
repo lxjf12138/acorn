@@ -16,6 +16,12 @@ server:
 sandbox:
   workspace_root: /tmp/acorn/sandbox/workspaces
   resource_blob_root: /tmp/acorn/sandbox/resources
+  local_process:
+    enabled: true
+    default_timeout_seconds: 30
+    max_timeout_seconds: 120
+    max_stdout_bytes: 1048576
+    max_stderr_bytes: 1048576
 
 log:
   level: info

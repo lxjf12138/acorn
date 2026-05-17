@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 type WorkspaceHostClient interface {
@@ -20,6 +22,7 @@ type WorkspaceHostClient interface {
 	PreviewWorkspaceFile(ctx context.Context, input PreviewWorkspaceFileInput) (*sandboxv1.PreviewWorkspaceFileResponse, error)
 	ExportWorkspacePath(ctx context.Context, input ExportWorkspacePathInput) (*sandboxv1.ExportWorkspacePathResponse, error)
 	ImportResourceToWorkspace(ctx context.Context, input ImportResourceInput, reader io.Reader) (*sandboxv1.ImportResourceToWorkspaceResponse, error)
+	ExecWorkspaceCommand(ctx context.Context, input ExecWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error)
 	Close() error
 }
 
@@ -58,12 +61,28 @@ type ImportResourceInput struct {
 	ConflictPolicy     sandboxv1.ImportConflictPolicy
 }
 
+type ExecWorkspaceCommandInput struct {
+	SessionID          string
+	UserID             string
+	ServiceWorkspaceID string
+
+	Command string
+	Args    []string
+	CWD     string
+	Env     map[string]string
+
+	Timeout        time.Duration
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
+}
+
 type GRPCWorkspaceHostClient struct {
 	serviceID string
 	conn      *grpc.ClientConn
 	client    sandboxv1.WorkspaceHostServiceClient
 	view      sandboxv1.WorkspaceViewServiceClient
 	transfer  sandboxv1.WorkspaceTransferServiceClient
+	exec      sandboxv1.WorkspaceExecServiceClient
 }
 
 func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHostClient, error) {
@@ -77,6 +96,7 @@ func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHo
 		client:    sandboxv1.NewWorkspaceHostServiceClient(conn),
 		view:      sandboxv1.NewWorkspaceViewServiceClient(conn),
 		transfer:  sandboxv1.NewWorkspaceTransferServiceClient(conn),
+		exec:      sandboxv1.NewWorkspaceExecServiceClient(conn),
 	}, nil
 }
 
@@ -207,6 +227,42 @@ func (c *GRPCWorkspaceHostClient) ImportResourceToWorkspace(ctx context.Context,
 	}
 }
 
+func (c *GRPCWorkspaceHostClient) ExecWorkspaceCommand(ctx context.Context, input ExecWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
+	return c.exec.ExecWorkspaceCommand(ctx, &sandboxv1.ExecWorkspaceCommandRequest{
+		Scope: &commonv1.Scope{
+			ServiceId: c.serviceID,
+			SessionId: input.SessionID,
+			UserId:    input.UserID,
+		},
+		ServiceWorkspaceId: input.ServiceWorkspaceID,
+		Command:            input.Command,
+		Args:               append([]string(nil), input.Args...),
+		Cwd:                input.CWD,
+		Env:                cloneStringMap(input.Env),
+		Timeout:            durationProto(input.Timeout),
+		MaxStdoutBytes:     input.MaxStdoutBytes,
+		MaxStderrBytes:     input.MaxStderrBytes,
+	})
+}
+
 func (c *GRPCWorkspaceHostClient) Close() error {
 	return c.conn.Close()
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	out := make(map[string]string, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func durationProto(value time.Duration) *durationpb.Duration {
+	if value <= 0 {
+		return nil
+	}
+	return durationpb.New(value)
 }

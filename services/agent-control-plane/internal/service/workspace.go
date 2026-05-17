@@ -34,6 +34,20 @@ type SessionWorkspaceState struct {
 	State  *sandboxv1.HostedWorkspaceState `json:"state"`
 }
 
+type ExecSessionWorkspaceCommandInput struct {
+	SessionID string
+	UserID    string
+
+	Command string
+	Args    []string
+	CWD     string
+	Env     map[string]string
+
+	Timeout        time.Duration
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
+}
+
 func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
 	return NewWorkspaceServiceWithResources(store, sandboxClient, nil, sandboxServiceID, sandboxProfileID)
 }
@@ -295,6 +309,39 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 	return resp, nil
 }
 
+func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, input ExecSessionWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
+	if input.Command == "" {
+		return nil, status.Error(codes.InvalidArgument, "command is required")
+	}
+	record, err := s.getWorkspaceRecordForView(ctx, input.SessionID)
+	if err != nil {
+		return nil, err
+	}
+	userID := userIDOrRecord(input.UserID, record.OwnerUserID)
+	if record.OwnerUserID != "" && userID != "" && record.OwnerUserID != userID {
+		return nil, status.Error(codes.PermissionDenied, "workspace owner mismatch")
+	}
+	resp, err := s.sandboxClient.ExecWorkspaceCommand(ctx, sandboxclient.ExecWorkspaceCommandInput{
+		SessionID:          record.SessionID,
+		UserID:             userID,
+		ServiceWorkspaceID: record.CurrentHost.GetServiceWorkspaceId(),
+		Command:            input.Command,
+		Args:               append([]string(nil), input.Args...),
+		CWD:                input.CWD,
+		Env:                cloneStringMap(input.Env),
+		Timeout:            input.Timeout,
+		MaxStdoutBytes:     input.MaxStdoutBytes,
+		MaxStderrBytes:     input.MaxStderrBytes,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWorkspaceHostRef(resp.GetWorkspace(), record.CurrentHost); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (s *WorkspaceService) getWorkspaceRecordForView(ctx context.Context, sessionID string) (workspacedomain.Record, error) {
 	if sessionID == "" {
 		return workspacedomain.Record{}, status.Error(codes.InvalidArgument, "session_id is required")
@@ -323,16 +370,7 @@ func validateHostedWorkspaceState(state *sandboxv1.HostedWorkspaceState, expecte
 	if expectedRef == nil {
 		return status.Error(codes.FailedPrecondition, "workspace record has no current host")
 	}
-	if ref.GetServiceId() != expectedRef.GetServiceId() {
-		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected service_id: %s", ref.GetServiceId())
-	}
-	if ref.GetServiceWorkspaceId() != expectedRef.GetServiceWorkspaceId() {
-		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected service_workspace_id: %s", ref.GetServiceWorkspaceId())
-	}
-	if ref.GetSandboxProfileId() != expectedRef.GetSandboxProfileId() {
-		return status.Errorf(codes.Internal, "sandbox host returned state for unexpected sandbox_profile_id: %s", ref.GetSandboxProfileId())
-	}
-	return nil
+	return validateWorkspaceHostRef(ref, expectedRef)
 }
 
 func validateWorkspacePathRef(ref *sandboxv1.WorkspacePathRef, expectedRef *workspacev1.WorkspaceHostRef) error {
@@ -346,14 +384,24 @@ func validateWorkspacePathRef(ref *sandboxv1.WorkspacePathRef, expectedRef *work
 	if workspaceRef == nil {
 		return status.Error(codes.Internal, "sandbox host returned workspace path without workspace ref")
 	}
-	if workspaceRef.GetServiceId() != expectedRef.GetServiceId() {
-		return status.Errorf(codes.Internal, "sandbox host returned path for unexpected service_id: %s", workspaceRef.GetServiceId())
+	return validateWorkspaceHostRef(workspaceRef, expectedRef)
+}
+
+func validateWorkspaceHostRef(ref *workspacev1.WorkspaceHostRef, expectedRef *workspacev1.WorkspaceHostRef) error {
+	if ref == nil {
+		return status.Error(codes.Internal, "sandbox host returned empty workspace ref")
 	}
-	if workspaceRef.GetServiceWorkspaceId() != expectedRef.GetServiceWorkspaceId() {
-		return status.Errorf(codes.Internal, "sandbox host returned path for unexpected service_workspace_id: %s", workspaceRef.GetServiceWorkspaceId())
+	if expectedRef == nil {
+		return status.Error(codes.FailedPrecondition, "workspace record has no current host")
 	}
-	if workspaceRef.GetSandboxProfileId() != expectedRef.GetSandboxProfileId() {
-		return status.Errorf(codes.Internal, "sandbox host returned path for unexpected sandbox_profile_id: %s", workspaceRef.GetSandboxProfileId())
+	if ref.GetServiceId() != expectedRef.GetServiceId() {
+		return status.Errorf(codes.Internal, "sandbox host returned workspace ref for unexpected service_id: %s", ref.GetServiceId())
+	}
+	if ref.GetServiceWorkspaceId() != expectedRef.GetServiceWorkspaceId() {
+		return status.Errorf(codes.Internal, "sandbox host returned workspace ref for unexpected service_workspace_id: %s", ref.GetServiceWorkspaceId())
+	}
+	if ref.GetSandboxProfileId() != expectedRef.GetSandboxProfileId() {
+		return status.Errorf(codes.Internal, "sandbox host returned workspace ref for unexpected sandbox_profile_id: %s", ref.GetSandboxProfileId())
 	}
 	return nil
 }
@@ -387,6 +435,17 @@ func cloneHostRef(ref *workspacev1.WorkspaceHostRef) *workspacev1.WorkspaceHostR
 		ServiceWorkspaceId: ref.GetServiceWorkspaceId(),
 		SandboxProfileId:   ref.GetSandboxProfileId(),
 	}
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	out := make(map[string]string, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
 
 func IsWorkspaceRecordNotFound(err error) bool {

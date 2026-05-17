@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package acorn.sandbox.v1;
+
+import "acorn/common/v1/common.proto";
+import "acorn/workspace/v1/workspace.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1;sandboxv1";
+
+message ExecWorkspaceCommandRequest {
+  acorn.common.v1.Scope scope = 1;
+
+  string service_workspace_id = 2;
+
+  // Command executable.
+  string command = 3;
+
+  // Command arguments, excluding command itself.
+  repeated string args = 4;
+
+  // Workspace-relative POSIX cwd. Empty means workspace root.
+  string cwd = 5;
+
+  // Extra environment variables.
+  map<string, string> env = 6;
+
+  google.protobuf.Duration timeout = 10;
+
+  int64 max_stdout_bytes = 20;
+  int64 max_stderr_bytes = 21;
+}
+
+message ExecWorkspaceCommandResponse {
+  acorn.workspace.v1.WorkspaceHostRef workspace = 1;
+
+  int32 exit_code = 2;
+
+  bytes stdout = 3;
+  bytes stderr = 4;
+
+  bool stdout_truncated = 5;
+  bool stderr_truncated = 6;
+
+  string error_message = 10;
+}
+
+service WorkspaceExecService {
+  rpc ExecWorkspaceCommand(ExecWorkspaceCommandRequest) returns (ExecWorkspaceCommandResponse);
+}

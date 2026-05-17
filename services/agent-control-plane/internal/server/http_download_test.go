@@ -219,6 +219,58 @@ func TestReadImportResourceRequestErrors(t *testing.T) {
 	}
 }
 
+func TestReadExecWorkspaceCommandRequest(t *testing.T) {
+	ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace/exec?user_id=user-1", strings.NewReader(`{
+		"command": "go",
+		"args": ["test", "./..."],
+		"cwd": "src",
+		"env": {"GOFLAGS": "-count=1"},
+		"timeout_seconds": 60,
+		"max_stdout_bytes": 1024,
+		"max_stderr_bytes": 2048
+	}`))
+	ctx.query = ctx.request.URL.Query()
+
+	req, err := readExecWorkspaceCommandRequest(ctx)
+	if err != nil {
+		t.Fatalf("readExecWorkspaceCommandRequest returned error: %v", err)
+	}
+	if req.Command != "go" ||
+		len(req.Args) != 2 ||
+		req.CWD != "src" ||
+		req.Env["GOFLAGS"] != "-count=1" ||
+		req.Timeout.Seconds() != 60 ||
+		req.MaxStdoutBytes != 1024 ||
+		req.MaxStderrBytes != 2048 ||
+		req.UserID != "user-1" {
+		t.Fatalf("unexpected exec request: %+v", req)
+	}
+}
+
+func TestReadExecWorkspaceCommandRequestErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		code codes.Code
+	}{
+		{name: "missing command", body: `{}`, code: codes.InvalidArgument},
+		{name: "bad json", body: `{`, code: codes.InvalidArgument},
+		{name: "negative timeout", body: `{"command":"go","timeout_seconds":-1}`, code: codes.InvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
+			ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace/exec", strings.NewReader(tt.body))
+			ctx.query = ctx.request.URL.Query()
+			_, err := readExecWorkspaceCommandRequest(ctx)
+			if status.Code(err) != tt.code {
+				t.Fatalf("expected %s, got %v", tt.code, err)
+			}
+		})
+	}
+}
+
 func TestReadUploadResourceInput(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)

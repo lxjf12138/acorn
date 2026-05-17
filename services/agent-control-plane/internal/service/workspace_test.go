@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
@@ -30,9 +31,12 @@ type fakeWorkspaceHostClient struct {
 	exportResp      *sandboxv1.ExportWorkspacePathResponse
 	importResp      *sandboxv1.ImportResourceToWorkspaceResponse
 	importErr       error
+	execResp        *sandboxv1.ExecWorkspaceCommandResponse
+	execErr         error
 	lastListInput   sandboxclient.ListWorkspaceDirInput
 	lastExportInput sandboxclient.ExportWorkspacePathInput
 	lastImportInput sandboxclient.ImportResourceInput
+	lastExecInput   sandboxclient.ExecWorkspaceCommandInput
 	lastImportBody  string
 	useHosted       bool
 }
@@ -163,7 +167,130 @@ func (f *fakeWorkspaceHostClient) ImportResourceToWorkspace(_ context.Context, i
 	}, nil
 }
 
+func (f *fakeWorkspaceHostClient) ExecWorkspaceCommand(_ context.Context, input sandboxclient.ExecWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
+	f.lastExecInput = input
+	if f.execErr != nil {
+		return nil, f.execErr
+	}
+	if f.execResp != nil {
+		return f.execResp, nil
+	}
+	return &sandboxv1.ExecWorkspaceCommandResponse{
+		Workspace: &workspacev1.WorkspaceHostRef{
+			ServiceId:          "sandbox-service",
+			ServiceWorkspaceId: input.ServiceWorkspaceID,
+			SandboxProfileId:   "local-process",
+		},
+		ExitCode: 0,
+		Stdout:   []byte("ok"),
+	}, nil
+}
+
 func (f *fakeWorkspaceHostClient) Close() error { return nil }
+
+func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
+	workspaceStore := workspacedomain.NewMemoryStore()
+	client := &fakeWorkspaceHostClient{}
+	service := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+
+	resp, err := service.ExecSessionWorkspaceCommand(context.Background(), ExecSessionWorkspaceCommandInput{
+		SessionID:      "sess-1",
+		UserID:         "user-1",
+		Command:        "go",
+		Args:           []string{"test"},
+		CWD:            "src",
+		Env:            map[string]string{"GOFLAGS": "-count=1"},
+		Timeout:        time.Second,
+		MaxStdoutBytes: 10,
+		MaxStderrBytes: 11,
+	})
+	if err != nil {
+		t.Fatalf("ExecSessionWorkspaceCommand returned error: %v", err)
+	}
+	if string(resp.GetStdout()) != "ok" {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+	if client.lastExecInput.SessionID != "sess-1" ||
+		client.lastExecInput.UserID != "user-1" ||
+		client.lastExecInput.ServiceWorkspaceID != "ws_sess-1" ||
+		client.lastExecInput.Command != "go" ||
+		client.lastExecInput.CWD != "src" ||
+		client.lastExecInput.Env["GOFLAGS"] != "-count=1" ||
+		client.lastExecInput.Timeout != time.Second ||
+		client.lastExecInput.MaxStdoutBytes != 10 ||
+		client.lastExecInput.MaxStderrBytes != 11 {
+		t.Fatalf("unexpected exec input: %+v", client.lastExecInput)
+	}
+}
+
+func TestWorkspaceServiceExecSessionWorkspaceCommandErrors(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(*testing.T, *workspacedomain.MemoryStore, *fakeWorkspaceHostClient)
+		input ExecSessionWorkspaceCommandInput
+		code  codes.Code
+	}{
+		{
+			name:  "missing command",
+			input: ExecSessionWorkspaceCommandInput{SessionID: "sess-1"},
+			code:  codes.InvalidArgument,
+		},
+		{
+			name:  "missing session",
+			input: ExecSessionWorkspaceCommandInput{SessionID: "missing", Command: "go"},
+			code:  codes.NotFound,
+		},
+		{
+			name: "owner mismatch",
+			setup: func(t *testing.T, store *workspacedomain.MemoryStore, client *fakeWorkspaceHostClient) {
+				if _, err := NewWorkspaceService(store, client, "sandbox-service", "local-process").CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+			},
+			input: ExecSessionWorkspaceCommandInput{SessionID: "sess-1", UserID: "user-2", Command: "go"},
+			code:  codes.PermissionDenied,
+		},
+		{
+			name: "sandbox error",
+			setup: func(t *testing.T, store *workspacedomain.MemoryStore, client *fakeWorkspaceHostClient) {
+				if _, err := NewWorkspaceService(store, client, "sandbox-service", "local-process").CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+				client.execErr = status.Error(codes.DeadlineExceeded, "timeout")
+			},
+			input: ExecSessionWorkspaceCommandInput{SessionID: "sess-1", UserID: "user-1", Command: "go"},
+			code:  codes.DeadlineExceeded,
+		},
+		{
+			name: "mismatched workspace",
+			setup: func(t *testing.T, store *workspacedomain.MemoryStore, client *fakeWorkspaceHostClient) {
+				if _, err := NewWorkspaceService(store, client, "sandbox-service", "local-process").CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+				client.execResp = &sandboxv1.ExecWorkspaceCommandResponse{Workspace: &workspacev1.WorkspaceHostRef{ServiceId: "sandbox-service", ServiceWorkspaceId: "other", SandboxProfileId: "local-process"}}
+			},
+			input: ExecSessionWorkspaceCommandInput{SessionID: "sess-1", UserID: "user-1", Command: "go"},
+			code:  codes.Internal,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := workspacedomain.NewMemoryStore()
+			client := &fakeWorkspaceHostClient{}
+			if tt.setup != nil {
+				tt.setup(t, store, client)
+			}
+			service := NewWorkspaceService(store, client, "sandbox-service", "local-process")
+			_, err := service.ExecSessionWorkspaceCommand(context.Background(), tt.input)
+			if status.Code(err) != tt.code {
+				t.Fatalf("expected %s, got %v", tt.code, err)
+			}
+		})
+	}
+}
 
 func TestWorkspaceServiceCreateSessionWorkspace(t *testing.T) {
 	client := &fakeWorkspaceHostClient{}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	"github.com/lxjf12138/acorn/packages/servicekit"
@@ -13,6 +14,7 @@ import (
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localfs"
+	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localprocess"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/version"
@@ -54,10 +56,19 @@ func main() {
 	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore, backingStore)
 	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
 	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore)
+	attachmentService := service.NewWorkspaceAttachmentService(workspaceStore, backingStore)
+	localProcessBackend := localprocess.NewBackend(localprocess.Config{
+		ID:                    "local-process-dev",
+		DefaultTimeout:        time.Duration(cfg.Sandbox.LocalProcess.DefaultTimeoutSeconds) * time.Second,
+		MaxTimeout:            time.Duration(cfg.Sandbox.LocalProcess.MaxTimeoutSeconds) * time.Second,
+		DefaultMaxStdoutBytes: cfg.Sandbox.LocalProcess.MaxStdoutBytes,
+		DefaultMaxStderrBytes: cfg.Sandbox.LocalProcess.MaxStderrBytes,
+	})
+	execService := service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, attachmentService, localProcessBackend)
 	resourceContentService := service.NewResourceContentService(cfg.Service.ID, exportStore, blobStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
-	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, resourceContentService, logger)
+	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, execService, resourceContentService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

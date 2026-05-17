@@ -41,7 +41,7 @@ func TestDescribeCapabilities(t *testing.T) {
 		t.Fatalf("unexpected control surface status: %s", status)
 	}
 	control := surfaceByName(descriptor, "control")
-	if !hasFeature(control, "create_hosted_workspace") || !hasFeature(control, "get_hosted_workspace") {
+	if !hasFeature(control, "create_hosted_workspace") || !hasFeature(control, "get_hosted_workspace") || !hasFeature(control, "exec_workspace_command") {
 		t.Fatalf("control surface missing hosted workspace features: %+v", control.GetFeatures())
 	}
 	state := surfaceByName(descriptor, "state")
@@ -73,6 +73,9 @@ func TestDescribeCapabilities(t *testing.T) {
 	}
 	if endpoint := endpointByName(descriptor, "workspace-transfer-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceTransferService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected workspace transfer gRPC endpoint: %+v", endpoint)
+	}
+	if endpoint := endpointByName(descriptor, "workspace-exec-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.sandbox.v1.WorkspaceExecService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
+		t.Fatalf("unexpected workspace exec gRPC endpoint: %+v", endpoint)
 	}
 	if endpoint := endpointByName(descriptor, "resource-content-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.resource.v1.ResourceContentService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected resource content gRPC endpoint: %+v", endpoint)

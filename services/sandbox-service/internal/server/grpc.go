@@ -12,7 +12,7 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 )
 
-func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorService, workspaceService *service.WorkspaceService, viewService *service.WorkspaceViewService, transferService *service.WorkspaceTransferService, resourceContentService *service.ResourceContentService, logger klog.Logger) *kgrpc.Server {
+func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorService, workspaceService *service.WorkspaceService, viewService *service.WorkspaceViewService, transferService *service.WorkspaceTransferService, execService *service.WorkspaceExecService, resourceContentService *service.ResourceContentService, logger klog.Logger) *kgrpc.Server {
 	srv := kgrpc.NewServer(
 		kgrpc.Address(cfg.Server.GRPC.Addr),
 		kgrpc.Timeout(cfg.Server.GRPC.TimeoutDuration()),
@@ -22,6 +22,7 @@ func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorServic
 	sandboxv1.RegisterWorkspaceHostServiceServer(srv, workspaceService)
 	sandboxv1.RegisterWorkspaceViewServiceServer(srv, viewService)
 	sandboxv1.RegisterWorkspaceTransferServiceServer(srv, transferService)
+	sandboxv1.RegisterWorkspaceExecServiceServer(srv, execService)
 	resourcev1.RegisterResourceContentServiceServer(srv, resourceContentService)
 	return srv
 }

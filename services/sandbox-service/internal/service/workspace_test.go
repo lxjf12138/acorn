@@ -20,13 +20,13 @@ func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
 	}
 	ref := resp.GetWorkspace().GetRef()
-	if ref.GetServiceId() != "sandbox-service-id" || ref.GetServiceWorkspaceId() == "" || ref.GetSandboxProfileId() != "local-process" {
+	if ref.GetServiceId() != "sandbox-service-id" || ref.GetServiceWorkspaceId() == "" || ref.GetSandboxProfileId() != "local-process-dev" {
 		t.Fatalf("unexpected workspace ref: %+v", ref)
 	}
 	if resp.GetWorkspace().GetStatus() != workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE {
 		t.Fatalf("unexpected status: %s", resp.GetWorkspace().GetStatus())
 	}
-	if backing.lastCreate.WorkspaceID != ref.GetServiceWorkspaceId() || backing.lastCreate.SandboxProfileID != "local-process" {
+	if backing.lastCreate.WorkspaceID != ref.GetServiceWorkspaceId() || backing.lastCreate.SandboxProfileID != "local-process-dev" {
 		t.Fatalf("unexpected backing create request: %+v", backing.lastCreate)
 	}
 }
@@ -89,7 +89,7 @@ func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
 func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
 	service, _ := newTestWorkspaceService(t)
 	created, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
-		SandboxProfileId: "local-process",
+		SandboxProfileId: "local-process-dev",
 	})
 	if err != nil {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
@@ -107,7 +107,7 @@ func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
 	if state.GetRef().GetServiceWorkspaceId() != created.GetWorkspace().GetRef().GetServiceWorkspaceId() {
 		t.Fatalf("unexpected service workspace id: %q", state.GetRef().GetServiceWorkspaceId())
 	}
-	if state.GetRef().GetSandboxProfileId() != "local-process" {
+	if state.GetRef().GetSandboxProfileId() != "local-process-dev" {
 		t.Fatalf("unexpected profile id: %q", state.GetRef().GetSandboxProfileId())
 	}
 	if state.GetStatus() != workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE {
