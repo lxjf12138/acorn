@@ -184,6 +184,8 @@ func TestSafeDownloadFilename(t *testing.T) {
 		{name: "reports/final\\v1.txt", fallback: "res_1", want: "reports_final_v1.txt"},
 		{name: "bad\r\nname.txt", fallback: "res_1", want: "badname.txt"},
 		{name: " \r\n ", fallback: "res_1", want: "res_1"},
+		{name: ".", fallback: "res_1", want: "res_1"},
+		{name: "..", fallback: "res_1", want: "res_1"},
 	}
 	for _, tt := range tests {
 		if got := safeDownloadFilename(tt.name, tt.fallback); got != tt.want {
@@ -288,6 +290,31 @@ func TestReadUploadResourceInputMissingFile(t *testing.T) {
 	_, err := readUploadResourceInput(ctx)
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestReadUploadResourceInputBodyLimit(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "large.txt")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write([]byte("hello")); err != nil {
+		t.Fatalf("write part: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer close: %v", err)
+	}
+	recorder := httptest.NewRecorder()
+	ctx := newDownloadTestContext("unused", "", recorder)
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/resources/upload", &body)
+	ctx.request.Header.Set("Content-Type", writer.FormDataContentType())
+	ctx.request.Body = nethttp.MaxBytesReader(recorder, ctx.request.Body, int64(body.Len()-1))
+
+	_, err = readUploadResourceInput(ctx)
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("expected ResourceExhausted, got %v", err)
 	}
 }
 

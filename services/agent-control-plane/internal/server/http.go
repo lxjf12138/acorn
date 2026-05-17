@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	nethttp "net/http"
@@ -23,6 +24,8 @@ import (
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 )
+
+const multipartUploadOverheadBytes = int64(10 << 20)
 
 func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger) *khttp.Server {
 	srv := khttp.NewServer(
@@ -138,6 +141,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		})
 	})
 	router.POST("/resources/upload", func(ctx khttp.Context) error {
+		limitUploadRequestBody(ctx, cfg.Resource.UploadMaxBytes)
 		input, err := readUploadResourceInput(ctx)
 		if err != nil {
 			return err
@@ -161,9 +165,20 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 	return srv
 }
 
+func limitUploadRequestBody(ctx khttp.Context, maxUploadBytes int64) {
+	if maxUploadBytes <= 0 {
+		maxUploadBytes = 100 * 1024 * 1024
+	}
+	ctx.Request().Body = nethttp.MaxBytesReader(ctx.Response(), ctx.Request().Body, maxUploadBytes+multipartUploadOverheadBytes)
+}
+
 func readUploadResourceInput(ctx khttp.Context) (service.UploadResourceInput, error) {
 	var input service.UploadResourceInput
 	if err := ctx.Request().ParseMultipartForm(32 << 20); err != nil {
+		var maxBytesErr *nethttp.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return input, status.Error(codes.ResourceExhausted, "upload too large")
+		}
 		return input, status.Error(codes.InvalidArgument, "invalid multipart upload")
 	}
 	file, header, err := ctx.Request().FormFile("file")
@@ -402,7 +417,7 @@ func safeDownloadFilename(name string, fallback string) string {
 	name = strings.ReplaceAll(name, "/", "_")
 	name = strings.ReplaceAll(name, `\`, "_")
 	name = strings.TrimSpace(name)
-	if name == "" {
+	if name == "" || name == "." || name == ".." {
 		return fallback
 	}
 	return name
