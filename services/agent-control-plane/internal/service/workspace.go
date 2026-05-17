@@ -527,16 +527,32 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 }
 
 func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, input ExecSessionWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
+	ctx, span := telemetry.Start(ctx, "agent-control-plane/workspace", telemetry.SpanWorkspaceExec)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrOperation, "workspace.exec"),
+		attribute.String(telemetry.AttrExecCommandName, telemetry.SafeCommandName(input.Command)),
+		attribute.Int(telemetry.AttrExecArgCount, len(input.Args)),
+	)
 	if input.Command == "" {
-		return nil, status.Error(codes.InvalidArgument, "command is required")
+		err := status.Error(codes.InvalidArgument, "command is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return nil, err
 	}
 	record, err := s.getWorkspaceRecordForView(ctx, input.SessionID)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrSandboxProfileID, record.CurrentHost.GetSandboxProfileId()))
 	userID := userIDOrRecord(input.UserID, record.OwnerUserID)
 	if record.OwnerUserID != "" && userID != "" && record.OwnerUserID != userID {
-		return nil, status.Error(codes.PermissionDenied, "workspace owner mismatch")
+		err := status.Error(codes.PermissionDenied, "workspace owner mismatch")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusDenied))
+		return nil, err
 	}
 	resp, err := s.sandboxClient.ExecWorkspaceCommand(ctx, sandboxclient.ExecWorkspaceCommandInput{
 		SessionID:          record.SessionID,
@@ -551,11 +567,21 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		MaxStderrBytes:     input.MaxStderrBytes,
 	})
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	if err := validateWorkspaceHostRef(resp.GetWorkspace(), record.CurrentHost); err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
+	span.SetAttributes(
+		attribute.Int(telemetry.AttrExecExitCode, int(resp.GetExitCode())),
+		attribute.Bool(telemetry.AttrExecStdoutTruncated, resp.GetStdoutTruncated()),
+		attribute.Bool(telemetry.AttrExecStderrTruncated, resp.GetStderrTruncated()),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
 	return resp, nil
 }
 

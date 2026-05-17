@@ -81,6 +81,8 @@ acorn.workspace.transfer.import
 acorn.workspace.transfer.export
 acorn.workspace.lease.acquire
 acorn.workspace.exec
+acorn.sandbox.backend.acquire
+acorn.sandbox.backend.exec
 acorn.sandbox.profile.resolve
 ```
 
@@ -106,6 +108,11 @@ Workspace
   acorn.workspace.transfer.import
   acorn.workspace.transfer.export
   acorn.workspace.lease.acquire
+
+Exec / Backend
+  acorn.workspace.exec
+  acorn.sandbox.backend.acquire
+  acorn.sandbox.backend.exec
 ```
 
 These spans use the active OpenTelemetry context created by transport
@@ -122,8 +129,21 @@ acorn.resource.mime_type
 acorn.resource.size_bytes
 acorn.workspace.lease.mode
 acorn.workspace.lease.reason
+acorn.sandbox.backend_id
+acorn.exec.command_name
+acorn.exec.arg_count
+acorn.exec.exit_code
+acorn.exec.timed_out
+acorn.exec.stdout_truncated
+acorn.exec.stderr_truncated
 acorn.truncated
 ```
+
+Exec spans record only the command basename and argument count, not full
+arguments, environment values, cwd, stdout, or stderr. A non-zero command exit
+code is represented as `acorn.exec.exit_code != 0` with `acorn.status=ok`;
+starting the command, backend failures, and timeouts are infrastructure errors
+and record span errors. Timeouts also set `acorn.status=timeout`.
 
 ## Sensitive Data
 

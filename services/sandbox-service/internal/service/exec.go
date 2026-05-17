@@ -7,11 +7,13 @@ import (
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/attachment"
 	backenddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/backend"
 	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -43,33 +45,65 @@ func NewWorkspaceExecService(serviceID string, workspaceStore workspacedomain.St
 }
 
 func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sandboxv1.ExecWorkspaceCommandRequest) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
+	ctx, span := telemetry.Start(ctx, "sandbox-service/exec", telemetry.SpanWorkspaceExec)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrOperation, "workspace.exec"),
+		attribute.String(telemetry.AttrExecCommandName, telemetry.SafeCommandName(req.GetCommand())),
+		attribute.Int(telemetry.AttrExecArgCount, len(req.GetArgs())),
+	)
 	if req.GetServiceWorkspaceId() == "" {
-		return nil, status.Error(codes.InvalidArgument, "service_workspace_id is required")
+		err := status.Error(codes.InvalidArgument, "service_workspace_id is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return nil, err
 	}
 	if req.GetCommand() == "" {
-		return nil, status.Error(codes.InvalidArgument, "command is required")
+		err := status.Error(codes.InvalidArgument, "command is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return nil, err
 	}
 	if s.attachmentService == nil || s.backend == nil {
-		return nil, status.Error(codes.FailedPrecondition, "workspace exec is not configured")
+		err := status.Error(codes.FailedPrecondition, "workspace exec is not configured")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, err
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrSandboxBackendID, s.backend.ID()))
 	workspace, err := s.workspaceStore.Get(ctx, req.GetServiceWorkspaceId())
 	if errors.Is(err, workspacedomain.ErrNotFound) {
-		return nil, status.Error(codes.NotFound, "hosted workspace not found")
+		err = status.Error(codes.NotFound, "hosted workspace not found")
 	}
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "get hosted workspace: %v", err)
+		if status.Code(err) == codes.Unknown {
+			err = status.Errorf(codes.Internal, "get hosted workspace: %v", err)
+		}
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		return nil, err
 	}
+	span.SetAttributes(
+		attribute.String(telemetry.AttrWorkspaceProfileID, workspace.SandboxProfileID),
+		attribute.String(telemetry.AttrSandboxProfileID, workspace.SandboxProfileID),
+	)
 	profile, err := s.execProfile(workspace.SandboxProfileID)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	workspaceLease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeWrite, "exec_workspace_command", req.GetScope())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	defer releaseWorkspaceLease(ctx, s.leases, workspaceLease)
 	att, err := s.attachmentService.PrepareLocalProcessAttachment(ctx, workspace.ID, false)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	lease, err := s.backend.Acquire(ctx, backenddomain.AcquireRequest{
@@ -78,7 +112,10 @@ func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sa
 		ProfileID:   profile.ID,
 	})
 	if err != nil {
-		return nil, mapBackendError(err)
+		mapped := mapBackendError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(mapped)))
+		return nil, mapped
 	}
 	defer func() {
 		_ = s.backend.Release(ctx, lease)
@@ -97,8 +134,18 @@ func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sa
 		MaxStderrBytes: req.GetMaxStderrBytes(),
 	})
 	if err != nil {
-		return nil, mapBackendError(err)
+		mapped := mapBackendError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.Bool(telemetry.AttrExecTimedOut, errors.Is(err, backenddomain.ErrExecTimeout)))
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(mapped)))
+		return nil, mapped
 	}
+	span.SetAttributes(
+		attribute.Int(telemetry.AttrExecExitCode, result.ExitCode),
+		attribute.Bool(telemetry.AttrExecStdoutTruncated, result.StdoutTruncated),
+		attribute.Bool(telemetry.AttrExecStderrTruncated, result.StderrTruncated),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
 	return &sandboxv1.ExecWorkspaceCommandResponse{
 		Workspace: &workspacev1.WorkspaceHostRef{
 			ServiceId:          s.serviceID,

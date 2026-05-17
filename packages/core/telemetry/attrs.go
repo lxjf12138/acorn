@@ -15,6 +15,14 @@ const (
 	AttrResourceSizeBytes          = "acorn.resource.size_bytes"
 
 	AttrSandboxProfileID = "acorn.sandbox.profile_id"
+	AttrSandboxBackendID = "acorn.sandbox.backend_id"
+
+	AttrExecExitCode        = "acorn.exec.exit_code"
+	AttrExecTimedOut        = "acorn.exec.timed_out"
+	AttrExecStdoutTruncated = "acorn.exec.stdout_truncated"
+	AttrExecStderrTruncated = "acorn.exec.stderr_truncated"
+	AttrExecCommandName     = "acorn.exec.command_name"
+	AttrExecArgCount        = "acorn.exec.arg_count"
 
 	AttrLeaseMode   = "acorn.workspace.lease.mode"
 	AttrLeaseReason = "acorn.workspace.lease.reason"

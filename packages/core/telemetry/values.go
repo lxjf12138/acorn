@@ -6,4 +6,5 @@ const (
 	StatusBusy    = "busy"
 	StatusDenied  = "denied"
 	StatusInvalid = "invalid"
+	StatusTimeout = "timeout"
 )

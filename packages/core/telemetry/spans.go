@@ -14,4 +14,8 @@ const (
 	SpanWorkspaceTransferExport = "acorn.workspace.transfer.export"
 
 	SpanWorkspaceLeaseAcquire = "acorn.workspace.lease.acquire"
+	SpanWorkspaceExec         = "acorn.workspace.exec"
+
+	SpanSandboxBackendAcquire = "acorn.sandbox.backend.acquire"
+	SpanSandboxBackendExec    = "acorn.sandbox.backend.exec"
 )

@@ -10,9 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/attachment"
 	backenddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/backend"
 	pathdomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/path"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -67,23 +69,41 @@ func (b *Backend) Kind() string {
 	return Kind
 }
 
-func (b *Backend) Acquire(_ context.Context, req backenddomain.AcquireRequest) (*backenddomain.SandboxLease, error) {
+func (b *Backend) Acquire(ctx context.Context, req backenddomain.AcquireRequest) (*backenddomain.SandboxLease, error) {
+	_, span := telemetry.Start(ctx, "sandbox-service/localprocess", telemetry.SpanSandboxBackendAcquire)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrOperation, "sandbox.backend.acquire"),
+		attribute.String(telemetry.AttrSandboxBackendID, b.ID()),
+		attribute.String(telemetry.AttrSandboxProfileID, req.ProfileID),
+	)
 	if req.Attachment == nil || req.Attachment.Kind != attachment.KindLocalPath {
+		telemetry.RecordError(span, backenddomain.ErrUnsupportedAttachment)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, backenddomain.ErrUnsupportedAttachment
 	}
 	if req.Attachment.LocalPath == "" {
+		telemetry.RecordError(span, backenddomain.ErrAttachmentNotReady)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, backenddomain.ErrAttachmentNotReady
 	}
 	info, err := os.Stat(req.Attachment.LocalPath)
 	if errors.Is(err, os.ErrNotExist) {
+		telemetry.RecordError(span, backenddomain.ErrAttachmentNotReady)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, backenddomain.ErrAttachmentNotReady
 	}
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
 	if !info.IsDir() {
+		telemetry.RecordError(span, backenddomain.ErrAttachmentNotReady)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, backenddomain.ErrAttachmentNotReady
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
 	return &backenddomain.SandboxLease{
 		ID:          fmt.Sprintf("lease_%d", time.Now().UnixNano()),
 		BackendID:   b.id,
@@ -99,14 +119,28 @@ func (b *Backend) Release(context.Context, *backenddomain.SandboxLease) error {
 }
 
 func (b *Backend) Exec(ctx context.Context, lease *backenddomain.SandboxLease, req backenddomain.ExecRequest) (*backenddomain.ExecResult, error) {
+	ctx, span := telemetry.Start(ctx, "sandbox-service/localprocess", telemetry.SpanSandboxBackendExec)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrOperation, "sandbox.backend.exec"),
+		attribute.String(telemetry.AttrSandboxBackendID, b.ID()),
+		attribute.String(telemetry.AttrExecCommandName, telemetry.SafeCommandName(req.Command)),
+		attribute.Int(telemetry.AttrExecArgCount, len(req.Args)),
+	)
 	if strings.TrimSpace(req.Command) == "" {
+		telemetry.RecordError(span, backenddomain.ErrInvalidRequest)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
 		return nil, backenddomain.ErrInvalidRequest
 	}
 	if lease == nil || lease.Attachment == nil || lease.Attachment.Kind != attachment.KindLocalPath {
+		telemetry.RecordError(span, backenddomain.ErrUnsupportedAttachment)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, backenddomain.ErrUnsupportedAttachment
 	}
 	cwd, err := resolveCWD(lease.Attachment.LocalPath, req.CWD)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
 		return nil, err
 	}
 	timeout := b.clampTimeout(req.Timeout)
@@ -123,6 +157,11 @@ func (b *Backend) Exec(ctx context.Context, lease *backenddomain.SandboxLease, r
 
 	err = cmd.Run()
 	if execCtx.Err() == context.DeadlineExceeded {
+		telemetry.RecordError(span, backenddomain.ErrExecTimeout)
+		span.SetAttributes(
+			attribute.Bool(telemetry.AttrExecTimedOut, true),
+			attribute.String(telemetry.AttrStatus, telemetry.StatusTimeout),
+		)
 		return nil, backenddomain.ErrExecTimeout
 	}
 	result := &backenddomain.ExecResult{
@@ -133,15 +172,30 @@ func (b *Backend) Exec(ctx context.Context, lease *backenddomain.SandboxLease, r
 		StderrTruncated: stderr.Truncated(),
 	}
 	if err == nil {
+		span.SetAttributes(
+			attribute.Int(telemetry.AttrExecExitCode, result.ExitCode),
+			attribute.Bool(telemetry.AttrExecStdoutTruncated, result.StdoutTruncated),
+			attribute.Bool(telemetry.AttrExecStderrTruncated, result.StderrTruncated),
+			attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+		)
 		return result, nil
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		result.ExitCode = exitErr.ExitCode()
 		result.ErrorMessage = err.Error()
+		span.SetAttributes(
+			attribute.Int(telemetry.AttrExecExitCode, result.ExitCode),
+			attribute.Bool(telemetry.AttrExecStdoutTruncated, result.StdoutTruncated),
+			attribute.Bool(telemetry.AttrExecStderrTruncated, result.StderrTruncated),
+			attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+		)
 		return result, nil
 	}
-	return nil, fmt.Errorf("%w: %v", backenddomain.ErrExecStart, err)
+	err = fmt.Errorf("%w: %v", backenddomain.ErrExecStart, err)
+	telemetry.RecordError(span, err)
+	span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+	return nil, err
 }
 
 func resolveCWD(root string, rel string) (string, error) {

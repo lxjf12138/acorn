@@ -21,6 +21,8 @@ func statusValue(err error) string {
 		return telemetry.StatusInvalid
 	case codes.PermissionDenied:
 		return telemetry.StatusDenied
+	case codes.DeadlineExceeded:
+		return telemetry.StatusTimeout
 	default:
 		return telemetry.StatusError
 	}
