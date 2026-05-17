@@ -18,7 +18,6 @@ type Workspace struct {
 	Status           workspacev1.WorkspaceStatus
 	StoreKind        string
 	StoreWorkspaceID string
-	RootPath         string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	MetadataJSON     []byte

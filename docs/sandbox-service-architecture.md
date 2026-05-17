@@ -60,28 +60,22 @@ services/sandbox-service/internal/
   version/
 ```
 
-The main gap is that local filesystem behavior still lives in the service
-layer:
+The previous local filesystem behavior has been moved behind the
+`WorkspaceStore` abstraction.
 
 ```text
-internal/service/workspace.go
-  creates local workspace roots
+internal/domain/workspacestore/
+  defines the workspace backing content contract
 
-internal/service/view.go
-  reads directories and files
-  resolves symlinks
-  applies local filesystem path containment
-
-internal/service/transfer.go
-  stats and exports local files
-
-internal/domain/path/resolve.go
-  contains filesystem-specific path resolution
+internal/infra/localfs/
+  workspace_store.go
+  path_resolver.go
+  mime.go
 ```
 
-That is acceptable for the current foundation, but it should not be extended
-into download, import, or exec. The next cleanup is to move local filesystem
-behavior behind a `WorkspaceStore` adapter.
+The service layer now depends on `domain/workspacestore.Store` rather than
+directly on `os`, `filepath`, symlink resolution, or concrete workspace root
+paths.
 
 ---
 
@@ -143,7 +137,6 @@ type Workspace struct {
     SandboxProfileID string
     DisplayName      string
     Status           workspacev1.WorkspaceStatus
-    RootPath         string
     CreatedAt        time.Time
     UpdatedAt        time.Time
     MetadataJSON     []byte
@@ -168,9 +161,8 @@ type Workspace struct {
 }
 ```
 
-`RootPath` may remain during migration, but service code should stop reading it.
-Only the local filesystem adapter should know how a workspace maps to host
-paths.
+The local filesystem root path is not part of hosted workspace metadata. Only
+the local filesystem adapter knows how a workspace maps to host paths.
 
 ### 4.2 WorkspacePathRef
 
