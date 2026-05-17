@@ -22,6 +22,7 @@ func TestHTTPStatusFromError(t *testing.T) {
 		{code: codes.AlreadyExists, want: http.StatusConflict},
 		{code: codes.FailedPrecondition, want: http.StatusConflict},
 		{code: codes.ResourceExhausted, want: http.StatusRequestEntityTooLarge},
+		{code: codes.DeadlineExceeded, want: http.StatusGatewayTimeout},
 		{code: codes.Unauthenticated, want: http.StatusUnauthorized},
 		{code: codes.Unavailable, want: http.StatusServiceUnavailable},
 	}

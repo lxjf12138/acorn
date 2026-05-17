@@ -31,8 +31,8 @@ type Config struct {
 	DefaultTimeout time.Duration
 	MaxTimeout     time.Duration
 
-	DefaultMaxStdoutBytes int64
-	DefaultMaxStderrBytes int64
+	MaxStdoutBytes int64
+	MaxStderrBytes int64
 }
 
 type Backend struct {
@@ -41,8 +41,8 @@ type Backend struct {
 	defaultTimeout time.Duration
 	maxTimeout     time.Duration
 
-	defaultMaxStdoutBytes int64
-	defaultMaxStderrBytes int64
+	maxStdoutBytes int64
+	maxStderrBytes int64
 }
 
 func NewBackend(cfg Config) *Backend {
@@ -51,11 +51,11 @@ func NewBackend(cfg Config) *Backend {
 		id = defaultBackendID
 	}
 	return &Backend{
-		id:                    id,
-		defaultTimeout:        durationOrDefault(cfg.DefaultTimeout, defaultTimeout),
-		maxTimeout:            durationOrDefault(cfg.MaxTimeout, maxTimeout),
-		defaultMaxStdoutBytes: valueOrDefaultInt64(cfg.DefaultMaxStdoutBytes, defaultMaxStdoutBytes),
-		defaultMaxStderrBytes: valueOrDefaultInt64(cfg.DefaultMaxStderrBytes, defaultMaxStderrBytes),
+		id:             id,
+		defaultTimeout: durationOrDefault(cfg.DefaultTimeout, defaultTimeout),
+		maxTimeout:     durationOrDefault(cfg.MaxTimeout, maxTimeout),
+		maxStdoutBytes: valueOrDefaultInt64(cfg.MaxStdoutBytes, defaultMaxStdoutBytes),
+		maxStderrBytes: valueOrDefaultInt64(cfg.MaxStderrBytes, defaultMaxStderrBytes),
 	}
 }
 
@@ -116,8 +116,8 @@ func (b *Backend) Exec(ctx context.Context, lease *backenddomain.SandboxLease, r
 	cmd := exec.CommandContext(execCtx, req.Command, req.Args...)
 	cmd.Dir = cwd
 	cmd.Env = buildEnv(lease.Attachment.LocalPath, cwd, req.Env)
-	stdout := newLimitedBuffer(b.outputLimit(req.MaxStdoutBytes, b.defaultMaxStdoutBytes))
-	stderr := newLimitedBuffer(b.outputLimit(req.MaxStderrBytes, b.defaultMaxStderrBytes))
+	stdout := newLimitedBuffer(b.outputLimit(req.MaxStdoutBytes, b.maxStdoutBytes))
+	stderr := newLimitedBuffer(b.outputLimit(req.MaxStderrBytes, b.maxStderrBytes))
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 
@@ -213,9 +213,15 @@ func (b *Backend) clampTimeout(requested time.Duration) time.Duration {
 	return requested
 }
 
-func (b *Backend) outputLimit(requested int64, fallback int64) int64 {
+func (b *Backend) outputLimit(requested int64, max int64) int64 {
+	if max <= 0 {
+		max = defaultMaxStdoutBytes
+	}
 	if requested <= 0 {
-		return fallback
+		return max
+	}
+	if requested > max {
+		return max
 	}
 	return requested
 }

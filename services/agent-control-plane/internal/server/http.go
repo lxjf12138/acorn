@@ -26,6 +26,7 @@ import (
 )
 
 const multipartUploadOverheadBytes = int64(10 << 20)
+const execRequestMaxBytes = int64(1 << 20)
 
 func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger) *khttp.Server {
 	srv := khttp.NewServer(
@@ -111,6 +112,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		return httpx.WriteProtoJSON(ctx, nethttp.StatusCreated, resp)
 	})
 	router.POST("/sessions/{session_id}/workspace/exec", func(ctx khttp.Context) error {
+		httpx.MaxBytesKratosBody(ctx, execRequestMaxBytes)
 		req, err := readExecWorkspaceCommandRequest(ctx)
 		if err != nil {
 			return err
@@ -337,6 +339,10 @@ func readExecWorkspaceCommandRequest(ctx khttp.Context) (struct {
 	}{}
 	body, err := io.ReadAll(ctx.Request().Body)
 	if err != nil {
+		var maxBytesErr *nethttp.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return out, status.Error(codes.ResourceExhausted, "exec request is too large")
+		}
 		return out, err
 	}
 	if len(body) > 0 {

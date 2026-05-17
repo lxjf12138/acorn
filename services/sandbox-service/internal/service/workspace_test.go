@@ -155,7 +155,7 @@ func newTestWorkspaceService(t *testing.T) (*WorkspaceService, *fakeBackingStore
 	backing := &fakeBackingStore{}
 	return NewWorkspaceService(
 		"sandbox-service-id",
-		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id"}),
+		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id", LocalProcessEnabled: true}),
 		workspacedomain.NewMemoryStore(),
 		backing,
 	), backing

@@ -136,6 +136,37 @@ func TestBackendExecOutputLimits(t *testing.T) {
 	}
 }
 
+func TestBackendExecOutputLimitsClampToConfiguredMax(t *testing.T) {
+	backend := NewBackend(Config{
+		DefaultTimeout: time.Second,
+		MaxTimeout:     2 * time.Second,
+		MaxStdoutBytes: 4,
+		MaxStderrBytes: 5,
+	})
+	root := t.TempDir()
+	lease, err := backend.Acquire(context.Background(), backenddomain.AcquireRequest{
+		WorkspaceID: "ws-test",
+		Attachment:  localPathAttachment(root),
+	})
+	if err != nil {
+		t.Fatalf("Acquire returned error: %v", err)
+	}
+	result, err := backend.Exec(context.Background(), lease, backenddomain.ExecRequest{
+		Command:        helperCommand(),
+		Args:           helperArgs("both", "abcdef"),
+		Env:            helperEnv(),
+		MaxStdoutBytes: 100,
+		MaxStderrBytes: 100,
+	})
+	if err != nil {
+		t.Fatalf("Exec returned error: %v", err)
+	}
+	if string(result.Stdout) != "abcd" || !result.StdoutTruncated ||
+		string(result.Stderr) != "abcde" || !result.StderrTruncated {
+		t.Fatalf("unexpected clamped result: %+v", result)
+	}
+}
+
 func TestBackendExecEnv(t *testing.T) {
 	backend, lease := newTestBackendAndLease(t)
 	result, err := backend.Exec(context.Background(), lease, backenddomain.ExecRequest{

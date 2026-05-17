@@ -33,7 +33,8 @@ func TestConfigValidateDefaultsWorkspaceRoot(t *testing.T) {
 	if cfg.Sandbox.LocalProcess.DefaultTimeoutSeconds != 30 ||
 		cfg.Sandbox.LocalProcess.MaxTimeoutSeconds != 120 ||
 		cfg.Sandbox.LocalProcess.MaxStdoutBytes != 1024*1024 ||
-		cfg.Sandbox.LocalProcess.MaxStderrBytes != 1024*1024 {
+		cfg.Sandbox.LocalProcess.MaxStderrBytes != 1024*1024 ||
+		cfg.Sandbox.LocalProcess.Enabled {
 		t.Fatalf("unexpected local process defaults: %+v", cfg.Sandbox.LocalProcess)
 	}
 }

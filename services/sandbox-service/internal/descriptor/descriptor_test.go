@@ -10,10 +10,11 @@ import (
 
 func TestDescribeCapabilities(t *testing.T) {
 	source := NewSource(Options{
-		ServiceID: "sandbox.local.test",
-		Version:   "test",
-		HTTPAddr:  "sandbox-service:8081",
-		GRPCAddr:  "sandbox-service:9081",
+		ServiceID:           "sandbox.local.test",
+		Version:             "test",
+		HTTPAddr:            "sandbox-service:8081",
+		GRPCAddr:            "sandbox-service:9081",
+		LocalProcessEnabled: true,
 	})
 	descriptor, err := source.DescribeCapabilities(context.Background())
 	if err != nil {
@@ -79,6 +80,31 @@ func TestDescribeCapabilities(t *testing.T) {
 	}
 	if endpoint := endpointByName(descriptor, "resource-content-grpc"); endpoint.GetAddress() != "sandbox-service:9081" || endpoint.GetPath() != "/acorn.resource.v1.ResourceContentService" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL {
 		t.Fatalf("unexpected resource content gRPC endpoint: %+v", endpoint)
+	}
+}
+
+func TestDescribeCapabilitiesWithoutLocalProcess(t *testing.T) {
+	source := NewSource(Options{
+		ServiceID: "sandbox.local.test",
+		Version:   "test",
+		HTTPAddr:  "sandbox-service:8081",
+		GRPCAddr:  "sandbox-service:9081",
+	})
+	descriptor, err := source.DescribeCapabilities(context.Background())
+	if err != nil {
+		t.Fatalf("DescribeCapabilities returned error: %v", err)
+	}
+	control := surfaceByName(descriptor, "control")
+	if hasFeature(control, "exec_workspace_command") {
+		t.Fatalf("control surface unexpectedly advertises exec: %+v", control.GetFeatures())
+	}
+	if endpoint := endpointByName(descriptor, "workspace-exec-grpc"); endpoint != nil {
+		t.Fatalf("unexpected workspace exec endpoint: %+v", endpoint)
+	}
+	for _, profile := range descriptor.GetSandboxProfiles() {
+		if profile.GetId() == "local-process-dev" {
+			t.Fatalf("unexpected local-process-dev profile while disabled: %+v", profile)
+		}
 	}
 }
 

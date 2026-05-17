@@ -30,6 +30,8 @@ func HTTPStatusFromError(err error) int {
 		return http.StatusConflict
 	case codes.ResourceExhausted:
 		return http.StatusRequestEntityTooLarge
+	case codes.DeadlineExceeded:
+		return http.StatusGatewayTimeout
 	case codes.Unimplemented:
 		return http.StatusNotImplemented
 	case codes.Unavailable:

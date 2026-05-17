@@ -14,12 +14,13 @@ const (
 )
 
 type Options struct {
-	ServiceID   string
-	DisplayName string
-	Version     string
-	HTTPAddr    string
-	GRPCAddr    string
-	MCPEndpoint string
+	ServiceID           string
+	DisplayName         string
+	Version             string
+	HTTPAddr            string
+	GRPCAddr            string
+	MCPEndpoint         string
+	LocalProcessEnabled bool
 }
 
 type Source struct {
@@ -32,15 +33,132 @@ func NewSource(opts Options) *Source {
 
 func NewSourceFromConfig(cfg *conf.Config, version string) *Source {
 	return NewSource(Options{
-		ServiceID:   cfg.Service.ID,
-		DisplayName: cfg.Service.Name,
-		Version:     version,
-		HTTPAddr:    cfg.Server.HTTP.AdvertiseAddr,
-		GRPCAddr:    cfg.Server.GRPC.AdvertiseAddr,
+		ServiceID:           cfg.Service.ID,
+		DisplayName:         cfg.Service.Name,
+		Version:             version,
+		HTTPAddr:            cfg.Server.HTTP.AdvertiseAddr,
+		GRPCAddr:            cfg.Server.GRPC.AdvertiseAddr,
+		LocalProcessEnabled: cfg.Sandbox.LocalProcess.Enabled,
 	})
 }
 
 func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.CapabilityDescriptor, error) {
+	controlFeatures := []string{
+		"describe_capabilities",
+		"health",
+		"version",
+		"create_hosted_workspace",
+		"get_hosted_workspace",
+	}
+	profiles := []*capabilityv1.SandboxProfile{
+		{
+			Id:             "local-docker",
+			DisplayName:    "Local Docker Sandbox",
+			Implementation: "local-docker",
+			Isolation:      "container",
+			Os:             "linux",
+			Default:        false,
+			Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+			Capabilities: []string{
+				"filesystem",
+				"exec",
+				"network_optional",
+			},
+		},
+	}
+	endpoints := []*capabilityv1.EndpointDescriptor{
+		{
+			Name:      "control-http",
+			Surface:   "control",
+			Protocol:  "http",
+			Transport: "http",
+			Address:   s.opts.HTTPAddr,
+			Path:      "/capability/descriptor",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED,
+		},
+		{
+			Name:      "control-grpc",
+			Surface:   "control",
+			Protocol:  "grpc",
+			Transport: "grpc",
+			Address:   s.opts.GRPCAddr,
+			Path:      "/acorn.capability.v1.CapabilityDescriptorService/GetCapabilityDescriptor",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED,
+		},
+		{
+			Name:      "workspace-host-grpc",
+			Surface:   "control",
+			Protocol:  "grpc",
+			Transport: "grpc",
+			Address:   s.opts.GRPCAddr,
+			Path:      "/acorn.sandbox.v1.WorkspaceHostService",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+		},
+		{
+			Name:      "agent-mcp",
+			Surface:   "agent",
+			Protocol:  "mcp",
+			Transport: "http",
+			Address:   s.opts.HTTPAddr,
+			Path:      s.opts.MCPEndpoint,
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
+		},
+		{
+			Name:      "workspace-view-grpc",
+			Surface:   "view",
+			Protocol:  "grpc",
+			Transport: "grpc",
+			Address:   s.opts.GRPCAddr,
+			Path:      "/acorn.sandbox.v1.WorkspaceViewService",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+		},
+		{
+			Name:      "workspace-transfer-grpc",
+			Surface:   "resource",
+			Protocol:  "grpc",
+			Transport: "grpc",
+			Address:   s.opts.GRPCAddr,
+			Path:      "/acorn.sandbox.v1.WorkspaceTransferService",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+		},
+		{
+			Name:      "resource-content-grpc",
+			Surface:   "resource",
+			Protocol:  "grpc",
+			Transport: "grpc",
+			Address:   s.opts.GRPCAddr,
+			Path:      "/acorn.resource.v1.ResourceContentService",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+		},
+	}
+	if s.opts.LocalProcessEnabled {
+		controlFeatures = append(controlFeatures, "exec_workspace_command")
+		profiles = append([]*capabilityv1.SandboxProfile{
+			{
+				Id:             "local-process-dev",
+				DisplayName:    "Local Process Dev Backend",
+				Implementation: "local-process-dev",
+				Isolation:      "process",
+				Os:             "host",
+				Default:        true,
+				Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+				Capabilities: []string{
+					"filesystem",
+					"exec",
+					"dev_only",
+				},
+			},
+		}, profiles...)
+		endpoints = append(endpoints, &capabilityv1.EndpointDescriptor{
+			Name:      "workspace-exec-grpc",
+			Surface:   "control",
+			Protocol:  "grpc",
+			Transport: "grpc",
+			Address:   s.opts.GRPCAddr,
+			Path:      "/acorn.sandbox.v1.WorkspaceExecService",
+			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+		})
+	}
 	return &capabilityv1.CapabilityDescriptor{
 		ServiceId:   s.opts.ServiceID,
 		Kind:        Kind,
@@ -50,16 +168,9 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 		Description: "Sandbox capability service descriptor for Phase 1 capability discovery.",
 		Surfaces: []*capabilityv1.SurfaceDescriptor{
 			{
-				Name:   "control",
-				Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-				Features: []string{
-					"describe_capabilities",
-					"health",
-					"version",
-					"create_hosted_workspace",
-					"get_hosted_workspace",
-					"exec_workspace_command",
-				},
+				Name:     "control",
+				Status:   capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+				Features: controlFeatures,
 			},
 			{
 				Name:   "agent",
@@ -113,110 +224,8 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				},
 			},
 		},
-		SandboxProfiles: []*capabilityv1.SandboxProfile{
-			{
-				Id:             "local-process-dev",
-				DisplayName:    "Local Process Dev Backend",
-				Implementation: "local-process-dev",
-				Isolation:      "process",
-				Os:             "host",
-				Default:        true,
-				Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-				Capabilities: []string{
-					"filesystem",
-					"exec",
-					"dev_only",
-				},
-			},
-			{
-				Id:             "local-docker",
-				DisplayName:    "Local Docker Sandbox",
-				Implementation: "local-docker",
-				Isolation:      "container",
-				Os:             "linux",
-				Default:        false,
-				Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
-				Capabilities: []string{
-					"filesystem",
-					"exec",
-					"network_optional",
-				},
-			},
-		},
-		Endpoints: []*capabilityv1.EndpointDescriptor{
-			{
-				Name:      "control-http",
-				Surface:   "control",
-				Protocol:  "http",
-				Transport: "http",
-				Address:   s.opts.HTTPAddr,
-				Path:      "/capability/descriptor",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED,
-			},
-			{
-				Name:      "control-grpc",
-				Surface:   "control",
-				Protocol:  "grpc",
-				Transport: "grpc",
-				Address:   s.opts.GRPCAddr,
-				Path:      "/acorn.capability.v1.CapabilityDescriptorService/GetCapabilityDescriptor",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED,
-			},
-			{
-				Name:      "workspace-host-grpc",
-				Surface:   "control",
-				Protocol:  "grpc",
-				Transport: "grpc",
-				Address:   s.opts.GRPCAddr,
-				Path:      "/acorn.sandbox.v1.WorkspaceHostService",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-			},
-			{
-				Name:      "agent-mcp",
-				Surface:   "agent",
-				Protocol:  "mcp",
-				Transport: "http",
-				Address:   s.opts.HTTPAddr,
-				Path:      s.opts.MCPEndpoint,
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
-			},
-			{
-				Name:      "workspace-view-grpc",
-				Surface:   "view",
-				Protocol:  "grpc",
-				Transport: "grpc",
-				Address:   s.opts.GRPCAddr,
-				Path:      "/acorn.sandbox.v1.WorkspaceViewService",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-			},
-			{
-				Name:      "workspace-transfer-grpc",
-				Surface:   "resource",
-				Protocol:  "grpc",
-				Transport: "grpc",
-				Address:   s.opts.GRPCAddr,
-				Path:      "/acorn.sandbox.v1.WorkspaceTransferService",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-			},
-			{
-				Name:      "workspace-exec-grpc",
-				Surface:   "control",
-				Protocol:  "grpc",
-				Transport: "grpc",
-				Address:   s.opts.GRPCAddr,
-				Path:      "/acorn.sandbox.v1.WorkspaceExecService",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-			},
-			{
-				Name:      "resource-content-grpc",
-				Surface:   "resource",
-				Protocol:  "grpc",
-				Transport: "grpc",
-				Address:   s.opts.GRPCAddr,
-				Path:      "/acorn.resource.v1.ResourceContentService",
-				Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-			},
-		},
+		SandboxProfiles: profiles,
+		Endpoints:       endpoints,
 	}, nil
 }
 

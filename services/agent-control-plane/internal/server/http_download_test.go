@@ -271,6 +271,18 @@ func TestReadExecWorkspaceCommandRequestErrors(t *testing.T) {
 	}
 }
 
+func TestReadExecWorkspaceCommandRequestBodyLimit(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx := newDownloadTestContext("unused", "", recorder)
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace/exec", strings.NewReader(`{"command":"go"}`))
+	httpx.MaxBytesKratosBody(ctx, 1)
+
+	_, err := readExecWorkspaceCommandRequest(ctx)
+	if status.Code(err) != codes.ResourceExhausted {
+		t.Fatalf("expected ResourceExhausted, got %v", err)
+	}
+}
+
 func TestReadUploadResourceInput(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)

@@ -56,15 +56,18 @@ func main() {
 	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore, backingStore)
 	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
 	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore)
-	attachmentService := service.NewWorkspaceAttachmentService(workspaceStore, backingStore)
-	localProcessBackend := localprocess.NewBackend(localprocess.Config{
-		ID:                    "local-process-dev",
-		DefaultTimeout:        time.Duration(cfg.Sandbox.LocalProcess.DefaultTimeoutSeconds) * time.Second,
-		MaxTimeout:            time.Duration(cfg.Sandbox.LocalProcess.MaxTimeoutSeconds) * time.Second,
-		DefaultMaxStdoutBytes: cfg.Sandbox.LocalProcess.MaxStdoutBytes,
-		DefaultMaxStderrBytes: cfg.Sandbox.LocalProcess.MaxStderrBytes,
-	})
-	execService := service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, attachmentService, localProcessBackend)
+	var execService *service.WorkspaceExecService
+	if cfg.Sandbox.LocalProcess.Enabled {
+		attachmentService := service.NewWorkspaceAttachmentService(workspaceStore, backingStore)
+		localProcessBackend := localprocess.NewBackend(localprocess.Config{
+			ID:             "local-process-dev",
+			DefaultTimeout: time.Duration(cfg.Sandbox.LocalProcess.DefaultTimeoutSeconds) * time.Second,
+			MaxTimeout:     time.Duration(cfg.Sandbox.LocalProcess.MaxTimeoutSeconds) * time.Second,
+			MaxStdoutBytes: cfg.Sandbox.LocalProcess.MaxStdoutBytes,
+			MaxStderrBytes: cfg.Sandbox.LocalProcess.MaxStderrBytes,
+		})
+		execService = service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, attachmentService, localProcessBackend)
+	}
 	resourceContentService := service.NewResourceContentService(cfg.Service.ID, exportStore, blobStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)

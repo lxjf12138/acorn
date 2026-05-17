@@ -22,7 +22,9 @@ func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorServic
 	sandboxv1.RegisterWorkspaceHostServiceServer(srv, workspaceService)
 	sandboxv1.RegisterWorkspaceViewServiceServer(srv, viewService)
 	sandboxv1.RegisterWorkspaceTransferServiceServer(srv, transferService)
-	sandboxv1.RegisterWorkspaceExecServiceServer(srv, execService)
+	if execService != nil {
+		sandboxv1.RegisterWorkspaceExecServiceServer(srv, execService)
+	}
 	resourcev1.RegisterResourceContentServiceServer(srv, resourceContentService)
 	return srv
 }
