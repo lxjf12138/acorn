@@ -89,7 +89,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return writeGetResourceJSON(ctx, nethttp.StatusCreated, record)
+		return writeRegisterResourceJSON(ctx, nethttp.StatusCreated, record)
 	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
