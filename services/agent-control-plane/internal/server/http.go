@@ -8,18 +8,17 @@ import (
 	"io"
 	nethttp "net/http"
 	"strconv"
-	"strings"
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	"github.com/lxjf12138/acorn/packages/servicekit"
+	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
@@ -32,6 +31,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
 		khttp.Middleware(servicekit.DefaultServerMiddleware(logger)...),
+		khttp.ErrorEncoder(httpx.ErrorEncoder),
 	)
 
 	router := srv.Route("/")
@@ -49,14 +49,14 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return writeProtoJSON(ctx, nethttp.StatusOK, record)
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, record)
 	})
 	router.GET("/sessions/{session_id}/workspace", func(ctx khttp.Context) error {
 		record, err := workspaceService.GetSessionWorkspace(ctx, ctx.Vars().Get("session_id"))
 		if err != nil {
 			return err
 		}
-		return writeProtoJSON(ctx, nethttp.StatusOK, record)
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, record)
 	})
 	router.GET("/sessions/{session_id}/workspace/state", func(ctx khttp.Context) error {
 		sessionState, err := workspaceService.GetSessionWorkspaceState(ctx, ctx.Vars().Get("session_id"))
@@ -74,7 +74,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return writeProtoJSON(ctx, nethttp.StatusOK, resp)
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, resp)
 	})
 	router.GET("/sessions/{session_id}/workspace/files/preview", func(ctx khttp.Context) error {
 		maxBytes, err := parseInt64Query(ctx.Query().Get("max_bytes"), "max_bytes")
@@ -85,7 +85,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return writeProtoJSON(ctx, nethttp.StatusOK, resp)
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, resp)
 	})
 	router.POST("/sessions/{session_id}/workspace/files/export", func(ctx khttp.Context) error {
 		req, err := readExportWorkspacePathRequest(ctx)
@@ -107,11 +107,11 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return writeProtoJSON(ctx, nethttp.StatusCreated, resp)
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusCreated, resp)
 	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
-		if err := readProtoJSON(ctx, &req); err != nil {
+		if err := httpx.ReadProtoJSON(ctx, &req); err != nil {
 			return err
 		}
 		record, err := resourceService.RegisterRecord(ctx, &req)
@@ -136,12 +136,12 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return writeProtoJSON(ctx, nethttp.StatusOK, &resourcev1.ListResourcesResponse{
+		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, &resourcev1.ListResourcesResponse{
 			Resources: records,
 		})
 	})
 	router.POST("/resources/upload", func(ctx khttp.Context) error {
-		limitUploadRequestBody(ctx, cfg.Resource.UploadMaxBytes)
+		httpx.MaxBytesKratosBody(ctx, uploadRequestBodyLimit(cfg.Resource.UploadMaxBytes))
 		input, err := readUploadResourceInput(ctx)
 		if err != nil {
 			return err
@@ -165,11 +165,11 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 	return srv
 }
 
-func limitUploadRequestBody(ctx khttp.Context, maxUploadBytes int64) {
+func uploadRequestBodyLimit(maxUploadBytes int64) int64 {
 	if maxUploadBytes <= 0 {
 		maxUploadBytes = 100 * 1024 * 1024
 	}
-	ctx.Request().Body = nethttp.MaxBytesReader(ctx.Response(), ctx.Request().Body, maxUploadBytes+multipartUploadOverheadBytes)
+	return maxUploadBytes + multipartUploadOverheadBytes
 }
 
 func readUploadResourceInput(ctx khttp.Context) (service.UploadResourceInput, error) {
@@ -256,16 +256,6 @@ func parseInt64Query(value string, name string) (int64, error) {
 	return parsed, nil
 }
 
-func readProtoJSON(ctx khttp.Context, msg proto.Message) error {
-	body, err := io.ReadAll(ctx.Request().Body)
-	if err != nil {
-		return err
-	}
-	return protojson.UnmarshalOptions{
-		DiscardUnknown: true,
-	}.Unmarshal(body, msg)
-}
-
 type exportWorkspacePathRequest struct {
 	Path         string `json:"path"`
 	ResourceName string `json:"resource_name"`
@@ -343,23 +333,12 @@ func readExportWorkspacePathRequest(ctx khttp.Context) (exportWorkspacePathReque
 	return req, nil
 }
 
-func writeProtoJSON(ctx khttp.Context, code int, msg proto.Message) error {
-	body, err := protojson.MarshalOptions{
-		UseProtoNames:   true,
-		EmitUnpopulated: true,
-	}.Marshal(msg)
-	if err != nil {
-		return err
-	}
-	return ctx.Blob(code, "application/json", body)
-}
-
 func writeRegisterResourceJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
-	return writeProtoJSON(ctx, code, &resourcev1.RegisterResourceResponse{Resource: record})
+	return httpx.WriteProtoJSON(ctx, code, &resourcev1.RegisterResourceResponse{Resource: record})
 }
 
 func writeGetResourceJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
-	return writeProtoJSON(ctx, code, &resourcev1.GetResourceResponse{Resource: record})
+	return httpx.WriteProtoJSON(ctx, code, &resourcev1.GetResourceResponse{Resource: record})
 }
 
 func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService) error {
@@ -404,23 +383,11 @@ func setDownloadHeaders(ctx khttp.Context, ref *resourcev1.ResourceRef) {
 	if ref.GetSizeBytes() > 0 {
 		headers.Set("Content-Length", strconv.FormatInt(ref.GetSizeBytes(), 10))
 	}
-	headers.Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, safeDownloadFilename(ref.GetName(), ref.GetId())))
+	headers.Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, httpx.SafeFilename(ref.GetName(), ref.GetId())))
 	headers.Set("X-Acorn-Resource-ID", ref.GetId())
 	if ref.GetContentHash() != "" {
 		headers.Set("X-Acorn-Content-Hash", ref.GetContentHash())
 	}
-}
-
-func safeDownloadFilename(name string, fallback string) string {
-	name = strings.ReplaceAll(name, "\r", "")
-	name = strings.ReplaceAll(name, "\n", "")
-	name = strings.ReplaceAll(name, "/", "_")
-	name = strings.ReplaceAll(name, `\`, "_")
-	name = strings.TrimSpace(name)
-	if name == "" || name == "." || name == ".." {
-		return fallback
-	}
-	return name
 }
 
 func resourceFilterFromQuery(ctx khttp.Context) (resourcedomain.Filter, error) {

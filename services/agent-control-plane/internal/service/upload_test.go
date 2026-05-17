@@ -88,24 +88,6 @@ func TestUploadServiceRollsBackBlobWithFakeStore(t *testing.T) {
 	}
 }
 
-func TestSafeResourceFilename(t *testing.T) {
-	tests := []struct {
-		name string
-		want string
-	}{
-		{name: " report.txt ", want: "report.txt"},
-		{name: "a/b\\c.txt", want: "a_b_c.txt"},
-		{name: "bad\r\nname.txt", want: "badname.txt"},
-		{name: ".", want: "res_1"},
-		{name: "", want: "res_1"},
-	}
-	for _, tt := range tests {
-		if got := safeResourceFilename(tt.name, "res_1"); got != tt.want {
-			t.Fatalf("safeResourceFilename(%q) = %q, want %q", tt.name, got, tt.want)
-		}
-	}
-}
-
 func newUploadTestBlobStore(t *testing.T) *localblob.Store {
 	t.Helper()
 	store, err := localblob.NewStore(localblob.Config{BaseDir: t.TempDir()})

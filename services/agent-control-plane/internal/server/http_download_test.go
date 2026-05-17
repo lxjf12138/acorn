@@ -15,6 +15,7 @@ import (
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
+	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 	"google.golang.org/grpc/codes"
@@ -174,26 +175,6 @@ func TestDownloadResourceRejectsOwnerMismatch(t *testing.T) {
 	}
 }
 
-func TestSafeDownloadFilename(t *testing.T) {
-	tests := []struct {
-		name     string
-		fallback string
-		want     string
-	}{
-		{name: " report.txt ", fallback: "res_1", want: "report.txt"},
-		{name: "reports/final\\v1.txt", fallback: "res_1", want: "reports_final_v1.txt"},
-		{name: "bad\r\nname.txt", fallback: "res_1", want: "badname.txt"},
-		{name: " \r\n ", fallback: "res_1", want: "res_1"},
-		{name: ".", fallback: "res_1", want: "res_1"},
-		{name: "..", fallback: "res_1", want: "res_1"},
-	}
-	for _, tt := range tests {
-		if got := safeDownloadFilename(tt.name, tt.fallback); got != tt.want {
-			t.Fatalf("safeDownloadFilename(%q) = %q, want %q", tt.name, got, tt.want)
-		}
-	}
-}
-
 func TestReadImportResourceRequest(t *testing.T) {
 	ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
 	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace/files/import?user_id=user-1", strings.NewReader(`{
@@ -310,7 +291,7 @@ func TestReadUploadResourceInputBodyLimit(t *testing.T) {
 	ctx := newDownloadTestContext("unused", "", recorder)
 	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/resources/upload", &body)
 	ctx.request.Header.Set("Content-Type", writer.FormDataContentType())
-	ctx.request.Body = nethttp.MaxBytesReader(recorder, ctx.request.Body, int64(body.Len()-1))
+	httpx.MaxBytesKratosBody(ctx, int64(body.Len()-1))
 
 	_, err = readUploadResourceInput(ctx)
 	if status.Code(err) != codes.ResourceExhausted {

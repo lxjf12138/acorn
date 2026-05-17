@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	"io"
-	"strings"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
+	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -56,7 +56,7 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		return nil, status.Error(codes.InvalidArgument, "upload source is required")
 	}
 	resourceID := resourcedomain.NewRecordID()
-	name := safeResourceFilename(input.Name, resourceID)
+	name := httpx.SafeFilename(input.Name, resourceID)
 	blob, err := s.blobStore.Put(ctx, resourceblob.PutRequest{
 		ResourceID:   resourceID,
 		Name:         name,
@@ -132,16 +132,4 @@ func (r *uploadLimitReader) Read(p []byte) (int, error) {
 		}
 	}
 	return n, nil
-}
-
-func safeResourceFilename(name string, fallback string) string {
-	name = strings.ReplaceAll(name, "\r", "")
-	name = strings.ReplaceAll(name, "\n", "")
-	name = strings.ReplaceAll(name, "/", "_")
-	name = strings.ReplaceAll(name, `\`, "_")
-	name = strings.TrimSpace(name)
-	if name == "" || name == "." || name == ".." {
-		return fallback
-	}
-	return name
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
+	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
@@ -276,7 +276,7 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 	resourceRecord := resourceStream.Record()
 	ref := resourceRecord.GetRef()
 	if destinationPath == "" {
-		destinationPath = safeWorkspaceImportFilename(ref.GetName(), ref.GetId())
+		destinationPath = httpx.SafeFilename(ref.GetName(), ref.GetId())
 	}
 	resp, err := s.sandboxClient.ImportResourceToWorkspace(ctx, sandboxclient.ImportResourceInput{
 		SessionID:          record.SessionID,
@@ -363,18 +363,6 @@ func userIDOrRecord(userID string, ownerUserID string) string {
 		return userID
 	}
 	return ownerUserID
-}
-
-func safeWorkspaceImportFilename(name string, fallback string) string {
-	name = strings.ReplaceAll(name, "\r", "")
-	name = strings.ReplaceAll(name, "\n", "")
-	name = strings.ReplaceAll(name, "/", "_")
-	name = strings.ReplaceAll(name, `\`, "_")
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return fallback
-	}
-	return name
 }
 
 func toProto(record workspacedomain.Record) *workspacev1.WorkspaceRecord {
