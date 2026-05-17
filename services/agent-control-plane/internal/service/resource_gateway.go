@@ -5,7 +5,9 @@ import (
 	"io"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -78,49 +80,93 @@ func NewResourceGatewayService(store resourcedomain.Store, authorities map[strin
 }
 
 func (s *ResourceGatewayService) OpenResource(ctx context.Context, resourceID string, userID string) (*resourcev1.ResourceRecord, *ResourceStream, error) {
+	ctx, span := telemetry.Start(ctx, "agent-control-plane/service", telemetry.SpanResourceDownload)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "resource.download"))
 	resourceStream, err := s.OpenResourceForTransfer(ctx, resourceID, userID)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, nil, err
 	}
+	ref := resourceStream.record.GetRef()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceAuthorityServiceID, ref.GetAuthorityServiceId()),
+		attribute.String(telemetry.AttrResourceMimeType, ref.GetMimeType()),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, ref.GetSizeBytes()),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
 	return resourceStream.record, resourceStream, nil
 }
 
 func (s *ResourceGatewayService) OpenResourceForTransfer(ctx context.Context, resourceID string, userID string) (*ResourceStream, error) {
+	ctx, span := telemetry.Start(ctx, "agent-control-plane/service", telemetry.SpanResourceGatewayOpen)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "resource.gateway.open"))
 	if resourceID == "" {
-		return nil, status.Error(codes.InvalidArgument, "resource_id is required")
+		err := status.Error(codes.InvalidArgument, "resource_id is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return nil, err
 	}
 	record, err := s.store.Get(ctx, resourceID)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
 	if record.GetStatus() != resourcev1.ResourceStatus_RESOURCE_STATUS_AVAILABLE {
-		return nil, status.Error(codes.FailedPrecondition, "resource is not available")
+		err := status.Error(codes.FailedPrecondition, "resource is not available")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, err
 	}
 	if record.GetOwnerUserId() != "" && userID != "" && record.GetOwnerUserId() != userID {
-		return nil, status.Error(codes.PermissionDenied, "resource owner mismatch")
+		err := status.Error(codes.PermissionDenied, "resource owner mismatch")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusDenied))
+		return nil, err
 	}
 	ref := record.GetRef()
 	if ref == nil || ref.GetAuthorityServiceId() == "" {
-		return nil, status.Error(codes.FailedPrecondition, "resource authority is missing")
+		err := status.Error(codes.FailedPrecondition, "resource authority is missing")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, err
 	}
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceAuthorityServiceID, ref.GetAuthorityServiceId()),
+		attribute.String(telemetry.AttrResourceMimeType, ref.GetMimeType()),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, ref.GetSizeBytes()),
+	)
 	authority, ok := s.authorities[ref.GetAuthorityServiceId()]
 	if !ok {
-		return nil, status.Errorf(codes.FailedPrecondition, "unsupported resource authority: %s", ref.GetAuthorityServiceId())
+		err := status.Errorf(codes.FailedPrecondition, "unsupported resource authority: %s", ref.GetAuthorityServiceId())
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, err
 	}
 	stream, err := authority.OpenResource(ctx, resourceID)
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
 	first, err := stream.Recv()
 	if err != nil {
 		if err == io.EOF {
-			return nil, status.Error(codes.Internal, "resource authority returned no content")
+			err = status.Error(codes.Internal, "resource authority returned no content")
 		}
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
 	if err := ValidateStreamResourceRef(ref, first.GetResource()); err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
 	return &ResourceStream{record: record, stream: stream, first: first}, nil
 }
 

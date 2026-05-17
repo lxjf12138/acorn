@@ -13,10 +13,12 @@ import (
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -44,43 +46,72 @@ func NewWorkspaceTransferService(serviceID string, workspaceStore workspacedomai
 }
 
 func (s *WorkspaceTransferService) ImportResourceToWorkspace(stream sandboxv1.WorkspaceTransferService_ImportResourceToWorkspaceServer) error {
+	ctx, span := telemetry.Start(stream.Context(), "sandbox-service/service", telemetry.SpanWorkspaceTransferImport)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "workspace.transfer.import"))
 	first, err := stream.Recv()
 	if err != nil {
 		if err == io.EOF {
-			return status.Error(codes.InvalidArgument, "import header is required")
+			err = status.Error(codes.InvalidArgument, "import header is required")
 		}
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return err
 	}
 	header := first.GetHeader()
 	if header == nil {
-		return status.Error(codes.InvalidArgument, "first import message must be header")
+		err := status.Error(codes.InvalidArgument, "first import message must be header")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return err
 	}
 	if header.GetServiceWorkspaceId() == "" {
-		return status.Error(codes.InvalidArgument, "service_workspace_id is required")
+		err := status.Error(codes.InvalidArgument, "service_workspace_id is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return err
 	}
 	if header.GetResource().GetId() == "" {
-		return status.Error(codes.InvalidArgument, "resource.id is required")
+		err := status.Error(codes.InvalidArgument, "resource.id is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return err
 	}
 	if header.GetDestinationPath() == "" {
-		return status.Error(codes.InvalidArgument, "destination_path is required")
+		err := status.Error(codes.InvalidArgument, "destination_path is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return err
 	}
-	workspace, err := s.workspaceStore.Get(stream.Context(), header.GetServiceWorkspaceId())
+	workspace, err := s.workspaceStore.Get(ctx, header.GetServiceWorkspaceId())
 	if errors.Is(err, workspacedomain.ErrNotFound) {
-		return status.Error(codes.NotFound, "hosted workspace not found")
+		err = status.Error(codes.NotFound, "hosted workspace not found")
 	}
 	if err != nil {
-		return status.Errorf(codes.Internal, "get hosted workspace: %v", err)
+		if status.Code(err) == codes.Unknown {
+			err = status.Errorf(codes.Internal, "get hosted workspace: %v", err)
+		}
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		return err
 	}
 	if workspace.StoreWorkspaceID == "" {
 		workspace.StoreWorkspaceID = workspace.ID
 	}
-	lease, err := acquireWorkspaceLease(stream.Context(), s.leases, workspace.ID, leasedomain.ModeWrite, "import_resource", header.GetScope())
+	span.SetAttributes(
+		attribute.String(telemetry.AttrWorkspaceProfileID, workspace.SandboxProfileID),
+		attribute.String(telemetry.AttrResourceMimeType, header.GetResource().GetMimeType()),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, header.GetResource().GetSizeBytes()),
+	)
+	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeWrite, "import_resource", header.GetScope())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return err
 	}
-	defer releaseWorkspaceLease(stream.Context(), s.leases, lease)
+	defer releaseWorkspaceLease(ctx, s.leases, lease)
 
-	imported, err := s.backing.ImportFile(stream.Context(), workspacestore.ImportFileRequest{
+	imported, err := s.backing.ImportFile(ctx, workspacestore.ImportFileRequest{
 		WorkspaceID:       workspace.StoreWorkspaceID,
 		Path:              header.GetDestinationPath(),
 		Name:              header.GetResource().GetName(),
@@ -92,11 +123,16 @@ func (s *WorkspaceTransferService) ImportResourceToWorkspace(stream sandboxv1.Wo
 	})
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
+			telemetry.RecordError(span, err)
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 			return err
 		}
-		return mapWorkspaceStoreError(err)
+		mapped := mapWorkspaceStoreError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(mapped)))
+		return mapped
 	}
-	return stream.SendAndClose(&sandboxv1.ImportResourceToWorkspaceResponse{
+	resp := &sandboxv1.ImportResourceToWorkspaceResponse{
 		Path: &sandboxv1.WorkspacePathRef{
 			Workspace: &workspacev1.WorkspaceHostRef{
 				ServiceId:          s.serviceID,
@@ -110,21 +146,42 @@ func (s *WorkspaceTransferService) ImportResourceToWorkspace(stream sandboxv1.Wo
 		SizeBytes:   imported.SizeBytes,
 		ContentHash: imported.ContentHash,
 		MimeType:    imported.MimeType,
-	})
+	}
+	if err := stream.SendAndClose(resp); err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		return err
+	}
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceMimeType, imported.MimeType),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, imported.SizeBytes),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
+	return nil
 }
 
 func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req *sandboxv1.ExportWorkspacePathRequest) (*sandboxv1.ExportWorkspacePathResponse, error) {
+	ctx, span := telemetry.Start(ctx, "sandbox-service/service", telemetry.SpanWorkspaceTransferExport)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "workspace.transfer.export"))
 	workspace, err := s.workspace(ctx, req.GetServiceWorkspaceId())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrWorkspaceProfileID, workspace.SandboxProfileID))
 	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeRead, "export_workspace_path", req.GetScope())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	defer releaseWorkspaceLease(ctx, s.leases, lease)
 	exported, err := s.exportableFile(ctx, workspace, req.GetPath())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 
@@ -140,7 +197,10 @@ func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req 
 
 	reader, err := exported.Open(ctx)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "open exported workspace path: %v", err)
+		err = status.Errorf(codes.Internal, "open exported workspace path: %v", err)
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, err
 	}
 	defer reader.Close()
 
@@ -152,7 +212,10 @@ func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req 
 		MetadataJSON: req.GetMetadataJson(),
 	})
 	if err != nil {
-		return nil, mapResourceBlobError(err)
+		mapped := mapResourceBlobError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(mapped)))
+		return nil, mapped
 	}
 
 	if _, err := s.exportStore.Create(ctx, exporteddomain.Record{
@@ -171,11 +234,22 @@ func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req 
 	}); err != nil {
 		_ = s.blobStore.Delete(ctx, resourceID)
 		if errors.Is(err, exporteddomain.ErrAlreadyExists) {
-			return nil, status.Error(codes.AlreadyExists, "exported resource already exists")
+			err = status.Error(codes.AlreadyExists, "exported resource already exists")
+			telemetry.RecordError(span, err)
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+			return nil, err
 		}
-		return nil, status.Errorf(codes.Internal, "create exported resource record: %v", err)
+		err = status.Errorf(codes.Internal, "create exported resource record: %v", err)
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceMimeType, blob.MimeType),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, blob.SizeBytes),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
 	return &sandboxv1.ExportWorkspacePathResponse{
 		Source: &sandboxv1.WorkspacePathRef{
 			Workspace: &workspacev1.WorkspaceHostRef{

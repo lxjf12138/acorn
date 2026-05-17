@@ -6,9 +6,11 @@ import (
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -32,12 +34,20 @@ func NewWorkspaceViewService(serviceID string, store workspacedomain.Store, back
 }
 
 func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandboxv1.ListWorkspaceDirRequest) (*sandboxv1.ListWorkspaceDirResponse, error) {
+	ctx, span := telemetry.Start(ctx, "sandbox-service/service", telemetry.SpanWorkspaceViewList)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "workspace.view.list"))
 	workspace, err := s.workspace(ctx, req.GetServiceWorkspaceId())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrWorkspaceProfileID, workspace.SandboxProfileID))
 	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeRead, "list_workspace_dir", req.GetScope())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	defer releaseWorkspaceLease(ctx, s.leases, lease)
@@ -48,7 +58,10 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 		PageToken:   req.GetPageToken(),
 	})
 	if err != nil {
-		return nil, mapWorkspaceStoreError(err)
+		mapped := mapWorkspaceStoreError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(mapped)))
+		return nil, mapped
 	}
 	out := make([]*sandboxv1.WorkspaceDirEntry, 0, len(listing.Entries))
 	for _, entry := range listing.Entries {
@@ -60,6 +73,7 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 			ModifiedAt: timestampFromTime(entry.ModifiedAt),
 		})
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
 	return &sandboxv1.ListWorkspaceDirResponse{
 		Directory:     s.pathRef(workspace, listing.Directory),
 		Entries:       out,
@@ -68,12 +82,20 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 }
 
 func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sandboxv1.PreviewWorkspaceFileRequest) (*sandboxv1.PreviewWorkspaceFileResponse, error) {
+	ctx, span := telemetry.Start(ctx, "sandbox-service/service", telemetry.SpanWorkspaceViewPreview)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "workspace.view.preview"))
 	workspace, err := s.workspace(ctx, req.GetServiceWorkspaceId())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrWorkspaceProfileID, workspace.SandboxProfileID))
 	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeRead, "preview_workspace_file", req.GetScope())
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		return nil, err
 	}
 	defer releaseWorkspaceLease(ctx, s.leases, lease)
@@ -83,8 +105,17 @@ func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sa
 		MaxBytes:    req.GetMaxBytes(),
 	})
 	if err != nil {
-		return nil, mapWorkspaceStoreError(err)
+		mapped := mapWorkspaceStoreError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(mapped)))
+		return nil, mapped
 	}
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceMimeType, preview.MimeType),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, preview.File.SizeBytes),
+		attribute.Bool(telemetry.AttrTruncated, preview.Truncated),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
 	return &sandboxv1.PreviewWorkspaceFileResponse{
 		File:         s.pathRef(workspace, preview.File),
 		MimeType:     preview.MimeType,

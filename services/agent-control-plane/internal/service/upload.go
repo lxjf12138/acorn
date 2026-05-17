@@ -6,8 +6,10 @@ import (
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -49,11 +51,23 @@ func NewUploadService(serviceID string, blobStore resourceblob.Store, resourceSe
 }
 
 func (s *UploadService) UploadResource(ctx context.Context, input UploadResourceInput) (*resourcev1.ResourceRecord, error) {
+	ctx, span := telemetry.Start(ctx, "agent-control-plane/service", telemetry.SpanResourceUpload)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrOperation, "resource.upload"),
+		attribute.String(telemetry.AttrResourceMimeType, input.MimeType),
+	)
 	if input.UserID == "" {
-		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+		err := status.Error(codes.InvalidArgument, "user_id is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return nil, err
 	}
 	if input.Source == nil {
-		return nil, status.Error(codes.InvalidArgument, "upload source is required")
+		err := status.Error(codes.InvalidArgument, "upload source is required")
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		return nil, err
 	}
 	resourceID := resourcedomain.NewRecordID()
 	name := httpx.SafeFilename(input.Name, resourceID)
@@ -66,9 +80,14 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 	})
 	if err != nil {
 		if _, ok := status.FromError(err); ok {
+			telemetry.RecordError(span, err)
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 			return nil, err
 		}
-		return nil, mapResourceBlobError(err)
+		mapped := mapResourceBlobError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		return nil, mapped
 	}
 	record, err := s.resourceService.RegisterRecord(ctx, &resourcev1.RegisterResourceRequest{
 		Ref: &resourcev1.ResourceRef{
@@ -91,8 +110,15 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 	})
 	if err != nil {
 		_ = s.blobStore.Delete(ctx, resourceID)
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		return nil, err
 	}
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceAuthorityServiceID, record.GetRef().GetAuthorityServiceId()),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, record.GetRef().GetSizeBytes()),
+		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
+	)
 	return record, nil
 }
 

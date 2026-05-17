@@ -5,13 +5,23 @@ import (
 	"errors"
 
 	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func acquireWorkspaceLease(ctx context.Context, manager leasedomain.Manager, workspaceID string, mode leasedomain.Mode, reason string, scope *commonv1.Scope) (*leasedomain.Lease, error) {
+	ctx, span := telemetry.Start(ctx, "sandbox-service/service", telemetry.SpanWorkspaceLeaseAcquire)
+	defer span.End()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrOperation, "workspace.lease.acquire"),
+		attribute.String(telemetry.AttrLeaseMode, string(mode)),
+		attribute.String(telemetry.AttrLeaseReason, reason),
+	)
 	if manager == nil {
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
 		return nil, nil
 	}
 	lease, err := manager.TryAcquire(ctx, leasedomain.AcquireRequest{
@@ -21,8 +31,12 @@ func acquireWorkspaceLease(ctx context.Context, manager leasedomain.Manager, wor
 		Reason:      reason,
 	})
 	if err != nil {
-		return nil, mapWorkspaceLeaseError(err)
+		mapped := mapWorkspaceLeaseError(err)
+		telemetry.RecordError(span, mapped)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		return nil, mapped
 	}
+	span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
 	return lease, nil
 }
 
