@@ -771,19 +771,18 @@ ExportWorkspacePath
 Control Plane workspace export forwarding
 ResourceBlobStore / LocalBlobStore
 Snapshot-backed ExportWorkspacePath
+ResourceContentService
+Resource Download Gateway
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: Resource Download Gateway
-  - ResourceRef download through Control Plane
-
-PR 2: ImportResource
+PR 1: ImportResource
   - ResourceRef -> WorkspacePathRef
   - Uses Resource Download Gateway / content API
 
-PR 3: Minimal Sandbox Exec
+PR 2: Minimal Sandbox Exec
   - Execute inside existing HostedWorkspace
   - Generated files remain WorkspacePathRef until export/download
 ```

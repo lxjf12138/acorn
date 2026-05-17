@@ -45,9 +45,17 @@ func main() {
 		panic(err)
 	}
 	defer workspaceClient.Close()
+	resourceContentClient, err := sandboxclient.NewGRPCResourceContentClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr)
+	if err != nil {
+		panic(err)
+	}
+	defer resourceContentClient.Close()
 	workspaceService := service.NewWorkspaceServiceWithResources(workspaceStore, workspaceClient, resourceService, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
+	resourceGatewayService := service.NewResourceGatewayService(resourceStore, map[string]service.ResourceAuthorityClient{
+		cfg.Sandbox.ServiceID: resourceContentClient,
+	})
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, logger)
+	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)

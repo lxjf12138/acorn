@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package acorn.resource.v1;
+
+import "acorn/common/v1/common.proto";
+import "acorn/resource/v1/resource.proto";
+
+option go_package = "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1;resourcev1";
+
+message OpenResourceRequest {
+  acorn.common.v1.Scope scope = 1;
+  string resource_id = 2;
+}
+
+message OpenResourceResponse {
+  ResourceRef resource = 1;
+  bytes data = 2;
+}
+
+service ResourceContentService {
+  rpc OpenResource(OpenResourceRequest) returns (stream OpenResourceResponse);
+}

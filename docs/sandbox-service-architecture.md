@@ -30,7 +30,7 @@ Workspace View Surface
 Workspace Resource Surface
   ExportWorkspacePath
   Creates ResourceRef / ResourceRecord
-  No download streaming yet
+  Download streams snapshot ResourceRef bytes through Control Plane
   No ImportResource yet
 ```
 
@@ -405,8 +405,8 @@ WorkspaceStore.ExportPath
 current local implementation stores blob metadata in memory and blob bytes on
 local disk.
 
-This still does not expose download streaming. The Resource Download Gateway is
-the next external user-visible resource content flow.
+The Resource Download Gateway streams these snapshot blobs through the Control
+Plane. Download does not read `WorkspacePathRef` or workspace live files.
 
 ---
 
@@ -542,6 +542,12 @@ Call authority service content API
 Stream bytes to user
 ```
 
+Status:
+
+```text
+Implemented.
+```
+
 ### PR 4: ImportResource
 
 Goal:
@@ -565,10 +571,10 @@ Execute inside a sandbox without coupling exec to local directories.
 
 ## 11. Non-Goals For The Next PR
 
-The next PR should focus on the Resource Download Gateway. Do not include:
+The next PR should focus on ImportResource. Do not include:
 
 ```text
-ImportResource
+Upload Gateway
 SandboxBackend
 Docker / VM / remote agent
 Profile registry config rewrite
@@ -576,5 +582,5 @@ WorkspaceStore redesign
 Large config schema migration
 ```
 
-The next PR should expose download streaming for existing ResourceRefs without
-changing workspace view behavior or adding import flows.
+The next PR should convert existing ResourceRefs into workspace content without
+changing workspace view behavior or adding execution flows.

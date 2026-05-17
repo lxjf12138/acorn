@@ -2,9 +2,11 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	nethttp "net/http"
 	"strconv"
+	"strings"
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
@@ -20,7 +22,7 @@ import (
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 )
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, logger klog.Logger) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, logger klog.Logger) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
@@ -122,6 +124,9 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 			Resources: records,
 		})
 	})
+	router.GET("/resources/{resource_id}/download", func(ctx khttp.Context) error {
+		return downloadResource(ctx, resourceGatewayService)
+	})
 
 	return srv
 }
@@ -209,6 +214,74 @@ func writeRegisterResourceJSON(ctx khttp.Context, code int, record *resourcev1.R
 
 func writeGetResourceJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
 	return writeProtoJSON(ctx, code, &resourcev1.GetResourceResponse{Resource: record})
+}
+
+func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService) error {
+	record, stream, err := gateway.OpenResource(ctx, ctx.Vars().Get("resource_id"), ownerUserID(ctx))
+	if err != nil {
+		return err
+	}
+	first, err := stream.Recv()
+	if err != nil {
+		if err == io.EOF {
+			return status.Error(codes.Internal, "resource authority returned no content")
+		}
+		return err
+	}
+	ref := first.GetResource()
+	if ref == nil {
+		ref = record.GetRef()
+	}
+	setDownloadHeaders(ctx, ref)
+	if len(first.GetData()) > 0 {
+		if _, err := ctx.Response().Write(first.GetData()); err != nil {
+			return err
+		}
+	}
+	for {
+		chunk, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if len(chunk.GetData()) == 0 {
+			continue
+		}
+		if _, err := ctx.Response().Write(chunk.GetData()); err != nil {
+			return err
+		}
+	}
+}
+
+func setDownloadHeaders(ctx khttp.Context, ref *resourcev1.ResourceRef) {
+	mimeType := ref.GetMimeType()
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+	headers := ctx.Response().Header()
+	headers.Set("Content-Type", mimeType)
+	if ref.GetSizeBytes() > 0 {
+		headers.Set("Content-Length", strconv.FormatInt(ref.GetSizeBytes(), 10))
+	}
+	headers.Set("Content-Disposition", fmt.Sprintf(`attachment; filename=%q`, safeDownloadFilename(ref.GetName(), ref.GetId())))
+	headers.Set("X-Acorn-Resource-ID", ref.GetId())
+	if ref.GetContentHash() != "" {
+		headers.Set("X-Acorn-Content-Hash", ref.GetContentHash())
+	}
+}
+
+func safeDownloadFilename(name string, fallback string) string {
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, `\`, "_")
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fallback
+	}
+	return name
 }
 
 func resourceFilterFromQuery(ctx khttp.Context) (resourcedomain.Filter, error) {

@@ -54,9 +54,10 @@ func main() {
 	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore, backingStore)
 	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
 	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore)
+	resourceContentService := service.NewResourceContentService(cfg.Service.ID, exportStore, blobStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
-	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, logger)
+	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, resourceContentService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

@@ -4,6 +4,7 @@ import (
 	klog "github.com/go-kratos/kratos/v2/log"
 	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
+	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 )
 
-func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorService, workspaceService *service.WorkspaceService, viewService *service.WorkspaceViewService, transferService *service.WorkspaceTransferService, logger klog.Logger) *kgrpc.Server {
+func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorService, workspaceService *service.WorkspaceService, viewService *service.WorkspaceViewService, transferService *service.WorkspaceTransferService, resourceContentService *service.ResourceContentService, logger klog.Logger) *kgrpc.Server {
 	srv := kgrpc.NewServer(
 		kgrpc.Address(cfg.Server.GRPC.Addr),
 		kgrpc.Timeout(cfg.Server.GRPC.TimeoutDuration()),
@@ -21,5 +22,6 @@ func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorServic
 	sandboxv1.RegisterWorkspaceHostServiceServer(srv, workspaceService)
 	sandboxv1.RegisterWorkspaceViewServiceServer(srv, viewService)
 	sandboxv1.RegisterWorkspaceTransferServiceServer(srv, transferService)
+	resourcev1.RegisterResourceContentServiceServer(srv, resourceContentService)
 	return srv
 }
