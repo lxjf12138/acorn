@@ -343,7 +343,14 @@ GetResource
 ListResources
 ```
 
-It does not upload, download, stream, import, or export bytes. Resource Gateway and service-specific transfer APIs are later layers.
+Resource bytes are streamed through `ResourceContentService` and the Control
+Plane Resource Download Gateway:
+
+```text
+OpenResource
+```
+
+Upload and import remain separate flows.
 
 ---
 
@@ -736,6 +743,10 @@ api/proto/acorn/resource/v1/
   # ResourceRecord
   # ResourceSource
   # metadata-only ResourceService
+
+  content.proto
+  # ResourceContentService
+  # OpenResource streaming
 ```
 
 Ownership rule:

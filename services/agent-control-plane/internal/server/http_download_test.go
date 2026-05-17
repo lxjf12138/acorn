@@ -40,7 +40,7 @@ func TestDownloadResourceStreamsBytesAndHeaders(t *testing.T) {
 					Resource: &resourcev1.ResourceRef{
 						Id:                 "res_1",
 						AuthorityServiceId: "sandbox-service",
-						Name:               "reports/final\r\n.txt",
+						Name:               "authority-name.txt",
 						MimeType:           "text/plain",
 						SizeBytes:          11,
 						ContentHash:        "sha256:abc",
@@ -75,6 +75,78 @@ func TestDownloadResourceStreamsBytesAndHeaders(t *testing.T) {
 	}
 	if got := recorder.Header().Get("X-Acorn-Content-Hash"); got != "sha256:abc" {
 		t.Fatalf("unexpected content hash header: %q", got)
+	}
+}
+
+func TestDownloadResourceRejectsMismatchedAuthorityMetadata(t *testing.T) {
+	tests := []struct {
+		name      string
+		streamRef *resourcev1.ResourceRef
+	}{
+		{
+			name: "id",
+			streamRef: &resourcev1.ResourceRef{
+				Id:                 "res_other",
+				AuthorityServiceId: "sandbox-service",
+				SizeBytes:          11,
+				ContentHash:        "sha256:abc",
+			},
+		},
+		{
+			name: "authority",
+			streamRef: &resourcev1.ResourceRef{
+				Id:                 "res_1",
+				AuthorityServiceId: "other-service",
+				SizeBytes:          11,
+				ContentHash:        "sha256:abc",
+			},
+		},
+		{
+			name: "content hash",
+			streamRef: &resourcev1.ResourceRef{
+				Id:                 "res_1",
+				AuthorityServiceId: "sandbox-service",
+				SizeBytes:          11,
+				ContentHash:        "sha256:other",
+			},
+		},
+		{
+			name: "size",
+			streamRef: &resourcev1.ResourceRef{
+				Id:                 "res_1",
+				AuthorityServiceId: "sandbox-service",
+				SizeBytes:          12,
+				ContentHash:        "sha256:abc",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := resourcedomain.NewMemoryStore()
+			if _, err := store.Register(context.Background(), &resourcev1.ResourceRecord{
+				Ref: &resourcev1.ResourceRef{
+					Id:                 "res_1",
+					AuthorityServiceId: "sandbox-service",
+					Name:               "report.txt",
+					MimeType:           "text/plain",
+					SizeBytes:          11,
+					ContentHash:        "sha256:abc",
+				},
+				OwnerUserId: "user-1",
+				Visibility:  resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE,
+			}); err != nil {
+				t.Fatalf("Register returned error: %v", err)
+			}
+			gateway := service.NewResourceGatewayService(store, map[string]service.ResourceAuthorityClient{
+				"sandbox-service": &downloadAuthorityClient{stream: &downloadStream{
+					chunks: []*resourcev1.OpenResourceResponse{{Resource: tt.streamRef, Data: []byte("hello world")}},
+				}},
+			})
+			err := downloadResource(newDownloadTestContext("res_1", "user-1", httptest.NewRecorder()), gateway)
+			if status.Code(err) != codes.Internal {
+				t.Fatalf("expected Internal, got %v", err)
+			}
+		})
 	}
 }
 

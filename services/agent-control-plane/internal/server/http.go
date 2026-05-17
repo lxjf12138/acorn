@@ -228,11 +228,10 @@ func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService
 		}
 		return err
 	}
-	ref := first.GetResource()
-	if ref == nil {
-		ref = record.GetRef()
+	if err := validateStreamResourceRef(record.GetRef(), first.GetResource()); err != nil {
+		return err
 	}
-	setDownloadHeaders(ctx, ref)
+	setDownloadHeaders(ctx, record.GetRef())
 	if len(first.GetData()) > 0 {
 		if _, err := ctx.Response().Write(first.GetData()); err != nil {
 			return err
@@ -270,6 +269,28 @@ func setDownloadHeaders(ctx khttp.Context, ref *resourcev1.ResourceRef) {
 	if ref.GetContentHash() != "" {
 		headers.Set("X-Acorn-Content-Hash", ref.GetContentHash())
 	}
+}
+
+func validateStreamResourceRef(recordRef *resourcev1.ResourceRef, streamRef *resourcev1.ResourceRef) error {
+	if streamRef == nil {
+		return nil
+	}
+	if recordRef == nil {
+		return status.Error(codes.Internal, "resource record has no ref")
+	}
+	if streamRef.GetId() != "" && streamRef.GetId() != recordRef.GetId() {
+		return status.Error(codes.Internal, "resource authority returned mismatched resource id")
+	}
+	if streamRef.GetAuthorityServiceId() != "" && streamRef.GetAuthorityServiceId() != recordRef.GetAuthorityServiceId() {
+		return status.Error(codes.Internal, "resource authority returned mismatched authority_service_id")
+	}
+	if streamRef.GetContentHash() != "" && recordRef.GetContentHash() != "" && streamRef.GetContentHash() != recordRef.GetContentHash() {
+		return status.Error(codes.Internal, "resource authority returned mismatched content_hash")
+	}
+	if streamRef.GetSizeBytes() > 0 && recordRef.GetSizeBytes() > 0 && streamRef.GetSizeBytes() != recordRef.GetSizeBytes() {
+		return status.Error(codes.Internal, "resource authority returned mismatched size_bytes")
+	}
+	return nil
 }
 
 func safeDownloadFilename(name string, fallback string) string {
