@@ -7,6 +7,7 @@ import (
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,13 +19,15 @@ type WorkspaceViewService struct {
 	serviceID string
 	store     workspacedomain.Store
 	backing   workspacestore.Store
+	leases    leasedomain.Manager
 }
 
-func NewWorkspaceViewService(serviceID string, store workspacedomain.Store, backing workspacestore.Store) *WorkspaceViewService {
+func NewWorkspaceViewService(serviceID string, store workspacedomain.Store, backing workspacestore.Store, leases leasedomain.Manager) *WorkspaceViewService {
 	return &WorkspaceViewService{
 		serviceID: serviceID,
 		store:     store,
 		backing:   backing,
+		leases:    leases,
 	}
 }
 
@@ -33,6 +36,11 @@ func (s *WorkspaceViewService) ListWorkspaceDir(ctx context.Context, req *sandbo
 	if err != nil {
 		return nil, err
 	}
+	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeRead, "list_workspace_dir", req.GetScope())
+	if err != nil {
+		return nil, err
+	}
+	defer releaseWorkspaceLease(ctx, s.leases, lease)
 	listing, err := s.backing.ListDir(ctx, workspacestore.ListDirRequest{
 		WorkspaceID: workspace.StoreWorkspaceID,
 		Path:        req.GetPath(),
@@ -64,6 +72,11 @@ func (s *WorkspaceViewService) PreviewWorkspaceFile(ctx context.Context, req *sa
 	if err != nil {
 		return nil, err
 	}
+	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeRead, "preview_workspace_file", req.GetScope())
+	if err != nil {
+		return nil, err
+	}
+	defer releaseWorkspaceLease(ctx, s.leases, lease)
 	preview, err := s.backing.PreviewFile(ctx, workspacestore.PreviewFileRequest{
 		WorkspaceID: workspace.StoreWorkspaceID,
 		Path:        req.GetPath(),

@@ -724,9 +724,41 @@ implement migration, scheduling, quota, or a new backend.
 
 ---
 
+### PR 9: Workspace Execution Lease / Concurrency Guard
+
+Goal:
+
+```text
+Protect workspace consistency with read/write leases.
+```
+
+Status:
+
+```text
+Implemented as an in-process lease manager.
+```
+
+Rules:
+
+```text
+ListWorkspaceDir and PreviewWorkspaceFile acquire read leases.
+ExportWorkspacePath acquires a read lease until the blob snapshot is written.
+ImportResourceToWorkspace and ExecWorkspaceCommand acquire write leases.
+Multiple read leases may coexist.
+A write lease is exclusive and blocks reads and writes.
+Busy workspaces return FailedPrecondition / HTTP 409.
+```
+
+This is a single-process guard for the current sandbox-service. It is not a
+distributed lock and does not survive process restarts. Clustered deployments
+will need persisted leases, service-owned workspace routing, or another
+distributed coordination mechanism.
+
+---
+
 ## 11. Non-Goals For The Next PR
 
-The next PR can focus on execution operational semantics.
+The next PR can focus on execution records or run-level operational semantics.
 Do not include:
 
 ```text

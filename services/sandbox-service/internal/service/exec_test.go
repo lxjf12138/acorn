@@ -12,6 +12,7 @@ import (
 	backenddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/backend"
 	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -40,7 +41,8 @@ func TestWorkspaceExecServiceExecWorkspaceCommand(t *testing.T) {
 			ErrorMessage:    "exit status 3",
 		},
 	}
-	service := NewWorkspaceExecService("sandbox-service", store, testExecProfileRegistry("fake-backend", true), attachmentSvc, backend)
+	leases := &fakeLeaseManager{}
+	service := NewWorkspaceExecService("sandbox-service", store, testExecProfileRegistry("fake-backend", true), attachmentSvc, backend, leases)
 
 	resp, err := service.ExecWorkspaceCommand(context.Background(), &sandboxv1.ExecWorkspaceCommandRequest{
 		ServiceWorkspaceId: workspace.ID,
@@ -60,6 +62,9 @@ func TestWorkspaceExecServiceExecWorkspaceCommand(t *testing.T) {
 	}
 	if backend.acquireReq.WorkspaceID != workspace.ID || backend.acquireReq.Attachment != attachmentSvc.att || backend.acquireReq.ProfileID != "local-process-dev" {
 		t.Fatalf("unexpected acquire request: %+v", backend.acquireReq)
+	}
+	if leases.lastAcquire.WorkspaceID != workspace.ID || leases.lastAcquire.Mode != leasedomain.ModeWrite || leases.lastAcquire.Reason != "exec_workspace_command" || !leases.released {
+		t.Fatalf("unexpected lease state: acquire=%+v released=%v", leases.lastAcquire, leases.released)
 	}
 	if !backend.released {
 		t.Fatal("expected lease release")
@@ -94,6 +99,7 @@ func TestWorkspaceExecServiceErrors(t *testing.T) {
 		req      *sandboxv1.ExecWorkspaceCommandRequest
 		backend  *fakeSandboxBackend
 		profiles profiledomain.Registry
+		leaseErr error
 		code     codes.Code
 	}{
 		{name: "missing workspace id", req: &sandboxv1.ExecWorkspaceCommandRequest{Command: "go"}, backend: &fakeSandboxBackend{}, code: codes.InvalidArgument},
@@ -105,6 +111,7 @@ func TestWorkspaceExecServiceErrors(t *testing.T) {
 		{name: "unknown backend", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: errors.New("boom")}, profiles: testExecProfileRegistry("fake-backend", true), code: codes.Internal},
 		{name: "profile without exec capability", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{}, profiles: testExecProfileRegistry("fake-backend", false), code: codes.FailedPrecondition},
 		{name: "profile backed by different backend", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{}, profiles: testExecProfileRegistry("other-backend", true), code: codes.FailedPrecondition},
+		{name: "workspace busy", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{}, profiles: testExecProfileRegistry("fake-backend", true), leaseErr: leasedomain.ErrWorkspaceBusy, code: codes.FailedPrecondition},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,7 +119,7 @@ func TestWorkspaceExecServiceErrors(t *testing.T) {
 			if profiles == nil {
 				profiles = testExecProfileRegistry("fake-backend", true)
 			}
-			service := NewWorkspaceExecService("sandbox-service", store, profiles, &fakeAttachmentPreparer{att: &attachment.WorkspaceAttachment{Kind: attachment.KindLocalPath}}, tt.backend)
+			service := NewWorkspaceExecService("sandbox-service", store, profiles, &fakeAttachmentPreparer{att: &attachment.WorkspaceAttachment{Kind: attachment.KindLocalPath}}, tt.backend, &fakeLeaseManager{acquireErr: tt.leaseErr})
 			_, err := service.ExecWorkspaceCommand(context.Background(), tt.req)
 			if status.Code(err) != tt.code {
 				t.Fatalf("expected %s, got %v", tt.code, err)

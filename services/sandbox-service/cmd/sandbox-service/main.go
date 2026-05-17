@@ -16,6 +16,7 @@ import (
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localfs"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localprocess"
+	workspaceleasememory "github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/workspacelease"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/version"
@@ -55,9 +56,10 @@ func main() {
 		panic(err)
 	}
 	exportStore := exporteddomain.NewMemoryStore()
+	workspaceLeaseManager := workspaceleasememory.NewMemoryManager()
 	workspaceService := service.NewWorkspaceService(cfg.Service.ID, profileRegistry, workspaceStore, backingStore)
-	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
-	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore)
+	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore, workspaceLeaseManager)
+	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore, workspaceLeaseManager)
 	var execService *service.WorkspaceExecService
 	if profileRegistry.AnyEnabledHasCapability(profiledomain.CapabilityWorkspaceExec) {
 		attachmentService := service.NewWorkspaceAttachmentService(workspaceStore, backingStore)
@@ -68,7 +70,7 @@ func main() {
 			MaxStdoutBytes: cfg.Sandbox.LocalProcess.MaxStdoutBytes,
 			MaxStderrBytes: cfg.Sandbox.LocalProcess.MaxStderrBytes,
 		})
-		execService = service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, profileRegistry, attachmentService, localProcessBackend)
+		execService = service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, profileRegistry, attachmentService, localProcessBackend, workspaceLeaseManager)
 	}
 	resourceContentService := service.NewResourceContentService(cfg.Service.ID, exportStore, blobStore)
 

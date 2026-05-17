@@ -11,6 +11,7 @@ import (
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -50,6 +51,15 @@ func TestWorkspaceViewServiceListWorkspaceDir(t *testing.T) {
 	assertWorkspacePathRef(t, resp.GetEntries()[0].GetRef(), workspace, "a.txt")
 }
 
+func TestWorkspaceViewServiceListWorkspaceDirLeaseBusy(t *testing.T) {
+	view, _, workspace := newTestViewService(t)
+	view.leases = &fakeLeaseManager{acquireErr: leasedomain.ErrWorkspaceBusy}
+	_, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
 func TestWorkspaceViewServicePreviewWorkspaceFile(t *testing.T) {
 	view, backing, workspace := newTestViewService(t)
 	modifiedAt := time.Now().UTC()
@@ -74,6 +84,23 @@ func TestWorkspaceViewServicePreviewWorkspaceFile(t *testing.T) {
 	assertWorkspacePathRef(t, resp.GetFile(), workspace, "report.txt")
 	if string(resp.GetPreviewBytes()) != "hello" || !resp.GetTruncated() || resp.GetSizeBytes() != 11 || resp.GetMimeType() == "" || resp.GetModifiedAt() == nil {
 		t.Fatalf("unexpected preview response: %+v", resp)
+	}
+}
+
+func TestWorkspaceViewServicePreviewWorkspaceFileLeaseReleasedOnStoreError(t *testing.T) {
+	view, backing, workspace := newTestViewService(t)
+	leases := &fakeLeaseManager{}
+	view.leases = leases
+	backing.previewErr = workspacestore.ErrPathNotFound
+	_, err := view.PreviewWorkspaceFile(context.Background(), &sandboxv1.PreviewWorkspaceFileRequest{
+		ServiceWorkspaceId: workspace.ID,
+		Path:               "missing.txt",
+	})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+	if !leases.released || leases.lastAcquire.Mode != leasedomain.ModeRead || leases.lastAcquire.Reason != "preview_workspace_file" {
+		t.Fatalf("unexpected lease state: acquire=%+v released=%v", leases.lastAcquire, leases.released)
 	}
 }
 
@@ -128,7 +155,7 @@ func newTestViewService(t *testing.T) (*WorkspaceViewService, *fakeBackingStore,
 	if err != nil {
 		t.Fatalf("Create workspace returned error: %v", err)
 	}
-	return NewWorkspaceViewService("sandbox-service", store, backing), backing, created
+	return NewWorkspaceViewService("sandbox-service", store, backing, &fakeLeaseManager{}), backing, created
 }
 
 func entryNames(entries []*sandboxv1.WorkspaceDirEntry) []string {

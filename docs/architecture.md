@@ -798,15 +798,16 @@ local-process-dev backend
 Control Plane workspace exec forwarding
 ProfileRegistry / Sandbox Profile Selection Cleanup
 Control Plane SandboxPolicy / PlacementResolver
+Workspace Execution Lease / Concurrency Guard
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: Workspace execution lease / concurrency guard
-  - Single-writer or execution lease foundation
-  - Protect workspaces from concurrent command writes
-  - Keep run-level profile selection for later Agent Runtime work
+PR 1: Minimal Run model / ExecutionRecord
+  - Record who executed what and when
+  - Store exit code and output summary
+  - Associate execution with session, user, workspace, and future run id
 ```
 
 `local-process-dev` executes host processes for development and is not a strong
@@ -818,6 +819,13 @@ profiles. Control Plane SandboxPolicy chooses a workspace creation-time profile
 from requested, user, tenant, global, or legacy defaults, then verifies the
 selected profile is policy-allowed and advertised by the target sandbox-service.
 Exec is gated by the stored workspace profile's capabilities and backend id.
+
+sandbox-service also uses an in-process WorkspaceLeaseManager for workspace
+consistency. View and export acquire read leases; import and exec acquire write
+leases. Multiple reads may coexist, while a write lease is exclusive. Busy
+workspaces return FailedPrecondition / HTTP 409. This is not a distributed
+lock; clustered sandbox-service deployments will need a persisted or routed
+lease mechanism.
 
 ---
 

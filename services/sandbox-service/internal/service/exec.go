@@ -11,6 +11,7 @@ import (
 	backenddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/backend"
 	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -27,15 +28,17 @@ type WorkspaceExecService struct {
 	profiles          profiledomain.Registry
 	attachmentService workspaceAttachmentPreparer
 	backend           backenddomain.SandboxBackend
+	leases            leasedomain.Manager
 }
 
-func NewWorkspaceExecService(serviceID string, workspaceStore workspacedomain.Store, profiles profiledomain.Registry, attachmentService workspaceAttachmentPreparer, backend backenddomain.SandboxBackend) *WorkspaceExecService {
+func NewWorkspaceExecService(serviceID string, workspaceStore workspacedomain.Store, profiles profiledomain.Registry, attachmentService workspaceAttachmentPreparer, backend backenddomain.SandboxBackend, leases leasedomain.Manager) *WorkspaceExecService {
 	return &WorkspaceExecService{
 		serviceID:         serviceID,
 		workspaceStore:    workspaceStore,
 		profiles:          profiles,
 		attachmentService: attachmentService,
 		backend:           backend,
+		leases:            leases,
 	}
 }
 
@@ -60,6 +63,11 @@ func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sa
 	if err != nil {
 		return nil, err
 	}
+	workspaceLease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeWrite, "exec_workspace_command", req.GetScope())
+	if err != nil {
+		return nil, err
+	}
+	defer releaseWorkspaceLease(ctx, s.leases, workspaceLease)
 	att, err := s.attachmentService.PrepareLocalProcessAttachment(ctx, workspace.ID, false)
 	if err != nil {
 		return nil, err

@@ -14,6 +14,7 @@ import (
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -78,6 +79,34 @@ func TestWorkspaceTransferServiceExportWorkspacePath(t *testing.T) {
 		record.ContentHash != "sha256:abc" ||
 		record.SizeBytes != 6 {
 		t.Fatalf("unexpected export record: %+v", record)
+	}
+}
+
+func TestWorkspaceTransferServiceExportWorkspacePathLease(t *testing.T) {
+	transfer, backing, _, _, workspace := newTestTransferService(t)
+	leases := &fakeLeaseManager{}
+	transfer.leases = leases
+	backing.exportResp = &workspacestore.ExportedPath{
+		Source:   workspacestore.PathInfo{Path: "report.txt", Name: "report.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE},
+		MimeType: "text/plain",
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("report")), nil
+		},
+	}
+	if _, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{ServiceWorkspaceId: workspace.ID, Path: "report.txt"}); err != nil {
+		t.Fatalf("ExportWorkspacePath returned error: %v", err)
+	}
+	if leases.lastAcquire.WorkspaceID != workspace.ID || leases.lastAcquire.Mode != leasedomain.ModeRead || leases.lastAcquire.Reason != "export_workspace_path" || !leases.released {
+		t.Fatalf("unexpected lease state: acquire=%+v released=%v", leases.lastAcquire, leases.released)
+	}
+}
+
+func TestWorkspaceTransferServiceExportWorkspacePathLeaseBusy(t *testing.T) {
+	transfer, _, _, _, workspace := newTestTransferService(t)
+	transfer.leases = &fakeLeaseManager{acquireErr: leasedomain.ErrWorkspaceBusy}
+	_, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{ServiceWorkspaceId: workspace.ID, Path: "report.txt"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
 	}
 }
 
@@ -252,6 +281,48 @@ func TestWorkspaceTransferServiceImportResourceToWorkspace(t *testing.T) {
 	}
 }
 
+func TestWorkspaceTransferServiceImportResourceToWorkspaceLease(t *testing.T) {
+	transfer, backing, _, _, workspace := newTestTransferService(t)
+	leases := &fakeLeaseManager{}
+	transfer.leases = leases
+	backing.importResp = &workspacestore.ImportedFile{Path: workspacestore.PathInfo{Path: "file.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE}}
+	stream := &fakeImportResourceServer{
+		ctx: context.Background(),
+		messages: []*sandboxv1.ImportResourceToWorkspaceRequest{
+			{Payload: &sandboxv1.ImportResourceToWorkspaceRequest_Header{Header: &sandboxv1.ImportResourceToWorkspaceHeader{
+				ServiceWorkspaceId: workspace.ID,
+				Resource:           &resourcev1.ResourceRef{Id: "res_1"},
+				DestinationPath:    "file.txt",
+			}}},
+		},
+	}
+	if err := transfer.ImportResourceToWorkspace(stream); err != nil {
+		t.Fatalf("ImportResourceToWorkspace returned error: %v", err)
+	}
+	if leases.lastAcquire.WorkspaceID != workspace.ID || leases.lastAcquire.Mode != leasedomain.ModeWrite || leases.lastAcquire.Reason != "import_resource" || !leases.released {
+		t.Fatalf("unexpected lease state: acquire=%+v released=%v", leases.lastAcquire, leases.released)
+	}
+}
+
+func TestWorkspaceTransferServiceImportResourceToWorkspaceLeaseBusy(t *testing.T) {
+	transfer, _, _, _, workspace := newTestTransferService(t)
+	transfer.leases = &fakeLeaseManager{acquireErr: leasedomain.ErrWorkspaceBusy}
+	stream := &fakeImportResourceServer{
+		ctx: context.Background(),
+		messages: []*sandboxv1.ImportResourceToWorkspaceRequest{
+			{Payload: &sandboxv1.ImportResourceToWorkspaceRequest_Header{Header: &sandboxv1.ImportResourceToWorkspaceHeader{
+				ServiceWorkspaceId: workspace.ID,
+				Resource:           &resourcev1.ResourceRef{Id: "res_1"},
+				DestinationPath:    "file.txt",
+			}}},
+		},
+	}
+	err := transfer.ImportResourceToWorkspace(stream)
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
 func TestWorkspaceTransferServiceImportResourceToWorkspaceErrors(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -360,7 +431,7 @@ func newTestTransferService(t *testing.T) (*WorkspaceTransferService, *fakeBacki
 	if err != nil {
 		t.Fatalf("Create workspace returned error: %v", err)
 	}
-	return NewWorkspaceTransferService("sandbox-service", store, backing, blobStore, exportStore), backing, blobStore, exportStore, created
+	return NewWorkspaceTransferService("sandbox-service", store, backing, blobStore, exportStore, &fakeLeaseManager{}), backing, blobStore, exportStore, created
 }
 
 type fakeBlobStore struct {

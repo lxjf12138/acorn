@@ -15,6 +15,7 @@ import (
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	leasedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacelease"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -28,15 +29,17 @@ type WorkspaceTransferService struct {
 	backing        workspacestore.Store
 	blobStore      resourceblob.Store
 	exportStore    exporteddomain.Store
+	leases         leasedomain.Manager
 }
 
-func NewWorkspaceTransferService(serviceID string, workspaceStore workspacedomain.Store, backing workspacestore.Store, blobStore resourceblob.Store, exportStore exporteddomain.Store) *WorkspaceTransferService {
+func NewWorkspaceTransferService(serviceID string, workspaceStore workspacedomain.Store, backing workspacestore.Store, blobStore resourceblob.Store, exportStore exporteddomain.Store, leases leasedomain.Manager) *WorkspaceTransferService {
 	return &WorkspaceTransferService{
 		serviceID:      serviceID,
 		workspaceStore: workspaceStore,
 		backing:        backing,
 		blobStore:      blobStore,
 		exportStore:    exportStore,
+		leases:         leases,
 	}
 }
 
@@ -71,6 +74,11 @@ func (s *WorkspaceTransferService) ImportResourceToWorkspace(stream sandboxv1.Wo
 	if workspace.StoreWorkspaceID == "" {
 		workspace.StoreWorkspaceID = workspace.ID
 	}
+	lease, err := acquireWorkspaceLease(stream.Context(), s.leases, workspace.ID, leasedomain.ModeWrite, "import_resource", header.GetScope())
+	if err != nil {
+		return err
+	}
+	defer releaseWorkspaceLease(stream.Context(), s.leases, lease)
 
 	imported, err := s.backing.ImportFile(stream.Context(), workspacestore.ImportFileRequest{
 		WorkspaceID:       workspace.StoreWorkspaceID,
@@ -106,7 +114,16 @@ func (s *WorkspaceTransferService) ImportResourceToWorkspace(stream sandboxv1.Wo
 }
 
 func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req *sandboxv1.ExportWorkspacePathRequest) (*sandboxv1.ExportWorkspacePathResponse, error) {
-	workspace, exported, err := s.exportableFile(ctx, req.GetServiceWorkspaceId(), req.GetPath())
+	workspace, err := s.workspace(ctx, req.GetServiceWorkspaceId())
+	if err != nil {
+		return nil, err
+	}
+	lease, err := acquireWorkspaceLease(ctx, s.leases, workspace.ID, leasedomain.ModeRead, "export_workspace_path", req.GetScope())
+	if err != nil {
+		return nil, err
+	}
+	defer releaseWorkspaceLease(ctx, s.leases, lease)
+	exported, err := s.exportableFile(ctx, workspace, req.GetPath())
 	if err != nil {
 		return nil, err
 	}
@@ -217,28 +234,32 @@ func importConflictPolicy(policy sandboxv1.ImportConflictPolicy) workspacestore.
 	return workspacestore.ImportConflictFailIfExists
 }
 
-func (s *WorkspaceTransferService) exportableFile(ctx context.Context, serviceWorkspaceID string, inputPath string) (workspacedomain.Workspace, *workspacestore.ExportedPath, error) {
+func (s *WorkspaceTransferService) workspace(ctx context.Context, serviceWorkspaceID string) (workspacedomain.Workspace, error) {
 	if serviceWorkspaceID == "" {
-		return workspacedomain.Workspace{}, nil, status.Error(codes.InvalidArgument, "service_workspace_id is required")
+		return workspacedomain.Workspace{}, status.Error(codes.InvalidArgument, "service_workspace_id is required")
 	}
 	workspace, err := s.workspaceStore.Get(ctx, serviceWorkspaceID)
 	if errors.Is(err, workspacedomain.ErrNotFound) {
-		return workspacedomain.Workspace{}, nil, status.Error(codes.NotFound, "hosted workspace not found")
+		return workspacedomain.Workspace{}, status.Error(codes.NotFound, "hosted workspace not found")
 	}
 	if err != nil {
-		return workspacedomain.Workspace{}, nil, status.Errorf(codes.Internal, "get hosted workspace: %v", err)
+		return workspacedomain.Workspace{}, status.Errorf(codes.Internal, "get hosted workspace: %v", err)
 	}
 	if workspace.StoreWorkspaceID == "" {
 		workspace.StoreWorkspaceID = workspace.ID
 	}
+	return workspace, nil
+}
+
+func (s *WorkspaceTransferService) exportableFile(ctx context.Context, workspace workspacedomain.Workspace, inputPath string) (*workspacestore.ExportedPath, error) {
 	exported, err := s.backing.ExportPath(ctx, workspacestore.ExportPathRequest{
 		WorkspaceID: workspace.StoreWorkspaceID,
 		Path:        inputPath,
 	})
 	if err != nil {
-		return workspacedomain.Workspace{}, nil, mapWorkspaceStoreError(err)
+		return nil, mapWorkspaceStoreError(err)
 	}
-	return workspace, exported, nil
+	return exported, nil
 }
 
 func newExportedResourceID() string {
