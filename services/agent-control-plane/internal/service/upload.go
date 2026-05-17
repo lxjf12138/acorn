@@ -1,0 +1,147 @@
+package service
+
+import (
+	"context"
+	"io"
+	"strings"
+
+	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
+	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+const defaultMaxUploadBytes = int64(100 * 1024 * 1024)
+
+type UploadService struct {
+	serviceID       string
+	blobStore       resourceblob.Store
+	resourceService resourceRegistrar
+	maxUploadBytes  int64
+}
+
+type resourceRegistrar interface {
+	RegisterRecord(ctx context.Context, req *resourcev1.RegisterResourceRequest) (*resourcev1.ResourceRecord, error)
+}
+
+type UploadResourceInput struct {
+	UserID    string
+	SessionID string
+
+	Name     string
+	MimeType string
+	Source   io.Reader
+
+	MetadataJSON []byte
+}
+
+func NewUploadService(serviceID string, blobStore resourceblob.Store, resourceService resourceRegistrar, maxUploadBytes int64) *UploadService {
+	if maxUploadBytes <= 0 {
+		maxUploadBytes = defaultMaxUploadBytes
+	}
+	return &UploadService{
+		serviceID:       serviceID,
+		blobStore:       blobStore,
+		resourceService: resourceService,
+		maxUploadBytes:  maxUploadBytes,
+	}
+}
+
+func (s *UploadService) UploadResource(ctx context.Context, input UploadResourceInput) (*resourcev1.ResourceRecord, error) {
+	if input.UserID == "" {
+		return nil, status.Error(codes.InvalidArgument, "user_id is required")
+	}
+	if input.Source == nil {
+		return nil, status.Error(codes.InvalidArgument, "upload source is required")
+	}
+	resourceID := resourcedomain.NewRecordID()
+	name := safeResourceFilename(input.Name, resourceID)
+	blob, err := s.blobStore.Put(ctx, resourceblob.PutRequest{
+		ResourceID:   resourceID,
+		Name:         name,
+		MimeType:     input.MimeType,
+		Source:       &uploadLimitReader{reader: input.Source, remaining: s.maxUploadBytes},
+		MetadataJSON: input.MetadataJSON,
+	})
+	if err != nil {
+		if _, ok := status.FromError(err); ok {
+			return nil, err
+		}
+		return nil, mapResourceBlobError(err)
+	}
+	record, err := s.resourceService.RegisterRecord(ctx, &resourcev1.RegisterResourceRequest{
+		Ref: &resourcev1.ResourceRef{
+			Id:                 blob.ResourceID,
+			AuthorityServiceId: s.serviceID,
+			Name:               blob.Name,
+			MimeType:           blob.MimeType,
+			SizeBytes:          blob.SizeBytes,
+			ContentHash:        blob.ContentHash,
+			MetadataJson:       append([]byte(nil), input.MetadataJSON...),
+		},
+		OwnerUserId: input.UserID,
+		SessionId:   input.SessionID,
+		Source: &resourcev1.ResourceSource{
+			Type:            "user_upload",
+			SourceServiceId: s.serviceID,
+		},
+		Visibility:   resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE,
+		MetadataJson: append([]byte(nil), input.MetadataJSON...),
+	})
+	if err != nil {
+		_ = s.blobStore.Delete(ctx, resourceID)
+		return nil, err
+	}
+	return record, nil
+}
+
+type uploadLimitReader struct {
+	reader    io.Reader
+	remaining int64
+}
+
+func (r *uploadLimitReader) Read(p []byte) (int, error) {
+	if r.remaining <= 0 {
+		var probe [1]byte
+		n, err := r.reader.Read(probe[:])
+		if n > 0 {
+			return 0, status.Error(codes.ResourceExhausted, "upload too large")
+		}
+		return 0, err
+	}
+	if int64(len(p)) > r.remaining {
+		p = p[:r.remaining]
+	}
+	n, err := r.reader.Read(p)
+	r.remaining -= int64(n)
+	if err == io.EOF {
+		return n, io.EOF
+	}
+	if err != nil {
+		return n, err
+	}
+	if r.remaining == 0 {
+		var probe [1]byte
+		extra, extraErr := r.reader.Read(probe[:])
+		if extra > 0 {
+			return n, status.Error(codes.ResourceExhausted, "upload too large")
+		}
+		if extraErr != nil && extraErr != io.EOF {
+			return n, extraErr
+		}
+	}
+	return n, nil
+}
+
+func safeResourceFilename(name string, fallback string) string {
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, `\`, "_")
+	name = strings.TrimSpace(name)
+	if name == "" || name == "." || name == ".." {
+		return fallback
+	}
+	return name
+}

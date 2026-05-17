@@ -16,5 +16,9 @@ sandbox:
   grpc_addr: 127.0.0.1:9081
   default_profile_id: local-process
 
+resource:
+  blob_root: /tmp/acorn/control-plane/resources
+  upload_max_bytes: 104857600
+
 log:
   level: info

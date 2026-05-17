@@ -41,5 +41,9 @@ func validConfig() Config {
 			GRPCAddr:         "127.0.0.1:9081",
 			DefaultProfileID: "local-process",
 		},
+		Resource: Resource{
+			BlobRoot:       "/tmp/acorn/control-plane/resources",
+			UploadMaxBytes: 100 * 1024 * 1024,
+		},
 	}
 }

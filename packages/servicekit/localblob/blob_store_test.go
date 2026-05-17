@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	resourceblob "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/resourceblob"
+	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 )
 
 func TestStorePutOpenStatDelete(t *testing.T) {

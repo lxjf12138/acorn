@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,7 +24,7 @@ import (
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 )
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, logger klog.Logger) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
@@ -136,11 +137,76 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 			Resources: records,
 		})
 	})
+	router.POST("/resources/upload", func(ctx khttp.Context) error {
+		input, err := readUploadResourceInput(ctx)
+		if err != nil {
+			return err
+		}
+		if closer, ok := input.Source.(io.Closer); ok {
+			defer closer.Close()
+		}
+		if form := ctx.Request().MultipartForm; form != nil {
+			defer form.RemoveAll()
+		}
+		record, err := uploadService.UploadResource(ctx, input)
+		if err != nil {
+			return err
+		}
+		return writeRegisterResourceJSON(ctx, nethttp.StatusCreated, record)
+	})
 	router.GET("/resources/{resource_id}/download", func(ctx khttp.Context) error {
 		return downloadResource(ctx, resourceGatewayService)
 	})
 
 	return srv
+}
+
+func readUploadResourceInput(ctx khttp.Context) (service.UploadResourceInput, error) {
+	var input service.UploadResourceInput
+	if err := ctx.Request().ParseMultipartForm(32 << 20); err != nil {
+		return input, status.Error(codes.InvalidArgument, "invalid multipart upload")
+	}
+	file, header, err := ctx.Request().FormFile("file")
+	if err != nil {
+		return input, status.Error(codes.InvalidArgument, "file field is required")
+	}
+	input.UserID = ctx.Request().FormValue("user_id")
+	if input.UserID == "" {
+		input.UserID = ownerUserID(ctx)
+	}
+	input.SessionID = ctx.Request().FormValue("session_id")
+	input.Name = ctx.Request().FormValue("name")
+	if input.Name == "" && header != nil {
+		input.Name = header.Filename
+	}
+	input.MimeType = ctx.Request().FormValue("mime_type")
+	if input.MimeType != "" {
+		input.Source = file
+		return input, nil
+	}
+	if header != nil {
+		input.MimeType = header.Header.Get("Content-Type")
+	}
+	head, err := io.ReadAll(io.LimitReader(file, 512))
+	if err != nil {
+		return input, err
+	}
+	if input.MimeType == "" && len(head) > 0 {
+		input.MimeType = nethttp.DetectContentType(head)
+	}
+	if input.MimeType == "" {
+		input.MimeType = "application/octet-stream"
+	}
+	input.Source = readCloser{
+		Reader: io.MultiReader(bytes.NewReader(head), file),
+		Closer: file,
+	}
+	return input, nil
+}
+
+type readCloser struct {
+	io.Reader
+	io.Closer
 }
 
 func ownerUserID(ctx khttp.Context) string {

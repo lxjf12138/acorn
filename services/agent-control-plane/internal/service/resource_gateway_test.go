@@ -3,9 +3,12 @@ package service
 import (
 	"context"
 	"io"
+	"strings"
 	"testing"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	"github.com/lxjf12138/acorn/packages/core/resourceblob"
+	"github.com/lxjf12138/acorn/packages/servicekit/localblob"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +32,53 @@ func TestResourceGatewayServiceOpenResource(t *testing.T) {
 	}
 	if authority.openedID != "res_1" {
 		t.Fatalf("unexpected opened id: %q", authority.openedID)
+	}
+}
+
+func TestResourceGatewayServiceOpenResourceForTransferLocalAuthority(t *testing.T) {
+	resourceStore := resourcedomain.NewMemoryStore()
+	blobStore, err := localblob.NewStore(localblob.Config{BaseDir: t.TempDir()})
+	if err != nil {
+		t.Fatalf("NewStore returned error: %v", err)
+	}
+	blob, err := blobStore.Put(context.Background(), resourceblob.PutRequest{
+		ResourceID: "res_local",
+		Name:       "upload.txt",
+		MimeType:   "text/plain",
+		Source:     strings.NewReader("uploaded"),
+	})
+	if err != nil {
+		t.Fatalf("Put returned error: %v", err)
+	}
+	if _, err := resourceStore.Register(context.Background(), &resourcev1.ResourceRecord{
+		Ref: &resourcev1.ResourceRef{
+			Id:                 blob.ResourceID,
+			AuthorityServiceId: "agent-control-plane",
+			Name:               blob.Name,
+			MimeType:           blob.MimeType,
+			SizeBytes:          blob.SizeBytes,
+			ContentHash:        blob.ContentHash,
+		},
+		OwnerUserId: "user-1",
+		Status:      resourcev1.ResourceStatus_RESOURCE_STATUS_AVAILABLE,
+		Visibility:  resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE,
+	}); err != nil {
+		t.Fatalf("Register returned error: %v", err)
+	}
+	gateway := NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{
+		"agent-control-plane": NewLocalResourceAuthority("agent-control-plane", blobStore),
+	})
+
+	stream, err := gateway.OpenResourceForTransfer(context.Background(), "res_local", "user-1")
+	if err != nil {
+		t.Fatalf("OpenResourceForTransfer returned error: %v", err)
+	}
+	body, err := io.ReadAll(stream)
+	if err != nil {
+		t.Fatalf("read resource stream: %v", err)
+	}
+	if string(body) != "uploaded" {
+		t.Fatalf("unexpected local authority body: %q", string(body))
 	}
 }
 
@@ -128,12 +178,12 @@ func registerGatewayResource(t *testing.T, store *resourcedomain.MemoryStore, re
 }
 
 type fakeAuthorityClient struct {
-	stream   resourcev1.ResourceContentService_OpenResourceClient
+	stream   ResourceChunkStream
 	err      error
 	openedID string
 }
 
-func (f *fakeAuthorityClient) OpenResource(_ context.Context, resourceID string) (resourcev1.ResourceContentService_OpenResourceClient, error) {
+func (f *fakeAuthorityClient) OpenResource(_ context.Context, resourceID string) (ResourceChunkStream, error) {
 	f.openedID = resourceID
 	if f.err != nil {
 		return nil, f.err
@@ -142,7 +192,7 @@ func (f *fakeAuthorityClient) OpenResource(_ context.Context, resourceID string)
 }
 
 type fakeResourceContentClient struct {
-	resourcev1.ResourceContentService_OpenResourceClient
+	ResourceChunkStream
 	chunks []*resourcev1.OpenResourceResponse
 	index  int
 }

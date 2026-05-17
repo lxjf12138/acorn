@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
-	resourceblob "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/resourceblob"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

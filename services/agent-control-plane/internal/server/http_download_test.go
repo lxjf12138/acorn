@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"mime/multipart"
 	nethttp "net/http"
 	"net/http/httptest"
 	"net/url"
@@ -234,12 +236,67 @@ func TestReadImportResourceRequestErrors(t *testing.T) {
 	}
 }
 
+func TestReadUploadResourceInput(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", "data.csv")
+	if err != nil {
+		t.Fatalf("CreateFormFile returned error: %v", err)
+	}
+	if _, err := part.Write([]byte("hello")); err != nil {
+		t.Fatalf("write part: %v", err)
+	}
+	if err := writer.WriteField("user_id", "user-1"); err != nil {
+		t.Fatalf("WriteField user_id: %v", err)
+	}
+	if err := writer.WriteField("session_id", "sess-1"); err != nil {
+		t.Fatalf("WriteField session_id: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer close: %v", err)
+	}
+	ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/resources/upload", &body)
+	ctx.request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	input, err := readUploadResourceInput(ctx)
+	if err != nil {
+		t.Fatalf("readUploadResourceInput returned error: %v", err)
+	}
+	if input.UserID != "user-1" || input.SessionID != "sess-1" || input.Name != "data.csv" || input.MimeType == "" {
+		t.Fatalf("unexpected upload input: %+v", input)
+	}
+	uploaded, err := io.ReadAll(input.Source)
+	if err != nil {
+		t.Fatalf("read upload source: %v", err)
+	}
+	if string(uploaded) != "hello" {
+		t.Fatalf("unexpected upload source: %q", string(uploaded))
+	}
+}
+
+func TestReadUploadResourceInputMissingFile(t *testing.T) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer close: %v", err)
+	}
+	ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/resources/upload", &body)
+	ctx.request.Header.Set("Content-Type", writer.FormDataContentType())
+
+	_, err := readUploadResourceInput(ctx)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
 type downloadAuthorityClient struct {
-	stream resourcev1.ResourceContentService_OpenResourceClient
+	stream service.ResourceChunkStream
 	err    error
 }
 
-func (c *downloadAuthorityClient) OpenResource(context.Context, string) (resourcev1.ResourceContentService_OpenResourceClient, error) {
+func (c *downloadAuthorityClient) OpenResource(context.Context, string) (service.ResourceChunkStream, error) {
 	if c.err != nil {
 		return nil, c.err
 	}
@@ -247,7 +304,7 @@ func (c *downloadAuthorityClient) OpenResource(context.Context, string) (resourc
 }
 
 type downloadStream struct {
-	resourcev1.ResourceContentService_OpenResourceClient
+	service.ResourceChunkStream
 	chunks []*resourcev1.OpenResourceResponse
 	index  int
 }

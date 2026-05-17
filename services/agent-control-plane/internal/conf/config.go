@@ -10,10 +10,11 @@ import (
 )
 
 type Config struct {
-	Service Service `json:"service" yaml:"service"`
-	Server  Server  `json:"server" yaml:"server"`
-	Sandbox Sandbox `json:"sandbox" yaml:"sandbox"`
-	Log     Log     `json:"log" yaml:"log"`
+	Service  Service  `json:"service" yaml:"service"`
+	Server   Server   `json:"server" yaml:"server"`
+	Resource Resource `json:"resource" yaml:"resource"`
+	Sandbox  Sandbox  `json:"sandbox" yaml:"sandbox"`
+	Log      Log      `json:"log" yaml:"log"`
 }
 
 type Service struct {
@@ -39,6 +40,11 @@ type GRPC struct {
 
 type Log struct {
 	Level string `json:"level" yaml:"level"`
+}
+
+type Resource struct {
+	BlobRoot       string `json:"blob_root" yaml:"blob_root"`
+	UploadMaxBytes int64  `json:"upload_max_bytes" yaml:"upload_max_bytes"`
 }
 
 type Sandbox struct {
@@ -97,6 +103,12 @@ func (c *Config) Validate() error {
 	}
 	if c.Sandbox.DefaultProfileID == "" {
 		return fmt.Errorf("sandbox.default_profile_id is required")
+	}
+	if c.Resource.BlobRoot == "" {
+		c.Resource.BlobRoot = "/tmp/acorn/control-plane/resources"
+	}
+	if c.Resource.UploadMaxBytes <= 0 {
+		c.Resource.UploadMaxBytes = 100 * 1024 * 1024
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"

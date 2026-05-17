@@ -2,7 +2,10 @@ module github.com/lxjf12138/acorn/packages/servicekit
 
 go 1.26
 
-require github.com/go-kratos/kratos/v2 v2.9.2
+require (
+	github.com/go-kratos/kratos/v2 v2.9.2
+	github.com/lxjf12138/acorn/packages/core v0.0.0
+)
 
 require (
 	github.com/go-playground/form/v4 v4.2.0 // indirect
@@ -13,3 +16,5 @@ require (
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/lxjf12138/acorn/packages/core => ../core

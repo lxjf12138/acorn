@@ -5,6 +5,7 @@ import (
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	"github.com/lxjf12138/acorn/packages/servicekit"
+	"github.com/lxjf12138/acorn/packages/servicekit/localblob"
 
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/app"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
@@ -39,6 +40,10 @@ func main() {
 	statusService := service.NewStatusService()
 	resourceStore := resourcedomain.NewMemoryStore()
 	resourceService := service.NewResourceService(resourceStore)
+	blobStore, err := localblob.NewStore(localblob.Config{BaseDir: cfg.Resource.BlobRoot})
+	if err != nil {
+		panic(err)
+	}
 	workspaceStore := workspacedomain.NewMemoryStore()
 	workspaceClient, err := sandboxclient.NewGRPCWorkspaceHostClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr)
 	if err != nil {
@@ -51,11 +56,13 @@ func main() {
 	}
 	defer resourceContentClient.Close()
 	resourceGatewayService := service.NewResourceGatewayService(resourceStore, map[string]service.ResourceAuthorityClient{
-		cfg.Sandbox.ServiceID: resourceContentClient,
+		cfg.Service.ID:        service.NewLocalResourceAuthority(cfg.Service.ID, blobStore),
+		cfg.Sandbox.ServiceID: service.NewSandboxResourceAuthority(resourceContentClient),
 	})
+	uploadService := service.NewUploadService(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes)
 	workspaceService := service.NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, logger)
+	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)

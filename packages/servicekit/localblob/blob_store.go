@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	resourceblob "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/resourceblob"
+	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 )
 
 const (

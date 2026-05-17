@@ -589,15 +589,15 @@ Execute inside a sandbox without coupling exec to local directories.
 
 ## 11. Non-Goals For The Next PR
 
-The next PR should focus on a User Upload Gateway. Do not include:
+The next PR should focus on WorkspaceAttachment and SandboxBackend foundations.
+Do not include:
 
 ```text
-SandboxBackend
 Docker / VM / remote agent
 Profile registry config rewrite
 WorkspaceStore redesign
 Large config schema migration
 ```
 
-The next PR should create ResourceRefs from user-uploaded bytes without changing
-workspace view behavior or adding execution flows.
+The next PR should prepare execution boundaries without changing workspace view
+behavior or resource upload/download/import flows.

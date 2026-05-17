@@ -11,7 +11,11 @@ import (
 )
 
 type ResourceAuthorityClient interface {
-	OpenResource(ctx context.Context, resourceID string) (resourcev1.ResourceContentService_OpenResourceClient, error)
+	OpenResource(ctx context.Context, resourceID string) (ResourceChunkStream, error)
+}
+
+type ResourceChunkStream interface {
+	Recv() (*resourcev1.OpenResourceResponse, error)
 }
 
 type ResourceGatewayService struct {
@@ -21,7 +25,7 @@ type ResourceGatewayService struct {
 
 type ResourceStream struct {
 	record *resourcev1.ResourceRecord
-	stream resourcev1.ResourceContentService_OpenResourceClient
+	stream ResourceChunkStream
 	first  *resourcev1.OpenResourceResponse
 	buf    []byte
 }

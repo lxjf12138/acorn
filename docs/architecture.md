@@ -563,10 +563,13 @@ MCP tools should run inside an existing execution context. They should not creat
 
 ```text
 User
-  -> Control Plane Resource API
+  -> Control Plane User Upload Gateway
+  -> Control Plane LocalBlobStore
   -> ResourceRecord
   -> ResourceRef
 ```
+
+Uploaded resources use `authority_service_id = agent-control-plane`.
 
 To place it into sandbox:
 
@@ -785,16 +788,17 @@ Snapshot-backed ExportWorkspacePath
 ResourceContentService
 Resource Download Gateway
 ImportResource to Workspace
+User Upload Gateway
+Control Plane local resource authority
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: User Upload Gateway
-  - User bytes -> ResourceRef
-  - Can reuse ImportResource to place files into workspace
+PR 1: WorkspaceAttachment Foundation
+  - Prepare backend-specific workspace attachments
 
-PR 2: Minimal Sandbox Exec
+PR 2: SandboxBackend + local-process-dev
   - Execute inside existing HostedWorkspace
   - Generated files remain WorkspacePathRef until export/download
 ```
