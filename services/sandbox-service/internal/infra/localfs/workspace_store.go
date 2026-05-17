@@ -2,7 +2,10 @@ package localfs
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"hash"
 	"io"
 	"os"
 	pathpkg "path"
@@ -18,10 +21,11 @@ import (
 const (
 	Kind = "localfs"
 
-	defaultListPageSize = int32(100)
-	maxListPageSize     = int32(500)
-	defaultPreviewBytes = int64(64 * 1024)
-	maxPreviewBytes     = int64(1024 * 1024)
+	defaultListPageSize   = int32(100)
+	maxListPageSize       = int32(500)
+	defaultPreviewBytes   = int64(64 * 1024)
+	maxPreviewBytes       = int64(1024 * 1024)
+	defaultMaxImportBytes = int64(100 * 1024 * 1024)
 )
 
 type Config struct {
@@ -241,6 +245,119 @@ func (s *WorkspaceStore) ExportPath(_ context.Context, req workspacestore.Export
 	}, nil
 }
 
+func (s *WorkspaceStore) ImportFile(ctx context.Context, req workspacestore.ImportFileRequest) (*workspacestore.ImportedFile, error) {
+	relPath, err := normalizeWorkspacePath(req.Path, false)
+	if err != nil {
+		return nil, err
+	}
+	if req.Source == nil {
+		return nil, workspacestore.ErrPathNotRegularFile
+	}
+	root, err := s.workspaceRoot(req.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(root); errors.Is(err, os.ErrNotExist) {
+		return nil, workspacestore.ErrWorkspaceNotReady
+	} else if err != nil {
+		return nil, err
+	}
+	targetPath, err := lexicalWorkspacePath(root, relPath)
+	if err != nil {
+		return nil, err
+	}
+	parentRel := pathpkg.Dir(relPath)
+	if parentRel == "." {
+		parentRel = ""
+	}
+	parentPath, err := lexicalWorkspacePath(root, parentRel)
+	if err != nil {
+		return nil, err
+	}
+	parentInfo, err := os.Lstat(parentPath)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, workspacestore.ErrParentNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	if parentInfo.Mode()&os.ModeSymlink != 0 {
+		return nil, workspacestore.ErrSymlinkNotAllowed
+	}
+	if !parentInfo.IsDir() {
+		return nil, workspacestore.ErrPathNotDirectory
+	}
+	resolvedParent, err := resolveExistingWorkspacePath(root, parentPath)
+	if err != nil {
+		return nil, err
+	}
+	if targetInfo, err := os.Lstat(targetPath); err == nil {
+		if targetInfo.Mode()&os.ModeSymlink != 0 {
+			return nil, workspacestore.ErrSymlinkNotAllowed
+		}
+		if targetInfo.IsDir() {
+			return nil, workspacestore.ErrPathIsDirectory
+		}
+		if !targetInfo.Mode().IsRegular() {
+			return nil, workspacestore.ErrPathNotRegularFile
+		}
+		if req.ConflictPolicy != workspacestore.ImportConflictOverwrite {
+			return nil, workspacestore.ErrPathAlreadyExists
+		}
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	tmp, err := os.CreateTemp(resolvedParent, "."+pathpkg.Base(relPath)+".*.tmp")
+	if err != nil {
+		return nil, err
+	}
+	tmpPath := tmp.Name()
+	cleanupTmp := true
+	defer func() {
+		_ = tmp.Close()
+		if cleanupTmp {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	hasher := sha256.New()
+	maxBytes := req.MaxBytes
+	if maxBytes <= 0 {
+		maxBytes = defaultMaxImportBytes
+	}
+	size, err := copyImportWithLimit(ctx, tmp, req.Source, hasher, maxBytes)
+	if err != nil {
+		return nil, err
+	}
+	contentHash := "sha256:" + hex.EncodeToString(hasher.Sum(nil))
+	if req.ExpectedSizeBytes > 0 && size != req.ExpectedSizeBytes {
+		return nil, workspacestore.ErrContentHashMismatch
+	}
+	if req.ExpectedHash != "" && req.ExpectedHash != contentHash {
+		return nil, workspacestore.ErrContentHashMismatch
+	}
+	if err := tmp.Close(); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		return nil, err
+	}
+	cleanupTmp = false
+
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		return nil, err
+	}
+	imported := pathInfo(relPath, displayNameForPath(relPath), sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, info)
+	return &workspacestore.ImportedFile{
+		Path:        imported,
+		MimeType:    req.MimeType,
+		SizeBytes:   size,
+		ContentHash: contentHash,
+	}, nil
+}
+
 func (s *WorkspaceStore) resolvedPath(workspaceID string, relPath string) (string, os.FileInfo, error) {
 	root, err := s.workspaceRoot(workspaceID)
 	if err != nil {
@@ -267,6 +384,40 @@ func (s *WorkspaceStore) resolvedPath(workspaceID string, relPath string) (strin
 		return "", nil, err
 	}
 	return resolvedPath, info, nil
+}
+
+func copyImportWithLimit(ctx context.Context, dst io.Writer, src io.Reader, hasher hash.Hash, maxBytes int64) (int64, error) {
+	var written int64
+	buf := make([]byte, 32*1024)
+	for {
+		if err := ctx.Err(); err != nil {
+			return written, err
+		}
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			if written+int64(nr) > maxBytes {
+				return written, workspacestore.ErrImportTooLarge
+			}
+			chunk := buf[:nr]
+			nw, ew := dst.Write(chunk)
+			if nw > 0 {
+				_, _ = hasher.Write(chunk[:nw])
+				written += int64(nw)
+			}
+			if ew != nil {
+				return written, ew
+			}
+			if nr != nw {
+				return written, io.ErrShortWrite
+			}
+		}
+		if er != nil {
+			if er == io.EOF {
+				return written, nil
+			}
+			return written, er
+		}
+	}
 }
 
 func (s *WorkspaceStore) workspaceRoot(workspaceID string) (string, error) {

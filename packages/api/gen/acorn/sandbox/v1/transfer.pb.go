@@ -23,6 +23,55 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type ImportConflictPolicy int32
+
+const (
+	ImportConflictPolicy_IMPORT_CONFLICT_POLICY_UNSPECIFIED    ImportConflictPolicy = 0
+	ImportConflictPolicy_IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS ImportConflictPolicy = 1
+	ImportConflictPolicy_IMPORT_CONFLICT_POLICY_OVERWRITE      ImportConflictPolicy = 2
+)
+
+// Enum value maps for ImportConflictPolicy.
+var (
+	ImportConflictPolicy_name = map[int32]string{
+		0: "IMPORT_CONFLICT_POLICY_UNSPECIFIED",
+		1: "IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS",
+		2: "IMPORT_CONFLICT_POLICY_OVERWRITE",
+	}
+	ImportConflictPolicy_value = map[string]int32{
+		"IMPORT_CONFLICT_POLICY_UNSPECIFIED":    0,
+		"IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS": 1,
+		"IMPORT_CONFLICT_POLICY_OVERWRITE":      2,
+	}
+)
+
+func (x ImportConflictPolicy) Enum() *ImportConflictPolicy {
+	p := new(ImportConflictPolicy)
+	*p = x
+	return p
+}
+
+func (x ImportConflictPolicy) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ImportConflictPolicy) Descriptor() protoreflect.EnumDescriptor {
+	return file_acorn_sandbox_v1_transfer_proto_enumTypes[0].Descriptor()
+}
+
+func (ImportConflictPolicy) Type() protoreflect.EnumType {
+	return &file_acorn_sandbox_v1_transfer_proto_enumTypes[0]
+}
+
+func (x ImportConflictPolicy) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ImportConflictPolicy.Descriptor instead.
+func (ImportConflictPolicy) EnumDescriptor() ([]byte, []int) {
+	return file_acorn_sandbox_v1_transfer_proto_rawDescGZIP(), []int{0}
+}
+
 type ExportWorkspacePathRequest struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	Scope              *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
@@ -160,6 +209,241 @@ func (x *ExportWorkspacePathResponse) GetResource() *v11.ResourceRef {
 	return nil
 }
 
+type ImportResourceToWorkspaceHeader struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Scope              *v1.Scope              `protobuf:"bytes,1,opt,name=scope,proto3" json:"scope,omitempty"`
+	ServiceWorkspaceId string                 `protobuf:"bytes,2,opt,name=service_workspace_id,json=serviceWorkspaceId,proto3" json:"service_workspace_id,omitempty"`
+	Resource           *v11.ResourceRef       `protobuf:"bytes,3,opt,name=resource,proto3" json:"resource,omitempty"`
+	// Workspace-relative POSIX destination path.
+	DestinationPath string               `protobuf:"bytes,4,opt,name=destination_path,json=destinationPath,proto3" json:"destination_path,omitempty"`
+	ConflictPolicy  ImportConflictPolicy `protobuf:"varint,5,opt,name=conflict_policy,json=conflictPolicy,proto3,enum=acorn.sandbox.v1.ImportConflictPolicy" json:"conflict_policy,omitempty"`
+	MetadataJson    []byte               `protobuf:"bytes,100,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ImportResourceToWorkspaceHeader) Reset() {
+	*x = ImportResourceToWorkspaceHeader{}
+	mi := &file_acorn_sandbox_v1_transfer_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportResourceToWorkspaceHeader) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportResourceToWorkspaceHeader) ProtoMessage() {}
+
+func (x *ImportResourceToWorkspaceHeader) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_sandbox_v1_transfer_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportResourceToWorkspaceHeader.ProtoReflect.Descriptor instead.
+func (*ImportResourceToWorkspaceHeader) Descriptor() ([]byte, []int) {
+	return file_acorn_sandbox_v1_transfer_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ImportResourceToWorkspaceHeader) GetScope() *v1.Scope {
+	if x != nil {
+		return x.Scope
+	}
+	return nil
+}
+
+func (x *ImportResourceToWorkspaceHeader) GetServiceWorkspaceId() string {
+	if x != nil {
+		return x.ServiceWorkspaceId
+	}
+	return ""
+}
+
+func (x *ImportResourceToWorkspaceHeader) GetResource() *v11.ResourceRef {
+	if x != nil {
+		return x.Resource
+	}
+	return nil
+}
+
+func (x *ImportResourceToWorkspaceHeader) GetDestinationPath() string {
+	if x != nil {
+		return x.DestinationPath
+	}
+	return ""
+}
+
+func (x *ImportResourceToWorkspaceHeader) GetConflictPolicy() ImportConflictPolicy {
+	if x != nil {
+		return x.ConflictPolicy
+	}
+	return ImportConflictPolicy_IMPORT_CONFLICT_POLICY_UNSPECIFIED
+}
+
+func (x *ImportResourceToWorkspaceHeader) GetMetadataJson() []byte {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return nil
+}
+
+type ImportResourceToWorkspaceRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Payload:
+	//
+	//	*ImportResourceToWorkspaceRequest_Header
+	//	*ImportResourceToWorkspaceRequest_Data
+	Payload       isImportResourceToWorkspaceRequest_Payload `protobuf_oneof:"payload"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportResourceToWorkspaceRequest) Reset() {
+	*x = ImportResourceToWorkspaceRequest{}
+	mi := &file_acorn_sandbox_v1_transfer_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportResourceToWorkspaceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportResourceToWorkspaceRequest) ProtoMessage() {}
+
+func (x *ImportResourceToWorkspaceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_sandbox_v1_transfer_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportResourceToWorkspaceRequest.ProtoReflect.Descriptor instead.
+func (*ImportResourceToWorkspaceRequest) Descriptor() ([]byte, []int) {
+	return file_acorn_sandbox_v1_transfer_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ImportResourceToWorkspaceRequest) GetPayload() isImportResourceToWorkspaceRequest_Payload {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *ImportResourceToWorkspaceRequest) GetHeader() *ImportResourceToWorkspaceHeader {
+	if x != nil {
+		if x, ok := x.Payload.(*ImportResourceToWorkspaceRequest_Header); ok {
+			return x.Header
+		}
+	}
+	return nil
+}
+
+func (x *ImportResourceToWorkspaceRequest) GetData() []byte {
+	if x != nil {
+		if x, ok := x.Payload.(*ImportResourceToWorkspaceRequest_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+type isImportResourceToWorkspaceRequest_Payload interface {
+	isImportResourceToWorkspaceRequest_Payload()
+}
+
+type ImportResourceToWorkspaceRequest_Header struct {
+	Header *ImportResourceToWorkspaceHeader `protobuf:"bytes,1,opt,name=header,proto3,oneof"`
+}
+
+type ImportResourceToWorkspaceRequest_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+func (*ImportResourceToWorkspaceRequest_Header) isImportResourceToWorkspaceRequest_Payload() {}
+
+func (*ImportResourceToWorkspaceRequest_Data) isImportResourceToWorkspaceRequest_Payload() {}
+
+type ImportResourceToWorkspaceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          *WorkspacePathRef      `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
+	SizeBytes     int64                  `protobuf:"varint,2,opt,name=size_bytes,json=sizeBytes,proto3" json:"size_bytes,omitempty"`
+	ContentHash   string                 `protobuf:"bytes,3,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
+	MimeType      string                 `protobuf:"bytes,4,opt,name=mime_type,json=mimeType,proto3" json:"mime_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportResourceToWorkspaceResponse) Reset() {
+	*x = ImportResourceToWorkspaceResponse{}
+	mi := &file_acorn_sandbox_v1_transfer_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportResourceToWorkspaceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportResourceToWorkspaceResponse) ProtoMessage() {}
+
+func (x *ImportResourceToWorkspaceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_acorn_sandbox_v1_transfer_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportResourceToWorkspaceResponse.ProtoReflect.Descriptor instead.
+func (*ImportResourceToWorkspaceResponse) Descriptor() ([]byte, []int) {
+	return file_acorn_sandbox_v1_transfer_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ImportResourceToWorkspaceResponse) GetPath() *WorkspacePathRef {
+	if x != nil {
+		return x.Path
+	}
+	return nil
+}
+
+func (x *ImportResourceToWorkspaceResponse) GetSizeBytes() int64 {
+	if x != nil {
+		return x.SizeBytes
+	}
+	return 0
+}
+
+func (x *ImportResourceToWorkspaceResponse) GetContentHash() string {
+	if x != nil {
+		return x.ContentHash
+	}
+	return ""
+}
+
+func (x *ImportResourceToWorkspaceResponse) GetMimeType() string {
+	if x != nil {
+		return x.MimeType
+	}
+	return ""
+}
+
 var File_acorn_sandbox_v1_transfer_proto protoreflect.FileDescriptor
 
 const file_acorn_sandbox_v1_transfer_proto_rawDesc = "" +
@@ -175,9 +459,31 @@ const file_acorn_sandbox_v1_transfer_proto_rawDesc = "" +
 	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x95\x01\n" +
 	"\x1bExportWorkspacePathResponse\x12:\n" +
 	"\x06source\x18\x01 \x01(\v2\".acorn.sandbox.v1.WorkspacePathRefR\x06source\x12:\n" +
-	"\bresource\x18\x02 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\bresource2\x8e\x01\n" +
+	"\bresource\x18\x02 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\bresource\"\xde\x02\n" +
+	"\x1fImportResourceToWorkspaceHeader\x12,\n" +
+	"\x05scope\x18\x01 \x01(\v2\x16.acorn.common.v1.ScopeR\x05scope\x120\n" +
+	"\x14service_workspace_id\x18\x02 \x01(\tR\x12serviceWorkspaceId\x12:\n" +
+	"\bresource\x18\x03 \x01(\v2\x1e.acorn.resource.v1.ResourceRefR\bresource\x12)\n" +
+	"\x10destination_path\x18\x04 \x01(\tR\x0fdestinationPath\x12O\n" +
+	"\x0fconflict_policy\x18\x05 \x01(\x0e2&.acorn.sandbox.v1.ImportConflictPolicyR\x0econflictPolicy\x12#\n" +
+	"\rmetadata_json\x18d \x01(\fR\fmetadataJson\"\x90\x01\n" +
+	" ImportResourceToWorkspaceRequest\x12K\n" +
+	"\x06header\x18\x01 \x01(\v21.acorn.sandbox.v1.ImportResourceToWorkspaceHeaderH\x00R\x06header\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04dataB\t\n" +
+	"\apayload\"\xba\x01\n" +
+	"!ImportResourceToWorkspaceResponse\x126\n" +
+	"\x04path\x18\x01 \x01(\v2\".acorn.sandbox.v1.WorkspacePathRefR\x04path\x12\x1d\n" +
+	"\n" +
+	"size_bytes\x18\x02 \x01(\x03R\tsizeBytes\x12!\n" +
+	"\fcontent_hash\x18\x03 \x01(\tR\vcontentHash\x12\x1b\n" +
+	"\tmime_type\x18\x04 \x01(\tR\bmimeType*\x8f\x01\n" +
+	"\x14ImportConflictPolicy\x12&\n" +
+	"\"IMPORT_CONFLICT_POLICY_UNSPECIFIED\x10\x00\x12)\n" +
+	"%IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS\x10\x01\x12$\n" +
+	" IMPORT_CONFLICT_POLICY_OVERWRITE\x10\x022\x97\x02\n" +
 	"\x18WorkspaceTransferService\x12r\n" +
-	"\x13ExportWorkspacePath\x12,.acorn.sandbox.v1.ExportWorkspacePathRequest\x1a-.acorn.sandbox.v1.ExportWorkspacePathResponseBHZFgithub.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1;sandboxv1b\x06proto3"
+	"\x13ExportWorkspacePath\x12,.acorn.sandbox.v1.ExportWorkspacePathRequest\x1a-.acorn.sandbox.v1.ExportWorkspacePathResponse\x12\x86\x01\n" +
+	"\x19ImportResourceToWorkspace\x122.acorn.sandbox.v1.ImportResourceToWorkspaceRequest\x1a3.acorn.sandbox.v1.ImportResourceToWorkspaceResponse(\x01BHZFgithub.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1;sandboxv1b\x06proto3"
 
 var (
 	file_acorn_sandbox_v1_transfer_proto_rawDescOnce sync.Once
@@ -191,25 +497,37 @@ func file_acorn_sandbox_v1_transfer_proto_rawDescGZIP() []byte {
 	return file_acorn_sandbox_v1_transfer_proto_rawDescData
 }
 
-var file_acorn_sandbox_v1_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_acorn_sandbox_v1_transfer_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_acorn_sandbox_v1_transfer_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_acorn_sandbox_v1_transfer_proto_goTypes = []any{
-	(*ExportWorkspacePathRequest)(nil),  // 0: acorn.sandbox.v1.ExportWorkspacePathRequest
-	(*ExportWorkspacePathResponse)(nil), // 1: acorn.sandbox.v1.ExportWorkspacePathResponse
-	(*v1.Scope)(nil),                    // 2: acorn.common.v1.Scope
-	(*WorkspacePathRef)(nil),            // 3: acorn.sandbox.v1.WorkspacePathRef
-	(*v11.ResourceRef)(nil),             // 4: acorn.resource.v1.ResourceRef
+	(ImportConflictPolicy)(0),                 // 0: acorn.sandbox.v1.ImportConflictPolicy
+	(*ExportWorkspacePathRequest)(nil),        // 1: acorn.sandbox.v1.ExportWorkspacePathRequest
+	(*ExportWorkspacePathResponse)(nil),       // 2: acorn.sandbox.v1.ExportWorkspacePathResponse
+	(*ImportResourceToWorkspaceHeader)(nil),   // 3: acorn.sandbox.v1.ImportResourceToWorkspaceHeader
+	(*ImportResourceToWorkspaceRequest)(nil),  // 4: acorn.sandbox.v1.ImportResourceToWorkspaceRequest
+	(*ImportResourceToWorkspaceResponse)(nil), // 5: acorn.sandbox.v1.ImportResourceToWorkspaceResponse
+	(*v1.Scope)(nil),                          // 6: acorn.common.v1.Scope
+	(*WorkspacePathRef)(nil),                  // 7: acorn.sandbox.v1.WorkspacePathRef
+	(*v11.ResourceRef)(nil),                   // 8: acorn.resource.v1.ResourceRef
 }
 var file_acorn_sandbox_v1_transfer_proto_depIdxs = []int32{
-	2, // 0: acorn.sandbox.v1.ExportWorkspacePathRequest.scope:type_name -> acorn.common.v1.Scope
-	3, // 1: acorn.sandbox.v1.ExportWorkspacePathResponse.source:type_name -> acorn.sandbox.v1.WorkspacePathRef
-	4, // 2: acorn.sandbox.v1.ExportWorkspacePathResponse.resource:type_name -> acorn.resource.v1.ResourceRef
-	0, // 3: acorn.sandbox.v1.WorkspaceTransferService.ExportWorkspacePath:input_type -> acorn.sandbox.v1.ExportWorkspacePathRequest
-	1, // 4: acorn.sandbox.v1.WorkspaceTransferService.ExportWorkspacePath:output_type -> acorn.sandbox.v1.ExportWorkspacePathResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6,  // 0: acorn.sandbox.v1.ExportWorkspacePathRequest.scope:type_name -> acorn.common.v1.Scope
+	7,  // 1: acorn.sandbox.v1.ExportWorkspacePathResponse.source:type_name -> acorn.sandbox.v1.WorkspacePathRef
+	8,  // 2: acorn.sandbox.v1.ExportWorkspacePathResponse.resource:type_name -> acorn.resource.v1.ResourceRef
+	6,  // 3: acorn.sandbox.v1.ImportResourceToWorkspaceHeader.scope:type_name -> acorn.common.v1.Scope
+	8,  // 4: acorn.sandbox.v1.ImportResourceToWorkspaceHeader.resource:type_name -> acorn.resource.v1.ResourceRef
+	0,  // 5: acorn.sandbox.v1.ImportResourceToWorkspaceHeader.conflict_policy:type_name -> acorn.sandbox.v1.ImportConflictPolicy
+	3,  // 6: acorn.sandbox.v1.ImportResourceToWorkspaceRequest.header:type_name -> acorn.sandbox.v1.ImportResourceToWorkspaceHeader
+	7,  // 7: acorn.sandbox.v1.ImportResourceToWorkspaceResponse.path:type_name -> acorn.sandbox.v1.WorkspacePathRef
+	1,  // 8: acorn.sandbox.v1.WorkspaceTransferService.ExportWorkspacePath:input_type -> acorn.sandbox.v1.ExportWorkspacePathRequest
+	4,  // 9: acorn.sandbox.v1.WorkspaceTransferService.ImportResourceToWorkspace:input_type -> acorn.sandbox.v1.ImportResourceToWorkspaceRequest
+	2,  // 10: acorn.sandbox.v1.WorkspaceTransferService.ExportWorkspacePath:output_type -> acorn.sandbox.v1.ExportWorkspacePathResponse
+	5,  // 11: acorn.sandbox.v1.WorkspaceTransferService.ImportResourceToWorkspace:output_type -> acorn.sandbox.v1.ImportResourceToWorkspaceResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_acorn_sandbox_v1_transfer_proto_init() }
@@ -218,18 +536,23 @@ func file_acorn_sandbox_v1_transfer_proto_init() {
 		return
 	}
 	file_acorn_sandbox_v1_path_proto_init()
+	file_acorn_sandbox_v1_transfer_proto_msgTypes[3].OneofWrappers = []any{
+		(*ImportResourceToWorkspaceRequest_Header)(nil),
+		(*ImportResourceToWorkspaceRequest_Data)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_acorn_sandbox_v1_transfer_proto_rawDesc), len(file_acorn_sandbox_v1_transfer_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   2,
+			NumEnums:      1,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_acorn_sandbox_v1_transfer_proto_goTypes,
 		DependencyIndexes: file_acorn_sandbox_v1_transfer_proto_depIdxs,
+		EnumInfos:         file_acorn_sandbox_v1_transfer_proto_enumTypes,
 		MessageInfos:      file_acorn_sandbox_v1_transfer_proto_msgTypes,
 	}.Build()
 	File_acorn_sandbox_v1_transfer_proto = out.File

@@ -55,7 +55,8 @@ func TestDescribeCapabilities(t *testing.T) {
 	resource := surfaceByName(descriptor, "resource")
 	if resource.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL ||
 		!hasFeature(resource, "export_workspace_path") ||
-		!hasFeature(resource, "open_resource") {
+		!hasFeature(resource, "open_resource") ||
+		!hasFeature(resource, "import_resource") {
 		t.Fatalf("unexpected resource surface: %+v", resource)
 	}
 	if endpoint := endpointByName(descriptor, "control-http"); endpoint.GetAddress() != "sandbox-service:8081" || endpoint.GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_IMPLEMENTED {

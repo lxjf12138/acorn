@@ -24,10 +24,18 @@ func mapWorkspaceStoreError(err error) error {
 		return status.Error(codes.FailedPrecondition, "workspace path is a directory")
 	case errors.Is(err, workspacestore.ErrPathNotRegularFile):
 		return status.Error(codes.FailedPrecondition, "workspace path is not a regular file")
+	case errors.Is(err, workspacestore.ErrPathAlreadyExists):
+		return status.Error(codes.AlreadyExists, "workspace path already exists")
 	case errors.Is(err, workspacestore.ErrSymlinkNotAllowed):
 		return status.Error(codes.PermissionDenied, "workspace symlink is not allowed")
 	case errors.Is(err, workspacestore.ErrPathEscapesWorkspace):
 		return status.Error(codes.PermissionDenied, "workspace path escapes workspace root")
+	case errors.Is(err, workspacestore.ErrContentHashMismatch):
+		return status.Error(codes.DataLoss, "workspace import content hash mismatch")
+	case errors.Is(err, workspacestore.ErrImportTooLarge):
+		return status.Error(codes.ResourceExhausted, "workspace import too large")
+	case errors.Is(err, workspacestore.ErrParentNotFound):
+		return status.Error(codes.NotFound, "workspace parent path not found")
 	case errors.Is(err, workspacestore.ErrWorkspaceNotReady):
 		return status.Error(codes.FailedPrecondition, "workspace backing store is not ready")
 	default:

@@ -204,6 +204,128 @@ func TestWorkspaceStoreExportPathErrors(t *testing.T) {
 	}
 }
 
+func TestWorkspaceStoreImportFile(t *testing.T) {
+	store := newTestWorkspaceStore(t)
+	createBacking(t, store, "ws-test")
+	if err := os.Mkdir(filepath.Join(store.baseDir, "ws-test/inputs"), 0o700); err != nil {
+		t.Fatalf("mkdir inputs: %v", err)
+	}
+
+	imported, err := store.ImportFile(context.Background(), workspacestore.ImportFileRequest{
+		WorkspaceID:       "ws-test",
+		Path:              "inputs/report.txt",
+		MimeType:          "text/plain",
+		Source:            strings.NewReader("report"),
+		ExpectedSizeBytes: 6,
+		ExpectedHash:      "sha256:845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917",
+		ConflictPolicy:    workspacestore.ImportConflictFailIfExists,
+	})
+	if err != nil {
+		t.Fatalf("ImportFile returned error: %v", err)
+	}
+	if imported.Path.Path != "inputs/report.txt" ||
+		imported.Path.Kind != sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE ||
+		imported.SizeBytes != 6 ||
+		imported.MimeType != "text/plain" ||
+		imported.ContentHash != "sha256:845e91831319e89c4d656bdb80c278ac09a7230d61e5dfd2e1b1fbb436ac8917" {
+		t.Fatalf("unexpected import result: %+v", imported)
+	}
+	body, err := os.ReadFile(filepath.Join(store.baseDir, "ws-test/inputs/report.txt"))
+	if err != nil {
+		t.Fatalf("read imported file: %v", err)
+	}
+	if string(body) != "report" {
+		t.Fatalf("unexpected imported body: %q", string(body))
+	}
+}
+
+func TestWorkspaceStoreImportFileOverwriteAndEmpty(t *testing.T) {
+	store := newTestWorkspaceStore(t)
+	createBacking(t, store, "ws-test")
+	writeFile(t, store.baseDir, "ws-test/existing.txt", "old")
+
+	imported, err := store.ImportFile(context.Background(), workspacestore.ImportFileRequest{
+		WorkspaceID:    "ws-test",
+		Path:           "existing.txt",
+		Source:         strings.NewReader(""),
+		ConflictPolicy: workspacestore.ImportConflictOverwrite,
+	})
+	if err != nil {
+		t.Fatalf("ImportFile overwrite returned error: %v", err)
+	}
+	if imported.SizeBytes != 0 || imported.ContentHash != "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" {
+		t.Fatalf("unexpected empty import result: %+v", imported)
+	}
+	body, err := os.ReadFile(filepath.Join(store.baseDir, "ws-test/existing.txt"))
+	if err != nil {
+		t.Fatalf("read overwritten file: %v", err)
+	}
+	if string(body) != "" {
+		t.Fatalf("unexpected overwritten body: %q", string(body))
+	}
+}
+
+func TestWorkspaceStoreImportFileErrors(t *testing.T) {
+	store := newTestWorkspaceStore(t)
+	createBacking(t, store, "ws-test")
+	writeFile(t, store.baseDir, "ws-test/existing.txt", "old")
+	if err := os.Mkdir(filepath.Join(store.baseDir, "ws-test/dir"), 0o700); err != nil {
+		t.Fatalf("mkdir dir: %v", err)
+	}
+
+	tests := []struct {
+		name string
+		req  workspacestore.ImportFileRequest
+		err  error
+	}{
+		{name: "missing workspace id", req: workspacestore.ImportFileRequest{Path: "file.txt", Source: strings.NewReader("x")}, err: workspacestore.ErrWorkspaceNotFound},
+		{name: "root path", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "", Source: strings.NewReader("x")}, err: workspacestore.ErrInvalidPath},
+		{name: "traversal", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "../secret", Source: strings.NewReader("x")}, err: workspacestore.ErrInvalidPath},
+		{name: "parent missing", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "missing/file.txt", Source: strings.NewReader("x")}, err: workspacestore.ErrParentNotFound},
+		{name: "directory target", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "dir", Source: strings.NewReader("x")}, err: workspacestore.ErrPathIsDirectory},
+		{name: "existing fail", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "existing.txt", Source: strings.NewReader("new"), ConflictPolicy: workspacestore.ImportConflictFailIfExists}, err: workspacestore.ErrPathAlreadyExists},
+		{name: "hash mismatch", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "hash.txt", Source: strings.NewReader("new"), ExpectedHash: "sha256:nope"}, err: workspacestore.ErrContentHashMismatch},
+		{name: "too large", req: workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "large.txt", Source: strings.NewReader("large"), MaxBytes: 4}, err: workspacestore.ErrImportTooLarge},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := store.ImportFile(context.Background(), tt.req)
+			if !errors.Is(err, tt.err) {
+				t.Fatalf("expected %v, got %v", tt.err, err)
+			}
+		})
+	}
+	if _, err := os.Stat(filepath.Join(store.baseDir, "ws-test/hash.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("hash mismatch left target file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(store.baseDir, "ws-test/large.txt")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("too large import left target file: %v", err)
+	}
+}
+
+func TestWorkspaceStoreImportFileSymlinkPolicy(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink test")
+	}
+	store := newTestWorkspaceStore(t)
+	createBacking(t, store, "ws-test")
+	writeFile(t, store.baseDir, "ws-test/file.txt", "content")
+	if err := os.Symlink(filepath.Join(store.baseDir, "ws-test/file.txt"), filepath.Join(store.baseDir, "ws-test/link.txt")); err != nil {
+		t.Fatalf("symlink file: %v", err)
+	}
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(store.baseDir, "ws-test/linkdir")); err != nil {
+		t.Fatalf("symlink outside dir: %v", err)
+	}
+
+	if _, err := store.ImportFile(context.Background(), workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "link.txt", Source: strings.NewReader("x"), ConflictPolicy: workspacestore.ImportConflictOverwrite}); !errors.Is(err, workspacestore.ErrSymlinkNotAllowed) {
+		t.Fatalf("expected target symlink rejection, got %v", err)
+	}
+	if _, err := store.ImportFile(context.Background(), workspacestore.ImportFileRequest{WorkspaceID: "ws-test", Path: "linkdir/file.txt", Source: strings.NewReader("x")}); !errors.Is(err, workspacestore.ErrSymlinkNotAllowed) && !errors.Is(err, workspacestore.ErrPathEscapesWorkspace) {
+		t.Fatalf("expected parent symlink rejection, got %v", err)
+	}
+}
+
 func TestWorkspaceStoreSymlinkPolicy(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("symlink test")

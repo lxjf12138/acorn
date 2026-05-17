@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
@@ -27,8 +28,12 @@ type fakeWorkspaceHostClient struct {
 	listResp        *sandboxv1.ListWorkspaceDirResponse
 	previewResp     *sandboxv1.PreviewWorkspaceFileResponse
 	exportResp      *sandboxv1.ExportWorkspacePathResponse
+	importResp      *sandboxv1.ImportResourceToWorkspaceResponse
+	importErr       error
 	lastListInput   sandboxclient.ListWorkspaceDirInput
 	lastExportInput sandboxclient.ExportWorkspacePathInput
+	lastImportInput sandboxclient.ImportResourceInput
+	lastImportBody  string
 	useHosted       bool
 }
 
@@ -132,6 +137,29 @@ func (f *fakeWorkspaceHostClient) ExportWorkspacePath(_ context.Context, input s
 			SizeBytes:          12,
 			ContentHash:        "sha256:abc",
 		},
+	}, nil
+}
+
+func (f *fakeWorkspaceHostClient) ImportResourceToWorkspace(_ context.Context, input sandboxclient.ImportResourceInput, reader io.Reader) (*sandboxv1.ImportResourceToWorkspaceResponse, error) {
+	f.lastImportInput = input
+	if reader != nil {
+		body, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, err
+		}
+		f.lastImportBody = string(body)
+	}
+	if f.importErr != nil {
+		return nil, f.importErr
+	}
+	if f.importResp != nil {
+		return f.importResp, nil
+	}
+	return &sandboxv1.ImportResourceToWorkspaceResponse{
+		Path:        pathRef("sandbox-service", input.ServiceWorkspaceID, "local-process", input.DestinationPath),
+		SizeBytes:   int64(len(f.lastImportBody)),
+		ContentHash: input.Resource.GetContentHash(),
+		MimeType:    input.Resource.GetMimeType(),
 	}, nil
 }
 
@@ -579,6 +607,162 @@ func TestWorkspaceServiceExportSessionWorkspacePathPropagatesErrors(t *testing.T
 			}
 		})
 	}
+}
+
+func TestWorkspaceServiceImportResourceToSessionWorkspace(t *testing.T) {
+	workspaceStore := workspacedomain.NewMemoryStore()
+	client := &fakeWorkspaceHostClient{}
+	resourceStore := resourcedomain.NewMemoryStore()
+	resourceRecord := registerImportResource(t, resourceStore, "res_1", "user-1", "data/report.txt")
+	gateway := NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{
+		"sandbox-service": &fakeAuthorityClient{stream: &fakeResourceContentClient{
+			chunks: []*resourcev1.OpenResourceResponse{
+				{Resource: resourceRecord.GetRef(), Data: []byte("hello ")},
+				{Data: []byte("world")},
+			},
+		}},
+	})
+	service := NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, client, NewResourceService(resourceStore), gateway, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+
+	resp, err := service.ImportResourceToSessionWorkspace(context.Background(), "sess-1", "user-1", "res_1", "inputs/report.txt", sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_OVERWRITE)
+	if err != nil {
+		t.Fatalf("ImportResourceToSessionWorkspace returned error: %v", err)
+	}
+	if client.lastImportInput.ServiceWorkspaceID != "ws_sess-1" ||
+		client.lastImportInput.DestinationPath != "inputs/report.txt" ||
+		client.lastImportInput.ConflictPolicy != sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_OVERWRITE ||
+		client.lastImportInput.Resource.GetId() != "res_1" {
+		t.Fatalf("unexpected import input: %+v", client.lastImportInput)
+	}
+	if client.lastImportBody != "hello world" {
+		t.Fatalf("unexpected import body: %q", client.lastImportBody)
+	}
+	if resp.GetPath().GetPath() != "inputs/report.txt" {
+		t.Fatalf("unexpected import response: %+v", resp)
+	}
+}
+
+func TestWorkspaceServiceImportResourceUsesSafeDefaultDestination(t *testing.T) {
+	workspaceStore := workspacedomain.NewMemoryStore()
+	client := &fakeWorkspaceHostClient{}
+	resourceStore := resourcedomain.NewMemoryStore()
+	resourceRecord := registerImportResource(t, resourceStore, "res_1", "user-1", "../../bad\r\nname.txt")
+	gateway := NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{
+		"sandbox-service": &fakeAuthorityClient{stream: &fakeResourceContentClient{
+			chunks: []*resourcev1.OpenResourceResponse{{Resource: resourceRecord.GetRef(), Data: []byte("x")}},
+		}},
+	})
+	service := NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, client, NewResourceService(resourceStore), gateway, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+
+	_, err := service.ImportResourceToSessionWorkspace(context.Background(), "sess-1", "user-1", "res_1", "", sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS)
+	if err != nil {
+		t.Fatalf("ImportResourceToSessionWorkspace returned error: %v", err)
+	}
+	if client.lastImportInput.DestinationPath != ".._.._badname.txt" {
+		t.Fatalf("unexpected default destination: %q", client.lastImportInput.DestinationPath)
+	}
+}
+
+func TestWorkspaceServiceImportResourceToSessionWorkspaceErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(*testing.T, *workspacedomain.MemoryStore, *resourcedomain.MemoryStore, *fakeWorkspaceHostClient) *ResourceGatewayService
+		sessionID string
+		userID    string
+		code      codes.Code
+	}{
+		{
+			name:      "missing session",
+			sessionID: "missing",
+			userID:    "user-1",
+			setup: func(t *testing.T, workspaceStore *workspacedomain.MemoryStore, resourceStore *resourcedomain.MemoryStore, client *fakeWorkspaceHostClient) *ResourceGatewayService {
+				record := registerImportResource(t, resourceStore, "res_1", "user-1", "file.txt")
+				return NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{"sandbox-service": &fakeAuthorityClient{stream: &fakeResourceContentClient{chunks: []*resourcev1.OpenResourceResponse{{Resource: record.GetRef()}}}}})
+			},
+			code: codes.NotFound,
+		},
+		{
+			name:      "owner mismatch",
+			sessionID: "sess-1",
+			userID:    "user-2",
+			setup: func(t *testing.T, workspaceStore *workspacedomain.MemoryStore, resourceStore *resourcedomain.MemoryStore, client *fakeWorkspaceHostClient) *ResourceGatewayService {
+				if _, err := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process").CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+				record := registerImportResource(t, resourceStore, "res_1", "user-1", "file.txt")
+				return NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{"sandbox-service": &fakeAuthorityClient{stream: &fakeResourceContentClient{chunks: []*resourcev1.OpenResourceResponse{{Resource: record.GetRef()}}}}})
+			},
+			code: codes.PermissionDenied,
+		},
+		{
+			name:      "sandbox import error",
+			sessionID: "sess-1",
+			userID:    "user-1",
+			setup: func(t *testing.T, workspaceStore *workspacedomain.MemoryStore, resourceStore *resourcedomain.MemoryStore, client *fakeWorkspaceHostClient) *ResourceGatewayService {
+				if _, err := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process").CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+				client.importErr = status.Error(codes.AlreadyExists, "exists")
+				record := registerImportResource(t, resourceStore, "res_1", "user-1", "file.txt")
+				return NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{"sandbox-service": &fakeAuthorityClient{stream: &fakeResourceContentClient{chunks: []*resourcev1.OpenResourceResponse{{Resource: record.GetRef(), Data: []byte("x")}}}}})
+			},
+			code: codes.AlreadyExists,
+		},
+		{
+			name:      "mismatched returned workspace",
+			sessionID: "sess-1",
+			userID:    "user-1",
+			setup: func(t *testing.T, workspaceStore *workspacedomain.MemoryStore, resourceStore *resourcedomain.MemoryStore, client *fakeWorkspaceHostClient) *ResourceGatewayService {
+				if _, err := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process").CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+				client.importResp = &sandboxv1.ImportResourceToWorkspaceResponse{Path: pathRef("sandbox-service", "other", "local-process", "file.txt")}
+				record := registerImportResource(t, resourceStore, "res_1", "user-1", "file.txt")
+				return NewResourceGatewayService(resourceStore, map[string]ResourceAuthorityClient{"sandbox-service": &fakeAuthorityClient{stream: &fakeResourceContentClient{chunks: []*resourcev1.OpenResourceResponse{{Resource: record.GetRef(), Data: []byte("x")}}}}})
+			},
+			code: codes.Internal,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			workspaceStore := workspacedomain.NewMemoryStore()
+			resourceStore := resourcedomain.NewMemoryStore()
+			client := &fakeWorkspaceHostClient{}
+			gateway := tt.setup(t, workspaceStore, resourceStore, client)
+			service := NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, client, NewResourceService(resourceStore), gateway, "sandbox-service", "local-process")
+			_, err := service.ImportResourceToSessionWorkspace(context.Background(), tt.sessionID, tt.userID, "res_1", "file.txt", sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS)
+			if status.Code(err) != tt.code {
+				t.Fatalf("expected %s, got %v", tt.code, err)
+			}
+		})
+	}
+}
+
+func registerImportResource(t *testing.T, store *resourcedomain.MemoryStore, resourceID string, owner string, name string) *resourcev1.ResourceRecord {
+	t.Helper()
+	record, err := store.Register(context.Background(), &resourcev1.ResourceRecord{
+		Ref: &resourcev1.ResourceRef{
+			Id:                 resourceID,
+			AuthorityServiceId: "sandbox-service",
+			Name:               name,
+			MimeType:           "text/plain",
+			SizeBytes:          11,
+			ContentHash:        "sha256:abc",
+		},
+		OwnerUserId: owner,
+		Status:      resourcev1.ResourceStatus_RESOURCE_STATUS_AVAILABLE,
+		Visibility:  resourcev1.ResourceVisibility_RESOURCE_VISIBILITY_USER_VISIBLE,
+	})
+	if err != nil {
+		t.Fatalf("Register returned error: %v", err)
+	}
+	return record
 }
 
 func pathRef(serviceID string, workspaceID string, profileID string, path string) *sandboxv1.WorkspacePathRef {

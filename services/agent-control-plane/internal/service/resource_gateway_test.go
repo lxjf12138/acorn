@@ -14,7 +14,7 @@ import (
 func TestResourceGatewayServiceOpenResource(t *testing.T) {
 	store := resourcedomain.NewMemoryStore()
 	record := registerGatewayResource(t, store, "res_1", "user-1", resourcev1.ResourceStatus_RESOURCE_STATUS_AVAILABLE, "sandbox-service")
-	authority := &fakeAuthorityClient{stream: &fakeResourceContentClient{}}
+	authority := &fakeAuthorityClient{stream: &fakeResourceContentClient{chunks: []*resourcev1.OpenResourceResponse{{Resource: record.GetRef(), Data: []byte("data")}}}}
 	gateway := NewResourceGatewayService(store, map[string]ResourceAuthorityClient{"sandbox-service": authority})
 
 	got, stream, err := gateway.OpenResource(context.Background(), "res_1", "user-1")

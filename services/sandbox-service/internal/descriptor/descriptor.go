@@ -85,6 +85,7 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 				Features: []string{
 					"export_workspace_path",
 					"open_resource",
+					"import_resource",
 				},
 			},
 			{

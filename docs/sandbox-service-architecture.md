@@ -31,7 +31,7 @@ Workspace Resource Surface
   ExportWorkspacePath
   Creates ResourceRef / ResourceRecord
   Download streams snapshot ResourceRef bytes through Control Plane
-  No ImportResource yet
+  ImportResource consumes ResourceRef bytes through Control Plane broker
 ```
 
 Core rule:
@@ -186,13 +186,18 @@ owning sandbox-service can interpret it.
 ExportWorkspacePath:
   WorkspacePathRef -> ResourceRef
 
-Future ImportResource:
+ImportResource:
   ResourceRef -> WorkspacePathRef
 ```
 
 ExportWorkspacePath now creates a snapshot-backed `ResourceRef`. The exported
 resource record points to blob metadata, while retaining the source workspace id
 and path only for provenance and debugging.
+
+ImportResource is brokered by the Control Plane: the Control Plane opens the
+ResourceRef authority stream, forwards bytes into sandbox-service, and
+sandbox-service writes them through `WorkspaceStore`. sandbox-service does not
+directly access another service's private storage.
 
 ---
 
@@ -556,8 +561,21 @@ Goal:
 ResourceRef -> WorkspacePathRef
 ```
 
-This should wait until ResourceRef bytes can be read through a content API or
-download gateway.
+Control Plane flow:
+
+```text
+Get ResourceRecord
+Open authority ResourceContentService
+Open sandbox ImportResourceToWorkspace stream
+Pipe bytes into WorkspaceStore
+Return WorkspacePathRef
+```
+
+Status:
+
+```text
+Implemented.
+```
 
 ### PR 5: SandboxBackend and WorkspaceAttachment
 
@@ -571,10 +589,9 @@ Execute inside a sandbox without coupling exec to local directories.
 
 ## 11. Non-Goals For The Next PR
 
-The next PR should focus on ImportResource. Do not include:
+The next PR should focus on a User Upload Gateway. Do not include:
 
 ```text
-Upload Gateway
 SandboxBackend
 Docker / VM / remote agent
 Profile registry config rewrite
@@ -582,5 +599,5 @@ WorkspaceStore redesign
 Large config schema migration
 ```
 
-The next PR should convert existing ResourceRefs into workspace content without
-changing workspace view behavior or adding execution flows.
+The next PR should create ResourceRefs from user-uploaded bytes without changing
+workspace view behavior or adding execution flows.

@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	WorkspaceTransferService_ExportWorkspacePath_FullMethodName = "/acorn.sandbox.v1.WorkspaceTransferService/ExportWorkspacePath"
+	WorkspaceTransferService_ExportWorkspacePath_FullMethodName       = "/acorn.sandbox.v1.WorkspaceTransferService/ExportWorkspacePath"
+	WorkspaceTransferService_ImportResourceToWorkspace_FullMethodName = "/acorn.sandbox.v1.WorkspaceTransferService/ImportResourceToWorkspace"
 )
 
 // WorkspaceTransferServiceClient is the client API for WorkspaceTransferService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type WorkspaceTransferServiceClient interface {
 	ExportWorkspacePath(ctx context.Context, in *ExportWorkspacePathRequest, opts ...grpc.CallOption) (*ExportWorkspacePathResponse, error)
+	ImportResourceToWorkspace(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse], error)
 }
 
 type workspaceTransferServiceClient struct {
@@ -47,11 +49,25 @@ func (c *workspaceTransferServiceClient) ExportWorkspacePath(ctx context.Context
 	return out, nil
 }
 
+func (c *workspaceTransferServiceClient) ImportResourceToWorkspace(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &WorkspaceTransferService_ServiceDesc.Streams[0], WorkspaceTransferService_ImportResourceToWorkspace_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkspaceTransferService_ImportResourceToWorkspaceClient = grpc.ClientStreamingClient[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse]
+
 // WorkspaceTransferServiceServer is the server API for WorkspaceTransferService service.
 // All implementations must embed UnimplementedWorkspaceTransferServiceServer
 // for forward compatibility.
 type WorkspaceTransferServiceServer interface {
 	ExportWorkspacePath(context.Context, *ExportWorkspacePathRequest) (*ExportWorkspacePathResponse, error)
+	ImportResourceToWorkspace(grpc.ClientStreamingServer[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse]) error
 	mustEmbedUnimplementedWorkspaceTransferServiceServer()
 }
 
@@ -64,6 +80,9 @@ type UnimplementedWorkspaceTransferServiceServer struct{}
 
 func (UnimplementedWorkspaceTransferServiceServer) ExportWorkspacePath(context.Context, *ExportWorkspacePathRequest) (*ExportWorkspacePathResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ExportWorkspacePath not implemented")
+}
+func (UnimplementedWorkspaceTransferServiceServer) ImportResourceToWorkspace(grpc.ClientStreamingServer[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse]) error {
+	return status.Error(codes.Unimplemented, "method ImportResourceToWorkspace not implemented")
 }
 func (UnimplementedWorkspaceTransferServiceServer) mustEmbedUnimplementedWorkspaceTransferServiceServer() {
 }
@@ -105,6 +124,13 @@ func _WorkspaceTransferService_ExportWorkspacePath_Handler(srv interface{}, ctx 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkspaceTransferService_ImportResourceToWorkspace_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(WorkspaceTransferServiceServer).ImportResourceToWorkspace(&grpc.GenericServerStream[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type WorkspaceTransferService_ImportResourceToWorkspaceServer = grpc.ClientStreamingServer[ImportResourceToWorkspaceRequest, ImportResourceToWorkspaceResponse]
+
 // WorkspaceTransferService_ServiceDesc is the grpc.ServiceDesc for WorkspaceTransferService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -117,6 +143,12 @@ var WorkspaceTransferService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _WorkspaceTransferService_ExportWorkspacePath_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "ImportResourceToWorkspace",
+			Handler:       _WorkspaceTransferService_ImportResourceToWorkspace_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "acorn/sandbox/v1/transfer.proto",
 }

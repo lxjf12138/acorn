@@ -158,11 +158,15 @@ type fakeBackingStore struct {
 	previewErr  error
 	exportResp  *workspacestore.ExportedPath
 	exportErr   error
+	importResp  *workspacestore.ImportedFile
+	importErr   error
 
-	lastCreate  workspacestore.CreateBackingWorkspaceRequest
-	lastList    workspacestore.ListDirRequest
-	lastPreview workspacestore.PreviewFileRequest
-	lastExport  workspacestore.ExportPathRequest
+	lastCreate        workspacestore.CreateBackingWorkspaceRequest
+	lastList          workspacestore.ListDirRequest
+	lastPreview       workspacestore.PreviewFileRequest
+	lastExport        workspacestore.ExportPathRequest
+	lastImport        workspacestore.ImportFileRequest
+	lastImportContent string
 }
 
 func (f *fakeBackingStore) Kind() string { return "fake" }
@@ -233,5 +237,29 @@ func (f *fakeBackingStore) ExportPath(_ context.Context, req workspacestore.Expo
 		Open: func(context.Context) (io.ReadCloser, error) {
 			return io.NopCloser(strings.NewReader("exported")), nil
 		},
+	}, nil
+}
+
+func (f *fakeBackingStore) ImportFile(_ context.Context, req workspacestore.ImportFileRequest) (*workspacestore.ImportedFile, error) {
+	f.lastImport = req
+	if req.Source != nil {
+		body, err := io.ReadAll(req.Source)
+		if err != nil {
+			return nil, err
+		}
+		f.lastImportContent = string(body)
+	}
+	if f.importErr != nil {
+		return nil, f.importErr
+	}
+	if f.importResp != nil {
+		return f.importResp, nil
+	}
+	size := int64(len(f.lastImportContent))
+	return &workspacestore.ImportedFile{
+		Path:        workspacestore.PathInfo{Path: req.Path, Name: req.Path, Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: size},
+		MimeType:    req.MimeType,
+		SizeBytes:   size,
+		ContentHash: req.ExpectedHash,
 	}, nil
 }

@@ -19,7 +19,15 @@ type Store interface {
 	PreviewFile(ctx context.Context, req PreviewFileRequest) (*FilePreview, error)
 	StatPath(ctx context.Context, req StatPathRequest) (*PathInfo, error)
 	ExportPath(ctx context.Context, req ExportPathRequest) (*ExportedPath, error)
+	ImportFile(ctx context.Context, req ImportFileRequest) (*ImportedFile, error)
 }
+
+type ImportConflictPolicy int
+
+const (
+	ImportConflictFailIfExists ImportConflictPolicy = iota
+	ImportConflictOverwrite
+)
 
 type CreateBackingWorkspaceRequest struct {
 	WorkspaceID      string
@@ -80,6 +88,28 @@ type ExportedPath struct {
 	MimeType  string
 	SizeBytes int64
 	Open      func(ctx context.Context) (io.ReadCloser, error)
+}
+
+type ImportFileRequest struct {
+	WorkspaceID string
+	Path        string
+
+	Name     string
+	MimeType string
+	Source   io.Reader
+
+	ExpectedSizeBytes int64
+	ExpectedHash      string
+
+	ConflictPolicy ImportConflictPolicy
+	MaxBytes       int64
+}
+
+type ImportedFile struct {
+	Path        PathInfo
+	MimeType    string
+	SizeBytes   int64
+	ContentHash string
 }
 
 type PathInfo struct {

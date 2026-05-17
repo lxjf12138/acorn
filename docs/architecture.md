@@ -784,14 +784,15 @@ ResourceBlobStore / LocalBlobStore
 Snapshot-backed ExportWorkspacePath
 ResourceContentService
 Resource Download Gateway
+ImportResource to Workspace
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: ImportResource
-  - ResourceRef -> WorkspacePathRef
-  - Uses Resource Download Gateway / content API
+PR 1: User Upload Gateway
+  - User bytes -> ResourceRef
+  - Can reuse ImportResource to place files into workspace
 
 PR 2: Minimal Sandbox Exec
   - Execute inside existing HostedWorkspace

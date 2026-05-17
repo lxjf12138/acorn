@@ -27,6 +27,43 @@ message ExportWorkspacePathResponse {
   acorn.resource.v1.ResourceRef resource = 2;
 }
 
+enum ImportConflictPolicy {
+  IMPORT_CONFLICT_POLICY_UNSPECIFIED = 0;
+  IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS = 1;
+  IMPORT_CONFLICT_POLICY_OVERWRITE = 2;
+}
+
+message ImportResourceToWorkspaceHeader {
+  acorn.common.v1.Scope scope = 1;
+
+  string service_workspace_id = 2;
+
+  acorn.resource.v1.ResourceRef resource = 3;
+
+  // Workspace-relative POSIX destination path.
+  string destination_path = 4;
+
+  ImportConflictPolicy conflict_policy = 5;
+
+  bytes metadata_json = 100;
+}
+
+message ImportResourceToWorkspaceRequest {
+  oneof payload {
+    ImportResourceToWorkspaceHeader header = 1;
+    bytes data = 2;
+  }
+}
+
+message ImportResourceToWorkspaceResponse {
+  WorkspacePathRef path = 1;
+
+  int64 size_bytes = 2;
+  string content_hash = 3;
+  string mime_type = 4;
+}
+
 service WorkspaceTransferService {
   rpc ExportWorkspacePath(ExportWorkspacePathRequest) returns (ExportWorkspacePathResponse);
+  rpc ImportResourceToWorkspace(stream ImportResourceToWorkspaceRequest) returns (ImportResourceToWorkspaceResponse);
 }

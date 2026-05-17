@@ -6,11 +6,13 @@ import (
 	nethttp "net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/go-kratos/kratos/v2/middleware"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 	"google.golang.org/grpc/codes"
@@ -185,6 +187,50 @@ func TestSafeDownloadFilename(t *testing.T) {
 		if got := safeDownloadFilename(tt.name, tt.fallback); got != tt.want {
 			t.Fatalf("safeDownloadFilename(%q) = %q, want %q", tt.name, got, tt.want)
 		}
+	}
+}
+
+func TestReadImportResourceRequest(t *testing.T) {
+	ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace/files/import?user_id=user-1", strings.NewReader(`{
+		"resource_id": "res_1",
+		"destination_path": "inputs/report.txt",
+		"conflict_policy": "IMPORT_CONFLICT_POLICY_OVERWRITE"
+	}`))
+	ctx.query = ctx.request.URL.Query()
+
+	req, err := readImportResourceRequest(ctx)
+	if err != nil {
+		t.Fatalf("readImportResourceRequest returned error: %v", err)
+	}
+	if req.ResourceID != "res_1" ||
+		req.DestinationPath != "inputs/report.txt" ||
+		req.UserID != "user-1" ||
+		req.ConflictPolicy != sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_OVERWRITE {
+		t.Fatalf("unexpected request: %+v", req)
+	}
+}
+
+func TestReadImportResourceRequestErrors(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		code codes.Code
+	}{
+		{name: "missing resource id", body: `{}`, code: codes.InvalidArgument},
+		{name: "bad policy", body: `{"resource_id":"res_1","conflict_policy":"BAD"}`, code: codes.InvalidArgument},
+		{name: "bad json", body: `{`, code: codes.InvalidArgument},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := newDownloadTestContext("unused", "", httptest.NewRecorder())
+			ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace/files/import", strings.NewReader(tt.body))
+			ctx.query = ctx.request.URL.Query()
+			_, err := readImportResourceRequest(ctx)
+			if status.Code(err) != tt.code {
+				t.Fatalf("expected %s, got %v", tt.code, err)
+			}
+		})
 	}
 }
 

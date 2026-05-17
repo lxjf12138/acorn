@@ -3,8 +3,10 @@ package sandbox
 import (
 	"context"
 	"fmt"
+	"io"
 
 	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
+	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -17,6 +19,7 @@ type WorkspaceHostClient interface {
 	ListWorkspaceDir(ctx context.Context, input ListWorkspaceDirInput) (*sandboxv1.ListWorkspaceDirResponse, error)
 	PreviewWorkspaceFile(ctx context.Context, input PreviewWorkspaceFileInput) (*sandboxv1.PreviewWorkspaceFileResponse, error)
 	ExportWorkspacePath(ctx context.Context, input ExportWorkspacePathInput) (*sandboxv1.ExportWorkspacePathResponse, error)
+	ImportResourceToWorkspace(ctx context.Context, input ImportResourceInput, reader io.Reader) (*sandboxv1.ImportResourceToWorkspaceResponse, error)
 	Close() error
 }
 
@@ -44,6 +47,15 @@ type ExportWorkspacePathInput struct {
 	Path               string
 	ResourceName       string
 	MimeType           string
+}
+
+type ImportResourceInput struct {
+	SessionID          string
+	UserID             string
+	ServiceWorkspaceID string
+	Resource           *resourcev1.ResourceRef
+	DestinationPath    string
+	ConflictPolicy     sandboxv1.ImportConflictPolicy
 }
 
 type GRPCWorkspaceHostClient struct {
@@ -151,6 +163,48 @@ func (c *GRPCWorkspaceHostClient) ExportWorkspacePath(ctx context.Context, input
 		ResourceName:       input.ResourceName,
 		MimeType:           input.MimeType,
 	})
+}
+
+func (c *GRPCWorkspaceHostClient) ImportResourceToWorkspace(ctx context.Context, input ImportResourceInput, reader io.Reader) (*sandboxv1.ImportResourceToWorkspaceResponse, error) {
+	stream, err := c.transfer.ImportResourceToWorkspace(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := stream.Send(&sandboxv1.ImportResourceToWorkspaceRequest{
+		Payload: &sandboxv1.ImportResourceToWorkspaceRequest_Header{
+			Header: &sandboxv1.ImportResourceToWorkspaceHeader{
+				Scope: &commonv1.Scope{
+					ServiceId: c.serviceID,
+					SessionId: input.SessionID,
+					UserId:    input.UserID,
+				},
+				ServiceWorkspaceId: input.ServiceWorkspaceID,
+				Resource:           input.Resource,
+				DestinationPath:    input.DestinationPath,
+				ConflictPolicy:     input.ConflictPolicy,
+			},
+		},
+	}); err != nil {
+		return nil, err
+	}
+	buf := make([]byte, 64*1024)
+	for {
+		n, readErr := reader.Read(buf)
+		if n > 0 {
+			if err := stream.Send(&sandboxv1.ImportResourceToWorkspaceRequest{
+				Payload: &sandboxv1.ImportResourceToWorkspaceRequest_Data{Data: append([]byte(nil), buf[:n]...)},
+			}); err != nil {
+				return nil, err
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF {
+				return stream.CloseAndRecv()
+			}
+			_ = stream.CloseSend()
+			return nil, readErr
+		}
+	}
 }
 
 func (c *GRPCWorkspaceHostClient) Close() error {

@@ -11,6 +11,7 @@ import (
 	klog "github.com/go-kratos/kratos/v2/log"
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"google.golang.org/grpc/codes"
@@ -92,6 +93,17 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 			return err
 		}
 		return writeRegisterResourceJSON(ctx, nethttp.StatusCreated, record)
+	})
+	router.POST("/sessions/{session_id}/workspace/files/import", func(ctx khttp.Context) error {
+		req, err := readImportResourceRequest(ctx)
+		if err != nil {
+			return err
+		}
+		resp, err := workspaceService.ImportResourceToSessionWorkspace(ctx, ctx.Vars().Get("session_id"), req.UserID, req.ResourceID, req.DestinationPath, req.ConflictPolicy)
+		if err != nil {
+			return err
+		}
+		return writeProtoJSON(ctx, nethttp.StatusCreated, resp)
 	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
@@ -180,6 +192,59 @@ type exportWorkspacePathRequest struct {
 	UserID       string `json:"user_id"`
 }
 
+type importResourceRequest struct {
+	ResourceID      string `json:"resource_id"`
+	DestinationPath string `json:"destination_path"`
+	ConflictPolicy  string `json:"conflict_policy"`
+	UserID          string `json:"user_id"`
+}
+
+func readImportResourceRequest(ctx khttp.Context) (struct {
+	ResourceID      string
+	DestinationPath string
+	ConflictPolicy  sandboxv1.ImportConflictPolicy
+	UserID          string
+}, error) {
+	var raw importResourceRequest
+	out := struct {
+		ResourceID      string
+		DestinationPath string
+		ConflictPolicy  sandboxv1.ImportConflictPolicy
+		UserID          string
+	}{}
+	body, err := io.ReadAll(ctx.Request().Body)
+	if err != nil {
+		return out, err
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &raw); err != nil {
+			return out, status.Error(codes.InvalidArgument, "invalid import request JSON")
+		}
+	}
+	if raw.ResourceID == "" {
+		return out, status.Error(codes.InvalidArgument, "resource_id is required")
+	}
+	out.ResourceID = raw.ResourceID
+	out.DestinationPath = raw.DestinationPath
+	out.UserID = raw.UserID
+	if out.UserID == "" {
+		out.UserID = ownerUserID(ctx)
+	}
+	if raw.ConflictPolicy == "" {
+		out.ConflictPolicy = sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS
+		return out, nil
+	}
+	value, ok := sandboxv1.ImportConflictPolicy_value[raw.ConflictPolicy]
+	if !ok {
+		return out, status.Errorf(codes.InvalidArgument, "invalid conflict_policy: %s", raw.ConflictPolicy)
+	}
+	out.ConflictPolicy = sandboxv1.ImportConflictPolicy(value)
+	if out.ConflictPolicy == sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_UNSPECIFIED {
+		out.ConflictPolicy = sandboxv1.ImportConflictPolicy_IMPORT_CONFLICT_POLICY_FAIL_IF_EXISTS
+	}
+	return out, nil
+}
+
 func readExportWorkspacePathRequest(ctx khttp.Context) (exportWorkspacePathRequest, error) {
 	var req exportWorkspacePathRequest
 	body, err := io.ReadAll(ctx.Request().Body)
@@ -217,28 +282,22 @@ func writeGetResourceJSON(ctx khttp.Context, code int, record *resourcev1.Resour
 }
 
 func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService) error {
-	record, stream, err := gateway.OpenResource(ctx, ctx.Vars().Get("resource_id"), ownerUserID(ctx))
+	resourceStream, err := gateway.OpenResourceForTransfer(ctx, ctx.Vars().Get("resource_id"), ownerUserID(ctx))
 	if err != nil {
 		return err
 	}
-	first, err := stream.Recv()
+	first, err := resourceStream.Recv()
 	if err != nil {
-		if err == io.EOF {
-			return status.Error(codes.Internal, "resource authority returned no content")
-		}
 		return err
 	}
-	if err := validateStreamResourceRef(record.GetRef(), first.GetResource()); err != nil {
-		return err
-	}
-	setDownloadHeaders(ctx, record.GetRef())
+	setDownloadHeaders(ctx, resourceStream.Record().GetRef())
 	if len(first.GetData()) > 0 {
 		if _, err := ctx.Response().Write(first.GetData()); err != nil {
 			return err
 		}
 	}
 	for {
-		chunk, err := stream.Recv()
+		chunk, err := resourceStream.Recv()
 		if err == io.EOF {
 			return nil
 		}
@@ -269,28 +328,6 @@ func setDownloadHeaders(ctx khttp.Context, ref *resourcev1.ResourceRef) {
 	if ref.GetContentHash() != "" {
 		headers.Set("X-Acorn-Content-Hash", ref.GetContentHash())
 	}
-}
-
-func validateStreamResourceRef(recordRef *resourcev1.ResourceRef, streamRef *resourcev1.ResourceRef) error {
-	if streamRef == nil {
-		return nil
-	}
-	if recordRef == nil {
-		return status.Error(codes.Internal, "resource record has no ref")
-	}
-	if streamRef.GetId() != "" && streamRef.GetId() != recordRef.GetId() {
-		return status.Error(codes.Internal, "resource authority returned mismatched resource id")
-	}
-	if streamRef.GetAuthorityServiceId() != "" && streamRef.GetAuthorityServiceId() != recordRef.GetAuthorityServiceId() {
-		return status.Error(codes.Internal, "resource authority returned mismatched authority_service_id")
-	}
-	if streamRef.GetContentHash() != "" && recordRef.GetContentHash() != "" && streamRef.GetContentHash() != recordRef.GetContentHash() {
-		return status.Error(codes.Internal, "resource authority returned mismatched content_hash")
-	}
-	if streamRef.GetSizeBytes() > 0 && recordRef.GetSizeBytes() > 0 && streamRef.GetSizeBytes() != recordRef.GetSizeBytes() {
-		return status.Error(codes.Internal, "resource authority returned mismatched size_bytes")
-	}
-	return nil
 }
 
 func safeDownloadFilename(name string, fallback string) string {

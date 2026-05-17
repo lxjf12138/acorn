@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +24,7 @@ type WorkspaceService struct {
 	store            workspacedomain.Store
 	sandboxClient    sandboxclient.WorkspaceHostClient
 	resourceService  *ResourceService
+	resourceGateway  *ResourceGatewayService
 	sandboxServiceID string
 	sandboxProfileID string
 }
@@ -37,10 +39,15 @@ func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclien
 }
 
 func NewWorkspaceServiceWithResources(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
+	return NewWorkspaceServiceWithResourcesAndGateway(store, sandboxClient, resourceService, nil, sandboxServiceID, sandboxProfileID)
+}
+
+func NewWorkspaceServiceWithResourcesAndGateway(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
 	return &WorkspaceService{
 		store:            store,
 		sandboxClient:    sandboxClient,
 		resourceService:  resourceService,
+		resourceGateway:  resourceGateway,
 		sandboxServiceID: sandboxServiceID,
 		sandboxProfileID: sandboxProfileID,
 	}
@@ -253,6 +260,41 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 	})
 }
 
+func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context, sessionID string, userID string, resourceID string, destinationPath string, conflictPolicy sandboxv1.ImportConflictPolicy) (*sandboxv1.ImportResourceToWorkspaceResponse, error) {
+	if s.resourceGateway == nil {
+		return nil, status.Error(codes.FailedPrecondition, "resource gateway is not configured")
+	}
+	record, err := s.getWorkspaceRecordForView(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	ownerUserID := userIDOrRecord(userID, record.OwnerUserID)
+	resourceStream, err := s.resourceGateway.OpenResourceForTransfer(ctx, resourceID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	resourceRecord := resourceStream.Record()
+	ref := resourceRecord.GetRef()
+	if destinationPath == "" {
+		destinationPath = safeWorkspaceImportFilename(ref.GetName(), ref.GetId())
+	}
+	resp, err := s.sandboxClient.ImportResourceToWorkspace(ctx, sandboxclient.ImportResourceInput{
+		SessionID:          record.SessionID,
+		UserID:             ownerUserID,
+		ServiceWorkspaceID: record.CurrentHost.GetServiceWorkspaceId(),
+		Resource:           ref,
+		DestinationPath:    destinationPath,
+		ConflictPolicy:     conflictPolicy,
+	}, resourceStream)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWorkspacePathRef(resp.GetPath(), record.CurrentHost); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 func (s *WorkspaceService) getWorkspaceRecordForView(ctx context.Context, sessionID string) (workspacedomain.Record, error) {
 	if sessionID == "" {
 		return workspacedomain.Record{}, status.Error(codes.InvalidArgument, "session_id is required")
@@ -321,6 +363,18 @@ func userIDOrRecord(userID string, ownerUserID string) string {
 		return userID
 	}
 	return ownerUserID
+}
+
+func safeWorkspaceImportFilename(name string, fallback string) string {
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	name = strings.ReplaceAll(name, "/", "_")
+	name = strings.ReplaceAll(name, `\`, "_")
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fallback
+	}
+	return name
 }
 
 func toProto(record workspacedomain.Record) *workspacev1.WorkspaceRecord {

@@ -50,10 +50,10 @@ func main() {
 		panic(err)
 	}
 	defer resourceContentClient.Close()
-	workspaceService := service.NewWorkspaceServiceWithResources(workspaceStore, workspaceClient, resourceService, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
 	resourceGatewayService := service.NewResourceGatewayService(resourceStore, map[string]service.ResourceAuthorityClient{
 		cfg.Sandbox.ServiceID: resourceContentClient,
 	})
+	workspaceService := service.NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)
