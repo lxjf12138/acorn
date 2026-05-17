@@ -97,12 +97,13 @@ services/sandbox-service/internal/
     workspace store contract
     path syntax policy
     exported resource records
-    future blob store, backend, attachment, profile contracts
+    resource blob store contract
+    future backend, attachment, profile contracts
 
   infra/
     concrete adapters
     localfs workspace store
-    future localblob store
+    localblob resource blob store
     future localprocess / docker / remoteagent backends
 
   descriptor/
@@ -189,9 +190,9 @@ Future ImportResource:
   ResourceRef -> WorkspacePathRef
 ```
 
-Export currently records a resource-to-workspace mapping. Before download
-streaming becomes durable, export should evolve into a snapshot flow backed by
-a `ResourceBlobStore`.
+ExportWorkspacePath now creates a snapshot-backed `ResourceRef`. The exported
+resource record points to blob metadata, while retaining the source workspace id
+and path only for provenance and debugging.
 
 ---
 
@@ -564,18 +565,16 @@ Execute inside a sandbox without coupling exec to local directories.
 
 ## 11. Non-Goals For The Next PR
 
-Do not include these in the WorkspaceStore abstraction PR:
+The next PR should focus on the Resource Download Gateway. Do not include:
 
 ```text
-Download streaming
 ImportResource
-ResourceBlobStore
-Snapshot export
 SandboxBackend
 Docker / VM / remote agent
 Profile registry config rewrite
+WorkspaceStore redesign
 Large config schema migration
 ```
 
-The next PR is only an internal boundary cleanup. It should not change the
-external sandbox API or user-visible behavior.
+The next PR should expose download streaming for existing ResourceRefs without
+changing workspace view behavior or adding import flows.
