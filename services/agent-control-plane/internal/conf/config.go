@@ -7,15 +7,17 @@ import (
 	"github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/config/file"
 	_ "github.com/go-kratos/kratos/v2/encoding/yaml"
+	"github.com/lxjf12138/acorn/packages/servicekit/observability"
 )
 
 type Config struct {
-	Service         Service         `json:"service" yaml:"service"`
-	Server          Server          `json:"server" yaml:"server"`
-	Resource        Resource        `json:"resource" yaml:"resource"`
-	Sandbox         Sandbox         `json:"sandbox" yaml:"sandbox"`
-	SandboxPolicies SandboxPolicies `json:"sandbox_policies" yaml:"sandbox_policies"`
-	Log             Log             `json:"log" yaml:"log"`
+	Service         Service              `json:"service" yaml:"service"`
+	Server          Server               `json:"server" yaml:"server"`
+	Resource        Resource             `json:"resource" yaml:"resource"`
+	Sandbox         Sandbox              `json:"sandbox" yaml:"sandbox"`
+	SandboxPolicies SandboxPolicies      `json:"sandbox_policies" yaml:"sandbox_policies"`
+	Observability   observability.Config `json:"observability" yaml:"observability"`
+	Log             Log                  `json:"log" yaml:"log"`
 }
 
 type Service struct {

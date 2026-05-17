@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/lxjf12138/acorn/packages/servicekit"
 
 	"github.com/lxjf12138/acorn/packages/servicekit/localblob"
+	"github.com/lxjf12138/acorn/packages/servicekit/observability"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/app"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
@@ -36,11 +38,17 @@ func main() {
 		version.Version = cfg.Service.Version
 	}
 
-	logger := servicekit.NewLogger(servicekit.BuildInfo{
+	buildInfo := servicekit.BuildInfo{
 		ID:      cfg.Service.ID,
 		Name:    cfg.Service.Name,
 		Version: version.Version,
-	}, cfg.Log.Level)
+	}
+	logger := servicekit.NewLogger(buildInfo, cfg.Log.Level)
+	obs, err := observability.Init(context.Background(), buildInfo, cfg.Observability)
+	if err != nil {
+		panic(err)
+	}
+	defer obs.Shutdown(context.Background())
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
 	profileRegistry := profiledomain.NewRegistryFromConfig(cfg.Sandbox)
@@ -74,8 +82,8 @@ func main() {
 	}
 	resourceContentService := service.NewResourceContentService(cfg.Service.ID, exportStore, blobStore)
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
-	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, execService, resourceContentService, logger)
+	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger, obs.TracingEnabled)
+	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, execService, resourceContentService, logger, obs.TracingEnabled)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

@@ -10,11 +10,14 @@ import (
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 )
 
-func NewGRPCServer(cfg *conf.Config, resourceService *service.ResourceService, logger klog.Logger) *kgrpc.Server {
+func NewGRPCServer(cfg *conf.Config, resourceService *service.ResourceService, logger klog.Logger, tracingEnabled bool) *kgrpc.Server {
 	srv := kgrpc.NewServer(
 		kgrpc.Address(cfg.Server.GRPC.Addr),
 		kgrpc.Timeout(cfg.Server.GRPC.TimeoutDuration()),
-		kgrpc.Middleware(servicekit.DefaultServerMiddleware(logger)...),
+		kgrpc.Middleware(servicekit.DefaultServerMiddleware(servicekit.ServerMiddlewareOptions{
+			Logger:         logger,
+			TracingEnabled: tracingEnabled,
+		})...),
 	)
 	resourcev1.RegisterResourceServiceServer(srv, resourceService)
 	return srv

@@ -12,11 +12,14 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 )
 
-func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorService, workspaceService *service.WorkspaceService, viewService *service.WorkspaceViewService, transferService *service.WorkspaceTransferService, execService *service.WorkspaceExecService, resourceContentService *service.ResourceContentService, logger klog.Logger) *kgrpc.Server {
+func NewGRPCServer(cfg *conf.Config, descriptorService *service.DescriptorService, workspaceService *service.WorkspaceService, viewService *service.WorkspaceViewService, transferService *service.WorkspaceTransferService, execService *service.WorkspaceExecService, resourceContentService *service.ResourceContentService, logger klog.Logger, tracingEnabled bool) *kgrpc.Server {
 	srv := kgrpc.NewServer(
 		kgrpc.Address(cfg.Server.GRPC.Addr),
 		kgrpc.Timeout(cfg.Server.GRPC.TimeoutDuration()),
-		kgrpc.Middleware(servicekit.DefaultServerMiddleware(logger)...),
+		kgrpc.Middleware(servicekit.DefaultServerMiddleware(servicekit.ServerMiddlewareOptions{
+			Logger:         logger,
+			TracingEnabled: tracingEnabled,
+		})...),
 	)
 	capabilityv1.RegisterCapabilityDescriptorServiceServer(srv, descriptorService)
 	sandboxv1.RegisterWorkspaceHostServiceServer(srv, workspaceService)

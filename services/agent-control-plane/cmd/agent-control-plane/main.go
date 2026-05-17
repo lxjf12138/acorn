@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 
 	klog "github.com/go-kratos/kratos/v2/log"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 	"github.com/lxjf12138/acorn/packages/servicekit/localblob"
+	"github.com/lxjf12138/acorn/packages/servicekit/observability"
 
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/app"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
@@ -32,11 +34,21 @@ func main() {
 		version.Version = cfg.Service.Version
 	}
 
-	logger := servicekit.NewLogger(servicekit.BuildInfo{
+	buildInfo := servicekit.BuildInfo{
 		ID:      cfg.Service.ID,
 		Name:    cfg.Service.Name,
 		Version: version.Version,
-	}, cfg.Log.Level)
+	}
+	logger := servicekit.NewLogger(buildInfo, cfg.Log.Level)
+	obs, err := observability.Init(context.Background(), buildInfo, cfg.Observability)
+	if err != nil {
+		panic(err)
+	}
+	defer obs.Shutdown(context.Background())
+	clientMiddleware := servicekit.DefaultClientMiddleware(servicekit.ClientMiddlewareOptions{
+		TracingEnabled: obs.TracingEnabled,
+		MetricsEnabled: obs.MetricsEnabled,
+	})
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
 	resourceStore := resourcedomain.NewMemoryStore()
@@ -46,12 +58,12 @@ func main() {
 		panic(err)
 	}
 	workspaceStore := workspacedomain.NewMemoryStore()
-	workspaceClient, err := sandboxclient.NewGRPCWorkspaceHostClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr)
+	workspaceClient, err := sandboxclient.NewGRPCWorkspaceHostClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr, clientMiddleware)
 	if err != nil {
 		panic(err)
 	}
 	defer workspaceClient.Close()
-	resourceContentClient, err := sandboxclient.NewGRPCResourceContentClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr)
+	resourceContentClient, err := sandboxclient.NewGRPCResourceContentClient(cfg.Sandbox.ServiceID, cfg.Sandbox.GRPCAddr, clientMiddleware)
 	if err != nil {
 		panic(err)
 	}
@@ -64,8 +76,8 @@ func main() {
 	sandboxPolicyResolver := sandboxpolicydomain.NewConfigResolver(cfg.SandboxPolicies, cfg.Sandbox.DefaultProfileID)
 	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayAndPolicy(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver)
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger)
-	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)
+	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger, obs.TracingEnabled)
+	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger, obs.TracingEnabled)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)
 

@@ -13,11 +13,14 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 )
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, descriptorSource *descriptor.Source, logger klog.Logger) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, descriptorSource *descriptor.Source, logger klog.Logger, tracingEnabled bool) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
-		khttp.Middleware(servicekit.DefaultServerMiddleware(logger)...),
+		khttp.Middleware(servicekit.DefaultServerMiddleware(servicekit.ServerMiddlewareOptions{
+			Logger:         logger,
+			TracingEnabled: tracingEnabled,
+		})...),
 	)
 
 	router := srv.Route("/")

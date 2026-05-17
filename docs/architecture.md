@@ -799,6 +799,7 @@ Control Plane workspace exec forwarding
 ProfileRegistry / Sandbox Profile Selection Cleanup
 Control Plane SandboxPolicy / PlacementResolver
 Workspace Execution Lease / Concurrency Guard
+Observability Foundation
 ```
 
 Next planned code sequence:
@@ -809,6 +810,11 @@ PR 1: Minimal Run model / ExecutionRecord
   - Store exit code and output summary
   - Associate execution with session, user, workspace, and future run id
 ```
+
+Observability now uses servicekit OpenTelemetry initialization and Kratos
+HTTP/gRPC tracing middleware. This is transport-level tracing only; domain
+spans, metrics, audit logs, and Event Surface records are separate layers. See
+`docs/observability.md`.
 
 `local-process-dev` executes host processes for development and is not a strong
 multi-tenant security boundary.

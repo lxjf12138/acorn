@@ -28,11 +28,14 @@ import (
 const multipartUploadOverheadBytes = int64(10 << 20)
 const execRequestMaxBytes = int64(1 << 20)
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger, tracingEnabled bool) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
-		khttp.Middleware(servicekit.DefaultServerMiddleware(logger)...),
+		khttp.Middleware(servicekit.DefaultServerMiddleware(servicekit.ServerMiddlewareOptions{
+			Logger:         logger,
+			TracingEnabled: tracingEnabled,
+		})...),
 		khttp.ErrorEncoder(httpx.ErrorEncoder),
 	)
 

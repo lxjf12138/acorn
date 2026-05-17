@@ -6,12 +6,13 @@ import (
 	"io"
 	"time"
 
+	"github.com/go-kratos/kratos/v2/middleware"
+	kgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
 	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 )
 
@@ -88,8 +89,12 @@ type GRPCWorkspaceHostClient struct {
 	exec       sandboxv1.WorkspaceExecServiceClient
 }
 
-func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHostClient, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func NewGRPCWorkspaceHostClient(serviceID string, addr string, middlewares []middleware.Middleware) (*GRPCWorkspaceHostClient, error) {
+	opts := []kgrpc.ClientOption{kgrpc.WithEndpoint(addr)}
+	if len(middlewares) > 0 {
+		opts = append(opts, kgrpc.WithMiddleware(middlewares...), kgrpc.WithStreamMiddleware(middlewares...))
+	}
+	conn, err := kgrpc.DialInsecure(context.Background(), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("create sandbox workspace client: %w", err)
 	}
