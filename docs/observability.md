@@ -22,8 +22,9 @@ Acorn Event Surface
   product timeline and audit events linked to trace/span ids
 ```
 
-This foundation only enables transport-level tracing. Domain spans, metrics,
-audit logs, and Event Surface records are separate follow-up work.
+The initial observability foundation enabled transport-level tracing. The
+current domain tracing layer adds selected Acorn resource and workspace spans.
+Metrics, audit logs, and Event Surface records remain follow-up work.
 
 ## Resource Attributes
 

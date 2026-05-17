@@ -14,9 +14,11 @@ import (
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
+	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
+	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -483,34 +485,68 @@ func writeGetResourceJSON(ctx khttp.Context, code int, record *resourcev1.Resour
 }
 
 func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService) error {
-	resourceStream, err := gateway.OpenResourceForTransfer(ctx, ctx.Vars().Get("resource_id"), ownerUserID(ctx))
+	reqCtx, span := telemetry.Start(ctx.Request().Context(), "agent-control-plane/server", telemetry.SpanResourceDownload)
+	defer span.End()
+	span.SetAttributes(attribute.String(telemetry.AttrOperation, "resource.download"))
+
+	resourceStream, err := gateway.OpenResourceForTransfer(reqCtx, ctx.Vars().Get("resource_id"), ownerUserID(ctx))
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, httpTelemetryStatusValue(err)))
 		return err
 	}
+	ref := resourceStream.Record().GetRef()
+	span.SetAttributes(
+		attribute.String(telemetry.AttrResourceAuthorityServiceID, ref.GetAuthorityServiceId()),
+		attribute.String(telemetry.AttrResourceMimeType, ref.GetMimeType()),
+		attribute.Int64(telemetry.AttrResourceSizeBytes, ref.GetSizeBytes()),
+	)
 	first, err := resourceStream.Recv()
 	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, httpTelemetryStatusValue(err)))
 		return err
 	}
-	setDownloadHeaders(ctx, resourceStream.Record().GetRef())
+	setDownloadHeaders(ctx, ref)
 	if len(first.GetData()) > 0 {
 		if _, err := ctx.Response().Write(first.GetData()); err != nil {
+			telemetry.RecordError(span, err)
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 			return err
 		}
 	}
 	for {
 		chunk, err := resourceStream.Recv()
 		if err == io.EOF {
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
 			return nil
 		}
 		if err != nil {
+			telemetry.RecordError(span, err)
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, httpTelemetryStatusValue(err)))
 			return err
 		}
 		if len(chunk.GetData()) == 0 {
 			continue
 		}
 		if _, err := ctx.Response().Write(chunk.GetData()); err != nil {
+			telemetry.RecordError(span, err)
+			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 			return err
 		}
+	}
+}
+
+func httpTelemetryStatusValue(err error) string {
+	switch status.Code(err) {
+	case codes.OK:
+		return telemetry.StatusOK
+	case codes.InvalidArgument:
+		return telemetry.StatusInvalid
+	case codes.PermissionDenied:
+		return telemetry.StatusDenied
+	default:
+		return telemetry.StatusError
 	}
 }
 
