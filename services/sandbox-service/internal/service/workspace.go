@@ -5,10 +5,9 @@ import (
 	"errors"
 	"time"
 
-	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
-	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
@@ -20,12 +19,12 @@ type WorkspaceService struct {
 	sandboxv1.UnimplementedWorkspaceHostServiceServer
 
 	serviceID string
-	profiles  *descriptor.Source
+	profiles  profiledomain.Registry
 	store     workspacedomain.Store
 	backing   workspacestore.Store
 }
 
-func NewWorkspaceService(serviceID string, profiles *descriptor.Source, store workspacedomain.Store, backing workspacestore.Store) *WorkspaceService {
+func NewWorkspaceService(serviceID string, profiles profiledomain.Registry, store workspacedomain.Store, backing workspacestore.Store) *WorkspaceService {
 	return &WorkspaceService{
 		serviceID: serviceID,
 		profiles:  profiles,
@@ -43,7 +42,7 @@ func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *sandb
 	workspaceID := workspacedomain.NewID()
 	backing, err := s.backing.CreateBackingWorkspace(ctx, workspacestore.CreateBackingWorkspaceRequest{
 		WorkspaceID:      workspaceID,
-		SandboxProfileID: profile.GetId(),
+		SandboxProfileID: profile.ID,
 		DisplayName:      req.GetDisplayName(),
 		MetadataJSON:     req.GetMetadataJson(),
 	})
@@ -52,7 +51,7 @@ func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *sandb
 	}
 	workspace, err := s.store.Create(ctx, workspacedomain.Workspace{
 		ID:               workspaceID,
-		SandboxProfileID: profile.GetId(),
+		SandboxProfileID: profile.ID,
 		DisplayName:      req.GetDisplayName(),
 		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
 		StoreKind:        backing.StoreKind,
@@ -101,20 +100,29 @@ func (s *WorkspaceService) GetHostedWorkspaceState(ctx context.Context, req *san
 	}, nil
 }
 
-func (s *WorkspaceService) resolveProfile(profileID string) (*capabilityv1.SandboxProfile, error) {
+func (s *WorkspaceService) resolveProfile(profileID string) (*profiledomain.Profile, error) {
+	if s.profiles == nil {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox profile registry is unavailable")
+	}
 	if profileID == "" {
-		profile, ok := s.profiles.DefaultSandboxProfile()
-		if !ok {
+		profile, err := s.profiles.Default()
+		if errors.Is(err, profiledomain.ErrNoDefaultProfile) {
 			return nil, status.Error(codes.FailedPrecondition, "default sandbox profile is unavailable")
+		}
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "resolve default sandbox profile: %v", err)
 		}
 		return profile, nil
 	}
-	profile, ok := s.profiles.SandboxProfile(profileID)
-	if !ok {
+	profile, err := s.profiles.Get(profileID)
+	if errors.Is(err, profiledomain.ErrProfileNotFound) {
 		return nil, status.Errorf(codes.InvalidArgument, "unknown sandbox profile: %s", profileID)
 	}
-	if profile.GetStatus() == capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DISABLED {
+	if errors.Is(err, profiledomain.ErrProfileDisabled) {
 		return nil, status.Errorf(codes.FailedPrecondition, "sandbox profile is disabled: %s", profileID)
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "resolve sandbox profile: %v", err)
 	}
 	return profile, nil
 }

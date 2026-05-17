@@ -6,15 +6,18 @@ import (
 
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 )
 
 func TestDescribeCapabilities(t *testing.T) {
 	source := NewSource(Options{
-		ServiceID:           "sandbox.local.test",
-		Version:             "test",
-		HTTPAddr:            "sandbox-service:8081",
-		GRPCAddr:            "sandbox-service:9081",
-		LocalProcessEnabled: true,
+		ServiceID: "sandbox.local.test",
+		Version:   "test",
+		HTTPAddr:  "sandbox-service:8081",
+		GRPCAddr:  "sandbox-service:9081",
+		ProfileRegistry: profiledomain.NewMemoryRegistry([]*profiledomain.Profile{
+			localProcessProfile(),
+		}),
 	})
 	descriptor, err := source.DescribeCapabilities(context.Background())
 	if err != nil {
@@ -29,7 +32,7 @@ func TestDescribeCapabilities(t *testing.T) {
 	if descriptor.GetContract() != "acorn.sandbox" {
 		t.Fatalf("unexpected contract: %q", descriptor.GetContract())
 	}
-	if len(descriptor.GetSandboxProfiles()) != 2 {
+	if len(descriptor.GetSandboxProfiles()) != 1 {
 		t.Fatalf("unexpected profiles: %v", descriptor.GetSandboxProfiles())
 	}
 	if descriptor.GetAgentSurface().GetStatus() != capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
@@ -85,10 +88,11 @@ func TestDescribeCapabilities(t *testing.T) {
 
 func TestDescribeCapabilitiesWithoutLocalProcess(t *testing.T) {
 	source := NewSource(Options{
-		ServiceID: "sandbox.local.test",
-		Version:   "test",
-		HTTPAddr:  "sandbox-service:8081",
-		GRPCAddr:  "sandbox-service:9081",
+		ServiceID:       "sandbox.local.test",
+		Version:         "test",
+		HTTPAddr:        "sandbox-service:8081",
+		GRPCAddr:        "sandbox-service:9081",
+		ProfileRegistry: profiledomain.NewMemoryRegistry(nil),
 	})
 	descriptor, err := source.DescribeCapabilities(context.Background())
 	if err != nil {
@@ -119,7 +123,7 @@ func TestNewSourceFromConfigUsesServiceIDAndNameSeparately(t *testing.T) {
 			GRPC: conf.GRPC{AdvertiseAddr: "sandbox-service:9081"},
 		},
 	}
-	source := NewSourceFromConfig(cfg, "test")
+	source := NewSourceFromConfig(cfg, "test", profiledomain.NewMemoryRegistry(nil))
 	descriptor, err := source.DescribeCapabilities(context.Background())
 	if err != nil {
 		t.Fatalf("DescribeCapabilities returned error: %v", err)
@@ -129,6 +133,23 @@ func TestNewSourceFromConfigUsesServiceIDAndNameSeparately(t *testing.T) {
 	}
 	if descriptor.GetDisplayName() != "Sandbox Display Name" {
 		t.Fatalf("unexpected display name: %q", descriptor.GetDisplayName())
+	}
+}
+
+func localProcessProfile() *profiledomain.Profile {
+	return &profiledomain.Profile{
+		ID:             profiledomain.LocalProcessDevID,
+		DisplayName:    "Local Process Dev Backend",
+		Enabled:        true,
+		Default:        true,
+		IsolationClass: profiledomain.IsolationDevProcess,
+		BackendID:      profiledomain.LocalProcessDevID,
+		Capabilities: []profiledomain.Capability{
+			profiledomain.CapabilityWorkspaceView,
+			profiledomain.CapabilityWorkspaceResource,
+			profiledomain.CapabilityWorkspaceExec,
+		},
+		Metadata: map[string]string{"dev_only": "true"},
 	}
 }
 

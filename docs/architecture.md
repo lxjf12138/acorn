@@ -796,18 +796,26 @@ SandboxBackend Foundation
 WorkspaceExecService
 local-process-dev backend
 Control Plane workspace exec forwarding
+ProfileRegistry / Sandbox Profile Selection Cleanup
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: ProfileRegistry / Sandbox policy hardening
-  - Keep local-process-dev clearly marked as dev-only
-  - Prepare OS sandboxing, Docker, VM, or remote-agent backends
+PR 1: Control Plane SandboxPolicy
+  - Per-user or per-tenant default profile
+  - Allowed profile checks
+  - Placement policy foundation
 ```
 
 `local-process-dev` executes host processes for development and is not a strong
 multi-tenant security boundary.
+
+Sandbox profile selection now follows one rule: sandbox-service ProfileRegistry
+is the source of truth. The sandbox descriptor is generated from enabled
+profiles, Control Plane validates its configured default profile against that
+descriptor before creating a workspace, and exec is gated by the stored
+workspace profile's capabilities and backend id.
 
 ---
 

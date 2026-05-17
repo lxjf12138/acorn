@@ -2,10 +2,11 @@ package descriptor
 
 import (
 	"context"
+	"encoding/json"
 
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
-
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 )
 
 const (
@@ -14,13 +15,13 @@ const (
 )
 
 type Options struct {
-	ServiceID           string
-	DisplayName         string
-	Version             string
-	HTTPAddr            string
-	GRPCAddr            string
-	MCPEndpoint         string
-	LocalProcessEnabled bool
+	ServiceID       string
+	DisplayName     string
+	Version         string
+	HTTPAddr        string
+	GRPCAddr        string
+	MCPEndpoint     string
+	ProfileRegistry profiledomain.Registry
 }
 
 type Source struct {
@@ -31,14 +32,17 @@ func NewSource(opts Options) *Source {
 	return &Source{opts: opts.withDefaults()}
 }
 
-func NewSourceFromConfig(cfg *conf.Config, version string) *Source {
+func NewSourceFromConfig(cfg *conf.Config, version string, profiles profiledomain.Registry) *Source {
+	if profiles == nil {
+		profiles = profiledomain.NewRegistryFromConfig(cfg.Sandbox)
+	}
 	return NewSource(Options{
-		ServiceID:           cfg.Service.ID,
-		DisplayName:         cfg.Service.Name,
-		Version:             version,
-		HTTPAddr:            cfg.Server.HTTP.AdvertiseAddr,
-		GRPCAddr:            cfg.Server.GRPC.AdvertiseAddr,
-		LocalProcessEnabled: cfg.Sandbox.LocalProcess.Enabled,
+		ServiceID:       cfg.Service.ID,
+		DisplayName:     cfg.Service.Name,
+		Version:         version,
+		HTTPAddr:        cfg.Server.HTTP.AdvertiseAddr,
+		GRPCAddr:        cfg.Server.GRPC.AdvertiseAddr,
+		ProfileRegistry: profiles,
 	})
 }
 
@@ -50,22 +54,7 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 		"create_hosted_workspace",
 		"get_hosted_workspace",
 	}
-	profiles := []*capabilityv1.SandboxProfile{
-		{
-			Id:             "local-docker",
-			DisplayName:    "Local Docker Sandbox",
-			Implementation: "local-docker",
-			Isolation:      "container",
-			Os:             "linux",
-			Default:        false,
-			Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED,
-			Capabilities: []string{
-				"filesystem",
-				"exec",
-				"network_optional",
-			},
-		},
-	}
+	profiles := s.sandboxProfiles()
 	endpoints := []*capabilityv1.EndpointDescriptor{
 		{
 			Name:      "control-http",
@@ -131,24 +120,8 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 			Status:    capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
 		},
 	}
-	if s.opts.LocalProcessEnabled {
+	if s.hasEnabledProfileCapability(profiledomain.CapabilityWorkspaceExec) {
 		controlFeatures = append(controlFeatures, "exec_workspace_command")
-		profiles = append([]*capabilityv1.SandboxProfile{
-			{
-				Id:             "local-process-dev",
-				DisplayName:    "Local Process Dev Backend",
-				Implementation: "local-process-dev",
-				Isolation:      "process",
-				Os:             "host",
-				Default:        true,
-				Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
-				Capabilities: []string{
-					"filesystem",
-					"exec",
-					"dev_only",
-				},
-			},
-		}, profiles...)
 		endpoints = append(endpoints, &capabilityv1.EndpointDescriptor{
 			Name:      "workspace-exec-grpc",
 			Surface:   "control",
@@ -230,29 +203,77 @@ func (s *Source) DescribeCapabilities(context.Context) (*capabilityv1.Capability
 }
 
 func (s *Source) SandboxProfile(id string) (*capabilityv1.SandboxProfile, bool) {
-	descriptor, err := s.DescribeCapabilities(context.Background())
+	if s.opts.ProfileRegistry == nil {
+		return nil, false
+	}
+	p, err := s.opts.ProfileRegistry.Get(id)
 	if err != nil {
 		return nil, false
 	}
-	for _, profile := range descriptor.GetSandboxProfiles() {
-		if profile.GetId() == id {
-			return profile, true
-		}
-	}
-	return nil, false
+	return toSandboxProfileDescriptor(p), true
 }
 
 func (s *Source) DefaultSandboxProfile() (*capabilityv1.SandboxProfile, bool) {
-	descriptor, err := s.DescribeCapabilities(context.Background())
+	if s.opts.ProfileRegistry == nil {
+		return nil, false
+	}
+	p, err := s.opts.ProfileRegistry.Default()
 	if err != nil {
 		return nil, false
 	}
-	for _, profile := range descriptor.GetSandboxProfiles() {
-		if profile.GetDefault() {
-			return profile, true
-		}
+	return toSandboxProfileDescriptor(p), true
+}
+
+func (s *Source) sandboxProfiles() []*capabilityv1.SandboxProfile {
+	if s.opts.ProfileRegistry == nil {
+		return nil
 	}
-	return nil, false
+	profiles := s.opts.ProfileRegistry.ListEnabled()
+	out := make([]*capabilityv1.SandboxProfile, 0, len(profiles))
+	for _, p := range profiles {
+		out = append(out, toSandboxProfileDescriptor(p))
+	}
+	return out
+}
+
+func (s *Source) hasEnabledProfileCapability(capability profiledomain.Capability) bool {
+	return s.opts.ProfileRegistry != nil && s.opts.ProfileRegistry.AnyEnabledHasCapability(capability)
+}
+
+func toSandboxProfileDescriptor(p *profiledomain.Profile) *capabilityv1.SandboxProfile {
+	return &capabilityv1.SandboxProfile{
+		Id:             p.ID,
+		DisplayName:    p.DisplayName,
+		Implementation: p.BackendID,
+		Isolation:      string(p.IsolationClass),
+		Os:             "host",
+		Default:        p.Default,
+		Status:         capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+		Capabilities:   profileCapabilities(p),
+		MetadataJson:   profileMetadataJSON(p),
+	}
+}
+
+func profileCapabilities(p *profiledomain.Profile) []string {
+	out := make([]string, 0, len(p.Capabilities))
+	for _, capability := range p.Capabilities {
+		out = append(out, string(capability))
+	}
+	if p.Metadata["dev_only"] == "true" {
+		out = append(out, "dev_only")
+	}
+	return out
+}
+
+func profileMetadataJSON(p *profiledomain.Profile) []byte {
+	if p.Metadata == nil {
+		return nil
+	}
+	data, err := json.Marshal(p.Metadata)
+	if err != nil {
+		return nil
+	}
+	return data
 }
 
 func (o Options) withDefaults() Options {

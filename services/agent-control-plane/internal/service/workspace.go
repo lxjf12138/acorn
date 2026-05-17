@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
 	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
@@ -27,7 +28,10 @@ type WorkspaceService struct {
 	resourceGateway  *ResourceGatewayService
 	sandboxServiceID string
 	sandboxProfileID string
+	profileCache     SandboxProfileCache
 }
+
+const sandboxProfileCacheTTL = 30 * time.Second
 
 type SessionWorkspaceState struct {
 	Record *workspacev1.WorkspaceRecord    `json:"workspace"`
@@ -84,6 +88,9 @@ func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID
 		return toProto(existing), nil
 	}
 
+	if err := s.ensureSandboxProfileAvailable(ctx, s.sandboxProfileID); err != nil {
+		return nil, err
+	}
 	hosted, err := s.sandboxClient.CreateHostedWorkspace(ctx, sessionID, ownerUserID, s.sandboxProfileID, fmt.Sprintf("workspace for session %s", sessionID))
 	if err != nil {
 		return nil, err
@@ -104,6 +111,66 @@ func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID
 		return nil, err
 	}
 	return toProto(record), nil
+}
+
+type SandboxProfileCache struct {
+	mu        sync.RWMutex
+	expiresAt time.Time
+	profiles  map[string]struct{}
+}
+
+func (s *WorkspaceService) ensureSandboxProfileAvailable(ctx context.Context, profileID string) error {
+	if profileID == "" {
+		return status.Error(codes.FailedPrecondition, "sandbox default profile is not configured")
+	}
+	if s.profileCache.Has(profileID, time.Now()) {
+		return nil
+	}
+	descriptor, err := s.sandboxClient.GetCapabilityDescriptor(ctx)
+	if err != nil {
+		return err
+	}
+	profiles := availableSandboxProfiles(descriptor)
+	s.profileCache.Store(profiles, time.Now().Add(sandboxProfileCacheTTL))
+	if _, ok := profiles[profileID]; !ok {
+		return status.Errorf(codes.FailedPrecondition, "sandbox profile unavailable: %s", profileID)
+	}
+	return nil
+}
+
+func (c *SandboxProfileCache) Has(profileID string, now time.Time) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.profiles == nil || now.After(c.expiresAt) {
+		return false
+	}
+	_, ok := c.profiles[profileID]
+	return ok
+}
+
+func (c *SandboxProfileCache) Store(profiles map[string]struct{}, expiresAt time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.profiles = make(map[string]struct{}, len(profiles))
+	for profileID := range profiles {
+		c.profiles[profileID] = struct{}{}
+	}
+	c.expiresAt = expiresAt
+}
+
+func availableSandboxProfiles(descriptor *capabilityv1.CapabilityDescriptor) map[string]struct{} {
+	out := map[string]struct{}{}
+	for _, profile := range descriptor.GetSandboxProfiles() {
+		if profile.GetId() == "" {
+			continue
+		}
+		if profile.GetStatus() == capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DISABLED ||
+			profile.GetStatus() == capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED {
+			continue
+		}
+		out[profile.GetId()] = struct{}{}
+	}
+	return out
 }
 
 func validateHostedWorkspace(hosted *sandboxv1.HostedWorkspace, expectedServiceID string, expectedProfileID string) error {

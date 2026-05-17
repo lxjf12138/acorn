@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
@@ -33,12 +34,26 @@ type fakeWorkspaceHostClient struct {
 	importErr       error
 	execResp        *sandboxv1.ExecWorkspaceCommandResponse
 	execErr         error
+	descriptor      *capabilityv1.CapabilityDescriptor
+	descriptorErr   error
+	descriptorCalls int
 	lastListInput   sandboxclient.ListWorkspaceDirInput
 	lastExportInput sandboxclient.ExportWorkspacePathInput
 	lastImportInput sandboxclient.ImportResourceInput
 	lastExecInput   sandboxclient.ExecWorkspaceCommandInput
 	lastImportBody  string
 	useHosted       bool
+}
+
+func (f *fakeWorkspaceHostClient) GetCapabilityDescriptor(context.Context) (*capabilityv1.CapabilityDescriptor, error) {
+	f.descriptorCalls++
+	if f.descriptorErr != nil {
+		return nil, f.descriptorErr
+	}
+	if f.descriptor != nil {
+		return f.descriptor, nil
+	}
+	return sandboxDescriptor("local-process"), nil
 }
 
 func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*sandboxv1.HostedWorkspace, error) {
@@ -188,6 +203,18 @@ func (f *fakeWorkspaceHostClient) ExecWorkspaceCommand(_ context.Context, input 
 
 func (f *fakeWorkspaceHostClient) Close() error { return nil }
 
+func sandboxDescriptor(profileIDs ...string) *capabilityv1.CapabilityDescriptor {
+	profiles := make([]*capabilityv1.SandboxProfile, 0, len(profileIDs))
+	for _, profileID := range profileIDs {
+		profiles = append(profiles, &capabilityv1.SandboxProfile{
+			Id:      profileID,
+			Status:  capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_EXPERIMENTAL,
+			Default: len(profiles) == 0,
+		})
+	}
+	return &capabilityv1.CapabilityDescriptor{SandboxProfiles: profiles}
+}
+
 func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
 	workspaceStore := workspacedomain.NewMemoryStore()
 	client := &fakeWorkspaceHostClient{}
@@ -304,6 +331,68 @@ func TestWorkspaceServiceCreateSessionWorkspace(t *testing.T) {
 	}
 	if client.created != 1 {
 		t.Fatalf("unexpected hosted workspace create count: %d", client.created)
+	}
+}
+
+func TestWorkspaceServiceCreateSessionWorkspaceValidatesProfileAvailability(t *testing.T) {
+	tests := []struct {
+		name       string
+		client     *fakeWorkspaceHostClient
+		wantCode   codes.Code
+		wantCreate int
+	}{
+		{
+			name:       "available",
+			client:     &fakeWorkspaceHostClient{descriptor: sandboxDescriptor("local-process")},
+			wantCreate: 1,
+		},
+		{
+			name:     "missing profile",
+			client:   &fakeWorkspaceHostClient{descriptor: sandboxDescriptor("other-profile")},
+			wantCode: codes.FailedPrecondition,
+		},
+		{
+			name:     "descriptor error",
+			client:   &fakeWorkspaceHostClient{descriptorErr: status.Error(codes.Unavailable, "sandbox unavailable")},
+			wantCode: codes.Unavailable,
+		},
+		{
+			name: "declared profile ignored",
+			client: &fakeWorkspaceHostClient{descriptor: &capabilityv1.CapabilityDescriptor{SandboxProfiles: []*capabilityv1.SandboxProfile{
+				{Id: "local-process", Status: capabilityv1.ImplementationStatus_IMPLEMENTATION_STATUS_DECLARED},
+			}}},
+			wantCode: codes.FailedPrecondition,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			service := NewWorkspaceService(workspacedomain.NewMemoryStore(), tt.client, "sandbox-service", "local-process")
+			_, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1")
+			if tt.wantCode == codes.OK {
+				if err != nil {
+					t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+				}
+			} else if status.Code(err) != tt.wantCode {
+				t.Fatalf("expected %s, got %v", tt.wantCode, err)
+			}
+			if tt.client.created != tt.wantCreate {
+				t.Fatalf("unexpected create count: %d", tt.client.created)
+			}
+		})
+	}
+}
+
+func TestWorkspaceServiceCreateSessionWorkspaceProfileCache(t *testing.T) {
+	client := &fakeWorkspaceHostClient{descriptor: sandboxDescriptor("local-process")}
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-2", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	if client.descriptorCalls != 1 {
+		t.Fatalf("expected one descriptor call, got %d", client.descriptorCalls)
 	}
 }
 

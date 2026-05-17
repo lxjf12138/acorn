@@ -472,10 +472,17 @@ infra/localfs
 service/attachment
   resolves canonical HostedWorkspace metadata
   asks the mounter for a backend-specific attachment
+
+domain/profile
+  ProfileRegistry is the internal source of truth for enabled sandbox profiles
+  local-process-dev is present only when sandbox.local_process.enabled = true
+  profiles declare workspace capabilities, attachment kind, backend id, and isolation class
 ```
 
-This does not add an Exec Surface or SandboxBackend yet. It only keeps the
-future execution path from depending directly on LocalFS root paths.
+CapabilityDescriptor sandbox_profiles are generated from ProfileRegistry.
+CreateHostedWorkspace accepts only enabled registry profiles. WorkspaceExecService
+checks that the workspace profile supports workspace exec and is backed by the
+configured backend before running a command.
 
 ---
 
@@ -651,17 +658,46 @@ It is not a strong multi-tenant security boundary.
 OS sandboxing, Docker, VM, and remote-agent backends are future profiles.
 ```
 
+### PR 7: ProfileRegistry / Sandbox Profile Selection Cleanup
+
+Goal:
+
+```text
+Make sandbox profile availability and selection explicit.
+```
+
+Status:
+
+```text
+Implemented.
+```
+
+Rules:
+
+```text
+ProfileRegistry is the sandbox-service source of truth.
+CapabilityDescriptor sandbox_profiles are generated from enabled profiles.
+local-process-dev appears only when sandbox.local_process.enabled = true.
+CreateHostedWorkspace rejects unknown or disabled profiles.
+WorkspaceExecService rejects profiles without workspace_exec capability.
+Control Plane checks its default profile against the sandbox descriptor before
+creating a workspace.
+```
+
+This is not a per-user or per-tenant policy layer. It only prevents the Control
+Plane and sandbox-service from selecting profiles that the sandbox-service does
+not currently expose as available.
+
 ---
 
 ## 11. Non-Goals For The Next PR
 
-The next PR should focus on profile/backend policy hardening and execution
-operational semantics.
+The next PR can focus on Control Plane sandbox policy or execution operational
+semantics.
 Do not include:
 
 ```text
 Docker / VM / remote agent
-Profile registry config rewrite
 WorkspaceStore redesign
 Large config schema migration
 ```

@@ -6,6 +6,7 @@ import (
 	"io"
 	"time"
 
+	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
 	commonv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/common/v1"
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
@@ -15,6 +16,7 @@ import (
 )
 
 type WorkspaceHostClient interface {
+	GetCapabilityDescriptor(ctx context.Context) (*capabilityv1.CapabilityDescriptor, error)
 	CreateHostedWorkspace(ctx context.Context, sessionID string, ownerUserID string, sandboxProfileID string, displayName string) (*sandboxv1.HostedWorkspace, error)
 	GetHostedWorkspace(ctx context.Context, serviceWorkspaceID string) (*sandboxv1.HostedWorkspace, error)
 	GetHostedWorkspaceState(ctx context.Context, sessionID string, ownerUserID string, serviceWorkspaceID string) (*sandboxv1.HostedWorkspaceState, error)
@@ -77,12 +79,13 @@ type ExecWorkspaceCommandInput struct {
 }
 
 type GRPCWorkspaceHostClient struct {
-	serviceID string
-	conn      *grpc.ClientConn
-	client    sandboxv1.WorkspaceHostServiceClient
-	view      sandboxv1.WorkspaceViewServiceClient
-	transfer  sandboxv1.WorkspaceTransferServiceClient
-	exec      sandboxv1.WorkspaceExecServiceClient
+	serviceID  string
+	conn       *grpc.ClientConn
+	descriptor capabilityv1.CapabilityDescriptorServiceClient
+	client     sandboxv1.WorkspaceHostServiceClient
+	view       sandboxv1.WorkspaceViewServiceClient
+	transfer   sandboxv1.WorkspaceTransferServiceClient
+	exec       sandboxv1.WorkspaceExecServiceClient
 }
 
 func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHostClient, error) {
@@ -91,13 +94,22 @@ func NewGRPCWorkspaceHostClient(serviceID string, addr string) (*GRPCWorkspaceHo
 		return nil, fmt.Errorf("create sandbox workspace client: %w", err)
 	}
 	return &GRPCWorkspaceHostClient{
-		serviceID: serviceID,
-		conn:      conn,
-		client:    sandboxv1.NewWorkspaceHostServiceClient(conn),
-		view:      sandboxv1.NewWorkspaceViewServiceClient(conn),
-		transfer:  sandboxv1.NewWorkspaceTransferServiceClient(conn),
-		exec:      sandboxv1.NewWorkspaceExecServiceClient(conn),
+		serviceID:  serviceID,
+		conn:       conn,
+		descriptor: capabilityv1.NewCapabilityDescriptorServiceClient(conn),
+		client:     sandboxv1.NewWorkspaceHostServiceClient(conn),
+		view:       sandboxv1.NewWorkspaceViewServiceClient(conn),
+		transfer:   sandboxv1.NewWorkspaceTransferServiceClient(conn),
+		exec:       sandboxv1.NewWorkspaceExecServiceClient(conn),
 	}, nil
+}
+
+func (c *GRPCWorkspaceHostClient) GetCapabilityDescriptor(ctx context.Context) (*capabilityv1.CapabilityDescriptor, error) {
+	resp, err := c.descriptor.GetCapabilityDescriptor(ctx, &capabilityv1.GetCapabilityDescriptorRequest{})
+	if err != nil {
+		return nil, err
+	}
+	return resp.GetCapabilityDescriptor(), nil
 }
 
 func (c *GRPCWorkspaceHostClient) CreateHostedWorkspace(ctx context.Context, sessionID string, ownerUserID string, sandboxProfileID string, displayName string) (*sandboxv1.HostedWorkspace, error) {

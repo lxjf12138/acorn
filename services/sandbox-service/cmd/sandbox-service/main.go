@@ -12,6 +12,7 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/conf"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localfs"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localprocess"
@@ -41,7 +42,8 @@ func main() {
 	}, cfg.Log.Level)
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
-	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version)
+	profileRegistry := profiledomain.NewRegistryFromConfig(cfg.Sandbox)
+	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version, profileRegistry)
 	descriptorService := service.NewDescriptorService(descriptorSource)
 	workspaceStore := workspacedomain.NewMemoryStore()
 	backingStore, err := localfs.NewWorkspaceStore(localfs.Config{BaseDir: cfg.Sandbox.WorkspaceRoot})
@@ -53,11 +55,11 @@ func main() {
 		panic(err)
 	}
 	exportStore := exporteddomain.NewMemoryStore()
-	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore, backingStore)
+	workspaceService := service.NewWorkspaceService(cfg.Service.ID, profileRegistry, workspaceStore, backingStore)
 	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
 	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore)
 	var execService *service.WorkspaceExecService
-	if cfg.Sandbox.LocalProcess.Enabled {
+	if profileRegistry.AnyEnabledHasCapability(profiledomain.CapabilityWorkspaceExec) {
 		attachmentService := service.NewWorkspaceAttachmentService(workspaceStore, backingStore)
 		localProcessBackend := localprocess.NewBackend(localprocess.Config{
 			ID:             "local-process-dev",
@@ -66,7 +68,7 @@ func main() {
 			MaxStdoutBytes: cfg.Sandbox.LocalProcess.MaxStdoutBytes,
 			MaxStderrBytes: cfg.Sandbox.LocalProcess.MaxStderrBytes,
 		})
-		execService = service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, attachmentService, localProcessBackend)
+		execService = service.NewWorkspaceExecService(cfg.Service.ID, workspaceStore, profileRegistry, attachmentService, localProcessBackend)
 	}
 	resourceContentService := service.NewResourceContentService(cfg.Service.ID, exportStore, blobStore)
 

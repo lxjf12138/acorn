@@ -10,6 +10,7 @@ import (
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/attachment"
 	backenddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/backend"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -39,7 +40,7 @@ func TestWorkspaceExecServiceExecWorkspaceCommand(t *testing.T) {
 			ErrorMessage:    "exit status 3",
 		},
 	}
-	service := NewWorkspaceExecService("sandbox-service", store, attachmentSvc, backend)
+	service := NewWorkspaceExecService("sandbox-service", store, testExecProfileRegistry("fake-backend", true), attachmentSvc, backend)
 
 	resp, err := service.ExecWorkspaceCommand(context.Background(), &sandboxv1.ExecWorkspaceCommandRequest{
 		ServiceWorkspaceId: workspace.ID,
@@ -89,28 +90,52 @@ func TestWorkspaceExecServiceErrors(t *testing.T) {
 		t.Fatalf("Create workspace returned error: %v", err)
 	}
 	tests := []struct {
-		name    string
-		req     *sandboxv1.ExecWorkspaceCommandRequest
-		backend *fakeSandboxBackend
-		code    codes.Code
+		name     string
+		req      *sandboxv1.ExecWorkspaceCommandRequest
+		backend  *fakeSandboxBackend
+		profiles profiledomain.Registry
+		code     codes.Code
 	}{
 		{name: "missing workspace id", req: &sandboxv1.ExecWorkspaceCommandRequest{Command: "go"}, backend: &fakeSandboxBackend{}, code: codes.InvalidArgument},
 		{name: "missing command", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service"}, backend: &fakeSandboxBackend{}, code: codes.InvalidArgument},
 		{name: "missing workspace", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "missing", Command: "go"}, backend: &fakeSandboxBackend{}, code: codes.NotFound},
-		{name: "backend timeout", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: backenddomain.ErrExecTimeout}, code: codes.DeadlineExceeded},
-		{name: "start failure", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: backenddomain.ErrExecStart}, code: codes.FailedPrecondition},
-		{name: "invalid cwd", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: backenddomain.ErrInvalidCWD}, code: codes.InvalidArgument},
-		{name: "unknown backend", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: errors.New("boom")}, code: codes.Internal},
+		{name: "backend timeout", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: backenddomain.ErrExecTimeout}, profiles: testExecProfileRegistry("fake-backend", true), code: codes.DeadlineExceeded},
+		{name: "start failure", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: backenddomain.ErrExecStart}, profiles: testExecProfileRegistry("fake-backend", true), code: codes.FailedPrecondition},
+		{name: "invalid cwd", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: backenddomain.ErrInvalidCWD}, profiles: testExecProfileRegistry("fake-backend", true), code: codes.InvalidArgument},
+		{name: "unknown backend", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{execErr: errors.New("boom")}, profiles: testExecProfileRegistry("fake-backend", true), code: codes.Internal},
+		{name: "profile without exec capability", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{}, profiles: testExecProfileRegistry("fake-backend", false), code: codes.FailedPrecondition},
+		{name: "profile backed by different backend", req: &sandboxv1.ExecWorkspaceCommandRequest{ServiceWorkspaceId: "ws-service", Command: "go"}, backend: &fakeSandboxBackend{}, profiles: testExecProfileRegistry("other-backend", true), code: codes.FailedPrecondition},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			service := NewWorkspaceExecService("sandbox-service", store, &fakeAttachmentPreparer{att: &attachment.WorkspaceAttachment{Kind: attachment.KindLocalPath}}, tt.backend)
+			profiles := tt.profiles
+			if profiles == nil {
+				profiles = testExecProfileRegistry("fake-backend", true)
+			}
+			service := NewWorkspaceExecService("sandbox-service", store, profiles, &fakeAttachmentPreparer{att: &attachment.WorkspaceAttachment{Kind: attachment.KindLocalPath}}, tt.backend)
 			_, err := service.ExecWorkspaceCommand(context.Background(), tt.req)
 			if status.Code(err) != tt.code {
 				t.Fatalf("expected %s, got %v", tt.code, err)
 			}
 		})
 	}
+}
+
+func testExecProfileRegistry(backendID string, exec bool) profiledomain.Registry {
+	capabilities := []profiledomain.Capability{profiledomain.CapabilityWorkspaceView}
+	if exec {
+		capabilities = append(capabilities, profiledomain.CapabilityWorkspaceExec)
+	}
+	return profiledomain.NewMemoryRegistry([]*profiledomain.Profile{
+		{
+			ID:             profiledomain.LocalProcessDevID,
+			Enabled:        true,
+			Default:        true,
+			IsolationClass: profiledomain.IsolationDevProcess,
+			BackendID:      backendID,
+			Capabilities:   capabilities,
+		},
+	})
 }
 
 type fakeAttachmentPreparer struct {

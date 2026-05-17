@@ -9,6 +9,7 @@ import (
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/attachment"
 	backenddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/backend"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,14 +24,16 @@ type WorkspaceExecService struct {
 
 	serviceID         string
 	workspaceStore    workspacedomain.Store
+	profiles          profiledomain.Registry
 	attachmentService workspaceAttachmentPreparer
 	backend           backenddomain.SandboxBackend
 }
 
-func NewWorkspaceExecService(serviceID string, workspaceStore workspacedomain.Store, attachmentService workspaceAttachmentPreparer, backend backenddomain.SandboxBackend) *WorkspaceExecService {
+func NewWorkspaceExecService(serviceID string, workspaceStore workspacedomain.Store, profiles profiledomain.Registry, attachmentService workspaceAttachmentPreparer, backend backenddomain.SandboxBackend) *WorkspaceExecService {
 	return &WorkspaceExecService{
 		serviceID:         serviceID,
 		workspaceStore:    workspaceStore,
+		profiles:          profiles,
 		attachmentService: attachmentService,
 		backend:           backend,
 	}
@@ -53,6 +56,10 @@ func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sa
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "get hosted workspace: %v", err)
 	}
+	profile, err := s.execProfile(workspace.SandboxProfileID)
+	if err != nil {
+		return nil, err
+	}
 	att, err := s.attachmentService.PrepareLocalProcessAttachment(ctx, workspace.ID, false)
 	if err != nil {
 		return nil, err
@@ -60,7 +67,7 @@ func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sa
 	lease, err := s.backend.Acquire(ctx, backenddomain.AcquireRequest{
 		WorkspaceID: workspace.ID,
 		Attachment:  att,
-		ProfileID:   workspace.SandboxProfileID,
+		ProfileID:   profile.ID,
 	})
 	if err != nil {
 		return nil, mapBackendError(err)
@@ -97,6 +104,29 @@ func (s *WorkspaceExecService) ExecWorkspaceCommand(ctx context.Context, req *sa
 		StderrTruncated: result.StderrTruncated,
 		ErrorMessage:    result.ErrorMessage,
 	}, nil
+}
+
+func (s *WorkspaceExecService) execProfile(profileID string) (*profiledomain.Profile, error) {
+	if s.profiles == nil {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox profile registry is unavailable")
+	}
+	profile, err := s.profiles.Get(profileID)
+	if errors.Is(err, profiledomain.ErrProfileNotFound) {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox profile is unavailable")
+	}
+	if errors.Is(err, profiledomain.ErrProfileDisabled) {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox profile is disabled")
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "resolve sandbox profile: %v", err)
+	}
+	if !profile.HasCapability(profiledomain.CapabilityWorkspaceExec) {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox profile does not support workspace exec")
+	}
+	if s.backend != nil && profile.BackendID != "" && profile.BackendID != s.backend.ID() {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox profile is not backed by configured backend")
+	}
+	return profile, nil
 }
 
 func cloneStringMap(values map[string]string) map[string]string {

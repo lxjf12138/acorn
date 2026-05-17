@@ -6,7 +6,7 @@ import (
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
-	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
+	profiledomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/profile"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
@@ -34,19 +34,19 @@ func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
 func TestWorkspaceServiceCreateHostedWorkspaceExplicitProfile(t *testing.T) {
 	service, backing := newTestWorkspaceService(t)
 	resp, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
-		SandboxProfileId: "local-docker",
-		DisplayName:      "docker workspace",
+		SandboxProfileId: "local-process-dev",
+		DisplayName:      "dev workspace",
 	})
 	if err != nil {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
 	}
-	if got := resp.GetWorkspace().GetRef().GetSandboxProfileId(); got != "local-docker" {
+	if got := resp.GetWorkspace().GetRef().GetSandboxProfileId(); got != "local-process-dev" {
 		t.Fatalf("unexpected profile: %q", got)
 	}
-	if got := resp.GetWorkspace().GetDisplayName(); got != "docker workspace" {
+	if got := resp.GetWorkspace().GetDisplayName(); got != "dev workspace" {
 		t.Fatalf("unexpected display name: %q", got)
 	}
-	if backing.lastCreate.SandboxProfileID != "local-docker" || backing.lastCreate.DisplayName != "docker workspace" {
+	if backing.lastCreate.SandboxProfileID != "local-process-dev" || backing.lastCreate.DisplayName != "dev workspace" {
 		t.Fatalf("unexpected backing create request: %+v", backing.lastCreate)
 	}
 }
@@ -58,6 +58,34 @@ func TestWorkspaceServiceCreateHostedWorkspaceUnknownProfile(t *testing.T) {
 	})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceCreateHostedWorkspaceNoDefaultProfile(t *testing.T) {
+	service := NewWorkspaceService(
+		"sandbox-service-id",
+		profiledomain.NewMemoryRegistry(nil),
+		workspacedomain.NewMemoryStore(),
+		&fakeBackingStore{},
+	)
+	_, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestWorkspaceServiceCreateHostedWorkspaceDisabledProfile(t *testing.T) {
+	service := NewWorkspaceService(
+		"sandbox-service-id",
+		profiledomain.NewMemoryRegistry([]*profiledomain.Profile{{ID: "disabled", Enabled: false}}),
+		workspacedomain.NewMemoryStore(),
+		&fakeBackingStore{},
+	)
+	_, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
+		SandboxProfileId: "disabled",
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
 	}
 }
 
@@ -155,8 +183,27 @@ func newTestWorkspaceService(t *testing.T) (*WorkspaceService, *fakeBackingStore
 	backing := &fakeBackingStore{}
 	return NewWorkspaceService(
 		"sandbox-service-id",
-		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id", LocalProcessEnabled: true}),
+		testProfileRegistry(),
 		workspacedomain.NewMemoryStore(),
 		backing,
 	), backing
+}
+
+func testProfileRegistry() profiledomain.Registry {
+	return profiledomain.NewMemoryRegistry([]*profiledomain.Profile{
+		{
+			ID:             profiledomain.LocalProcessDevID,
+			DisplayName:    "Local Process Dev Backend",
+			Enabled:        true,
+			Default:        true,
+			IsolationClass: profiledomain.IsolationDevProcess,
+			BackendID:      profiledomain.LocalProcessDevID,
+			Capabilities: []profiledomain.Capability{
+				profiledomain.CapabilityWorkspaceView,
+				profiledomain.CapabilityWorkspaceResource,
+				profiledomain.CapabilityWorkspaceExec,
+				profiledomain.CapabilityLocalProcessExec,
+			},
+		},
+	})
 }
