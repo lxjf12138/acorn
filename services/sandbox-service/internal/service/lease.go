@@ -34,6 +34,9 @@ func acquireWorkspaceLease(ctx context.Context, manager leasedomain.Manager, wor
 		mapped := mapWorkspaceLeaseError(err)
 		telemetry.RecordError(span, mapped)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		if errors.Is(err, leasedomain.ErrWorkspaceBusy) {
+			recordWorkspaceLeaseBusy(ctx, mode, reason)
+		}
 		return nil, mapped
 	}
 	span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))

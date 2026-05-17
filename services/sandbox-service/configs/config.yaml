@@ -34,6 +34,7 @@ observability:
   metrics:
     enabled: false
     exporter: noop
+    otlp_endpoint: ""
 
 log:
   level: info

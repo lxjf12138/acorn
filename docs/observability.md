@@ -178,6 +178,47 @@ content hash
 Prefer stable labels such as service name, operation, status code, profile id,
 backend kind, and exporter kind.
 
+## Implemented Metrics
+
+The current metrics layer records a small set of platform-level metrics:
+
+```text
+acorn.resource.transfer.total
+acorn.resource.transfer.bytes_total
+acorn.workspace.exec.total
+acorn.workspace.exec.duration_seconds
+acorn.workspace.lease.busy_total
+```
+
+Resource transfer metrics are recorded from the Control Plane user-facing
+operations:
+
+```text
+operation = upload | download | import | export
+status = ok | error | timeout | invalid | denied
+authority_service_id = logical ResourceRef authority service
+```
+
+Workspace exec metrics are also recorded from the Control Plane user-facing
+operation:
+
+```text
+status = ok | nonzero_exit | error | timeout | invalid | denied
+sandbox_profile_id = selected workspace sandbox profile
+```
+
+Workspace lease busy metrics are recorded inside sandbox-service:
+
+```text
+lease_mode = read | write
+lease_reason = fixed operation reason
+status = busy
+```
+
+Metrics do not use `workspace_id`, `resource_id`, `user_id`, `session_id`,
+paths, filenames, command arguments, content hashes, or environment values as
+labels.
+
 ## Event Surface Boundary
 
 OpenTelemetry traces explain system execution. Acorn Event Surface records will

@@ -393,17 +393,20 @@ func (s *WorkspaceService) PreviewSessionWorkspaceFile(ctx context.Context, sess
 func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessionID string, userID string, path string, resourceName string, mimeType string) (*resourcev1.ResourceRecord, error) {
 	ctx, span := telemetry.Start(ctx, "agent-control-plane/service", telemetry.SpanResourceExport)
 	defer span.End()
+	var resourceAuthorityServiceID string
 	span.SetAttributes(attribute.String(telemetry.AttrOperation, "resource.export"))
 	if s.resourceService == nil {
 		err := status.Error(codes.FailedPrecondition, "resource service is not configured")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "export", telemetry.StatusError, "", 0)
 		return nil, err
 	}
 	record, err := s.getWorkspaceRecordForView(ctx, sessionID)
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordResourceTransfer(ctx, "export", statusValue(err), "", 0)
 		return nil, err
 	}
 	span.SetAttributes(attribute.String(telemetry.AttrSandboxProfileID, record.CurrentHost.GetSandboxProfileId()))
@@ -419,11 +422,13 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordResourceTransfer(ctx, "export", statusValue(err), "", 0)
 		return nil, err
 	}
 	if err := validateWorkspacePathRef(resp.GetSource(), record.CurrentHost); err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "export", telemetry.StatusError, "", 0)
 		return nil, err
 	}
 	resourceRef := resp.GetResource()
@@ -431,12 +436,15 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 		err := status.Error(codes.Internal, "sandbox export returned empty resource ref")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "export", telemetry.StatusError, "", 0)
 		return nil, err
 	}
+	resourceAuthorityServiceID = resourceRef.GetAuthorityServiceId()
 	if resourceRef.GetAuthorityServiceId() != record.CurrentHost.GetServiceId() {
 		err := status.Errorf(codes.Internal, "sandbox export returned resource for unexpected authority_service_id: %s", resourceRef.GetAuthorityServiceId())
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "export", telemetry.StatusError, resourceAuthorityServiceID, 0)
 		return nil, err
 	}
 	registered, err := s.resourceService.RegisterRecord(ctx, &resourcev1.RegisterResourceRequest{
@@ -460,6 +468,7 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordResourceTransfer(ctx, "export", statusValue(err), resourceAuthorityServiceID, 0)
 		return nil, err
 	}
 	span.SetAttributes(
@@ -468,23 +477,27 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 		attribute.Int64(telemetry.AttrResourceSizeBytes, registered.GetRef().GetSizeBytes()),
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
+	recordResourceTransfer(ctx, "export", telemetry.StatusOK, registered.GetRef().GetAuthorityServiceId(), registered.GetRef().GetSizeBytes())
 	return registered, nil
 }
 
 func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context, sessionID string, userID string, resourceID string, destinationPath string, conflictPolicy sandboxv1.ImportConflictPolicy) (*sandboxv1.ImportResourceToWorkspaceResponse, error) {
 	ctx, span := telemetry.Start(ctx, "agent-control-plane/service", telemetry.SpanResourceImport)
 	defer span.End()
+	var resourceAuthorityServiceID string
 	span.SetAttributes(attribute.String(telemetry.AttrOperation, "resource.import"))
 	if s.resourceGateway == nil {
 		err := status.Error(codes.FailedPrecondition, "resource gateway is not configured")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "import", telemetry.StatusError, "", 0)
 		return nil, err
 	}
 	record, err := s.getWorkspaceRecordForView(ctx, sessionID)
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordResourceTransfer(ctx, "import", statusValue(err), "", 0)
 		return nil, err
 	}
 	span.SetAttributes(attribute.String(telemetry.AttrSandboxProfileID, record.CurrentHost.GetSandboxProfileId()))
@@ -493,10 +506,12 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordResourceTransfer(ctx, "import", statusValue(err), "", 0)
 		return nil, err
 	}
 	resourceRecord := resourceStream.Record()
 	ref := resourceRecord.GetRef()
+	resourceAuthorityServiceID = ref.GetAuthorityServiceId()
 	if destinationPath == "" {
 		destinationPath = httpx.SafeFilename(ref.GetName(), ref.GetId())
 	}
@@ -511,11 +526,13 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordResourceTransfer(ctx, "import", statusValue(err), resourceAuthorityServiceID, 0)
 		return nil, err
 	}
 	if err := validateWorkspacePathRef(resp.GetPath(), record.CurrentHost); err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "import", telemetry.StatusError, resourceAuthorityServiceID, 0)
 		return nil, err
 	}
 	span.SetAttributes(
@@ -523,12 +540,15 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 		attribute.Int64(telemetry.AttrResourceSizeBytes, resp.GetSizeBytes()),
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
+	recordResourceTransfer(ctx, "import", telemetry.StatusOK, resourceAuthorityServiceID, resp.GetSizeBytes())
 	return resp, nil
 }
 
 func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, input ExecSessionWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
 	ctx, span := telemetry.Start(ctx, "agent-control-plane/workspace", telemetry.SpanWorkspaceExec)
 	defer span.End()
+	startedAt := time.Now()
+	var sandboxProfileID string
 	span.SetAttributes(
 		attribute.String(telemetry.AttrOperation, "workspace.exec"),
 		attribute.String(telemetry.AttrExecCommandName, telemetry.SafeCommandName(input.Command)),
@@ -538,20 +558,24 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		err := status.Error(codes.InvalidArgument, "command is required")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		recordWorkspaceExec(ctx, telemetry.StatusInvalid, sandboxProfileID, time.Since(startedAt))
 		return nil, err
 	}
 	record, err := s.getWorkspaceRecordForView(ctx, input.SessionID)
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
 		return nil, err
 	}
-	span.SetAttributes(attribute.String(telemetry.AttrSandboxProfileID, record.CurrentHost.GetSandboxProfileId()))
+	sandboxProfileID = record.CurrentHost.GetSandboxProfileId()
+	span.SetAttributes(attribute.String(telemetry.AttrSandboxProfileID, sandboxProfileID))
 	userID := userIDOrRecord(input.UserID, record.OwnerUserID)
 	if record.OwnerUserID != "" && userID != "" && record.OwnerUserID != userID {
 		err := status.Error(codes.PermissionDenied, "workspace owner mismatch")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusDenied))
+		recordWorkspaceExec(ctx, telemetry.StatusDenied, sandboxProfileID, time.Since(startedAt))
 		return nil, err
 	}
 	resp, err := s.sandboxClient.ExecWorkspaceCommand(ctx, sandboxclient.ExecWorkspaceCommandInput{
@@ -569,12 +593,18 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
 		return nil, err
 	}
 	if err := validateWorkspaceHostRef(resp.GetWorkspace(), record.CurrentHost); err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordWorkspaceExec(ctx, telemetry.StatusError, sandboxProfileID, time.Since(startedAt))
 		return nil, err
+	}
+	metricStatus := telemetry.StatusOK
+	if resp.GetExitCode() != 0 {
+		metricStatus = telemetry.StatusNonzeroExit
 	}
 	span.SetAttributes(
 		attribute.Int(telemetry.AttrExecExitCode, int(resp.GetExitCode())),
@@ -582,6 +612,7 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		attribute.Bool(telemetry.AttrExecStderrTruncated, resp.GetStderrTruncated()),
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
+	recordWorkspaceExec(ctx, metricStatus, sandboxProfileID, time.Since(startedAt))
 	return resp, nil
 }
 

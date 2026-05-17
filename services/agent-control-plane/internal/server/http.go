@@ -493,6 +493,7 @@ func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, httpTelemetryStatusValue(err)))
+		recordDownloadTransfer(reqCtx, httpTelemetryStatusValue(err), "", 0)
 		return err
 	}
 	ref := resourceStream.Record().GetRef()
@@ -505,13 +506,18 @@ func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService
 	if err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, httpTelemetryStatusValue(err)))
+		recordDownloadTransfer(reqCtx, httpTelemetryStatusValue(err), ref.GetAuthorityServiceId(), 0)
 		return err
 	}
+	var writtenBytes int64
 	setDownloadHeaders(ctx, ref)
 	if len(first.GetData()) > 0 {
-		if _, err := ctx.Response().Write(first.GetData()); err != nil {
+		n, err := ctx.Response().Write(first.GetData())
+		writtenBytes += int64(n)
+		if err != nil {
 			telemetry.RecordError(span, err)
 			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+			recordDownloadTransfer(reqCtx, telemetry.StatusError, ref.GetAuthorityServiceId(), 0)
 			return err
 		}
 	}
@@ -519,19 +525,24 @@ func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService
 		chunk, err := resourceStream.Recv()
 		if err == io.EOF {
 			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusOK))
+			recordDownloadTransfer(reqCtx, telemetry.StatusOK, ref.GetAuthorityServiceId(), writtenBytes)
 			return nil
 		}
 		if err != nil {
 			telemetry.RecordError(span, err)
 			span.SetAttributes(attribute.String(telemetry.AttrStatus, httpTelemetryStatusValue(err)))
+			recordDownloadTransfer(reqCtx, httpTelemetryStatusValue(err), ref.GetAuthorityServiceId(), 0)
 			return err
 		}
 		if len(chunk.GetData()) == 0 {
 			continue
 		}
-		if _, err := ctx.Response().Write(chunk.GetData()); err != nil {
+		n, err := ctx.Response().Write(chunk.GetData())
+		writtenBytes += int64(n)
+		if err != nil {
 			telemetry.RecordError(span, err)
 			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+			recordDownloadTransfer(reqCtx, telemetry.StatusError, ref.GetAuthorityServiceId(), 0)
 			return err
 		}
 	}

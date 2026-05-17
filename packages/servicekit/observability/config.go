@@ -16,8 +16,9 @@ type TracingConfig struct {
 }
 
 type MetricsConfig struct {
-	Enabled  bool   `json:"enabled" yaml:"enabled"`
-	Exporter string `json:"exporter" yaml:"exporter"`
+	Enabled      bool   `json:"enabled" yaml:"enabled"`
+	Exporter     string `json:"exporter" yaml:"exporter"`
+	OTLPEndpoint string `json:"otlp_endpoint" yaml:"otlp_endpoint"`
 }
 
 const (

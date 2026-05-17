@@ -61,12 +61,14 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		err := status.Error(codes.InvalidArgument, "user_id is required")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		recordResourceTransfer(ctx, "upload", telemetry.StatusInvalid, "", 0)
 		return nil, err
 	}
 	if input.Source == nil {
 		err := status.Error(codes.InvalidArgument, "upload source is required")
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
+		recordResourceTransfer(ctx, "upload", telemetry.StatusInvalid, "", 0)
 		return nil, err
 	}
 	resourceID := resourcedomain.NewRecordID()
@@ -82,11 +84,13 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		if _, ok := status.FromError(err); ok {
 			telemetry.RecordError(span, err)
 			span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+			recordResourceTransfer(ctx, "upload", statusValue(err), "", 0)
 			return nil, err
 		}
 		mapped := mapResourceBlobError(err)
 		telemetry.RecordError(span, mapped)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "upload", statusValue(mapped), "", 0)
 		return nil, mapped
 	}
 	record, err := s.resourceService.RegisterRecord(ctx, &resourcev1.RegisterResourceRequest{
@@ -112,6 +116,7 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		_ = s.blobStore.Delete(ctx, resourceID)
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
+		recordResourceTransfer(ctx, "upload", statusValue(err), "", 0)
 		return nil, err
 	}
 	span.SetAttributes(
@@ -119,6 +124,7 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		attribute.Int64(telemetry.AttrResourceSizeBytes, record.GetRef().GetSizeBytes()),
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
+	recordResourceTransfer(ctx, "upload", telemetry.StatusOK, record.GetRef().GetAuthorityServiceId(), record.GetRef().GetSizeBytes())
 	return record, nil
 }
 
