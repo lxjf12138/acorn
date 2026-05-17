@@ -790,16 +790,16 @@ Resource Download Gateway
 ImportResource to Workspace
 User Upload Gateway
 Control Plane local resource authority
+WorkspaceAttachment Foundation
+LocalFS local_path attachment for local_process
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: WorkspaceAttachment Foundation
-  - Prepare backend-specific workspace attachments
-
-PR 2: SandboxBackend + local-process-dev
+PR 1: SandboxBackend + local-process-dev
   - Execute inside existing HostedWorkspace
+  - Use WorkspaceAttachment instead of direct LocalFS root paths
   - Generated files remain WorkspacePathRef until export/download
 ```
 

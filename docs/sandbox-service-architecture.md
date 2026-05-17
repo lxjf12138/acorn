@@ -457,8 +457,25 @@ cloud-vm:
   Attachment = remote workspace id / guest path
 ```
 
-Do not introduce these packages before there is code that uses them. Keep the
-next PR focused on WorkspaceStore.
+Current internal foundation:
+
+```text
+domain/attachment
+  WorkspaceAttachment
+  WorkspaceMounter
+  local_process target
+
+infra/localfs
+  prepares local_path attachments for local_process targets
+  validates the resolved workspace root stays under the resolved localfs base
+
+service/attachment
+  resolves canonical HostedWorkspace metadata
+  asks the mounter for a backend-specific attachment
+```
+
+This does not add an Exec Surface or SandboxBackend yet. It only keeps the
+future execution path from depending directly on LocalFS root paths.
 
 ---
 
@@ -577,7 +594,31 @@ Status:
 Implemented.
 ```
 
-### PR 5: SandboxBackend and WorkspaceAttachment
+### PR 5: WorkspaceAttachment Foundation
+
+Goal:
+
+```text
+Prepare backend-specific workspace attachments without adding exec.
+```
+
+Status:
+
+```text
+Implemented internally.
+```
+
+Scope:
+
+```text
+Add domain/attachment
+LocalFS prepares local_path attachments for local_process targets
+WorkspaceAttachmentService resolves HostedWorkspace metadata before mounting
+No external proto changes
+No ExecService or SandboxBackend
+```
+
+### PR 6: SandboxBackend and local-process-dev
 
 Goal:
 
@@ -589,7 +630,7 @@ Execute inside a sandbox without coupling exec to local directories.
 
 ## 11. Non-Goals For The Next PR
 
-The next PR should focus on WorkspaceAttachment and SandboxBackend foundations.
+The next PR should focus on SandboxBackend and local-process-dev execution.
 Do not include:
 
 ```text
@@ -599,5 +640,6 @@ WorkspaceStore redesign
 Large config schema migration
 ```
 
-The next PR should prepare execution boundaries without changing workspace view
-behavior or resource upload/download/import flows.
+The next PR should use WorkspaceAttachment rather than reaching into LocalFS
+workspace roots directly. It should not change workspace view behavior or
+resource upload/download/import flows.
