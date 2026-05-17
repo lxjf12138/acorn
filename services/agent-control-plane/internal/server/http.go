@@ -47,7 +47,16 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		return ctx.JSON(nethttp.StatusOK, statusService.Version())
 	})
 	router.POST("/sessions/{session_id}/workspace", func(ctx khttp.Context) error {
-		record, err := workspaceService.CreateSessionWorkspace(ctx, ctx.Vars().Get("session_id"), ownerUserID(ctx))
+		req, err := readCreateSessionWorkspaceRequest(ctx)
+		if err != nil {
+			return err
+		}
+		record, err := workspaceService.CreateSessionWorkspaceWithInput(ctx, service.CreateSessionWorkspaceInput{
+			SessionID:          ctx.Vars().Get("session_id"),
+			TenantID:           req.TenantID,
+			UserID:             req.UserID,
+			RequestedProfileID: req.RequestedProfileID,
+		})
 		if err != nil {
 			return err
 		}
@@ -296,6 +305,35 @@ type exportWorkspacePathRequest struct {
 	ResourceName string `json:"resource_name"`
 	MimeType     string `json:"mime_type"`
 	UserID       string `json:"user_id"`
+}
+
+type createSessionWorkspaceRequest struct {
+	UserID             string `json:"user_id"`
+	TenantID           string `json:"tenant_id"`
+	RequestedProfileID string `json:"requested_profile_id"`
+}
+
+func readCreateSessionWorkspaceRequest(ctx khttp.Context) (createSessionWorkspaceRequest, error) {
+	var req createSessionWorkspaceRequest
+	body, err := io.ReadAll(ctx.Request().Body)
+	if err != nil {
+		return req, err
+	}
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &req); err != nil {
+			return req, status.Error(codes.InvalidArgument, "invalid create workspace JSON")
+		}
+	}
+	if req.UserID == "" {
+		req.UserID = ownerUserID(ctx)
+	}
+	if req.TenantID == "" {
+		req.TenantID = ctx.Query().Get("tenant_id")
+	}
+	if req.RequestedProfileID == "" {
+		req.RequestedProfileID = ctx.Query().Get("requested_profile_id")
+	}
+	return req, nil
 }
 
 type importResourceRequest struct {

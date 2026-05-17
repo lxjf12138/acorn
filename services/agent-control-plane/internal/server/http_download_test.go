@@ -322,6 +322,35 @@ func TestReadUploadResourceInput(t *testing.T) {
 	}
 }
 
+func TestReadCreateSessionWorkspaceRequest(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx := newDownloadTestContext("unused", "", recorder)
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace?tenant_id=t-query&requested_profile_id=profile-query", strings.NewReader(`{"user_id":"user-1","tenant_id":"tenant-a","requested_profile_id":"cloud-vm"}`))
+
+	req, err := readCreateSessionWorkspaceRequest(ctx)
+	if err != nil {
+		t.Fatalf("readCreateSessionWorkspaceRequest returned error: %v", err)
+	}
+	if req.UserID != "user-1" || req.TenantID != "tenant-a" || req.RequestedProfileID != "cloud-vm" {
+		t.Fatalf("unexpected request: %+v", req)
+	}
+}
+
+func TestReadCreateSessionWorkspaceRequestQueryFallback(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx := newDownloadTestContext("unused", "user-query", recorder)
+	ctx.request = httptest.NewRequest(nethttp.MethodPost, "/sessions/sess-1/workspace?tenant_id=tenant-a&requested_profile_id=cloud-vm&user_id=user-query", nil)
+	ctx.query = ctx.request.URL.Query()
+
+	req, err := readCreateSessionWorkspaceRequest(ctx)
+	if err != nil {
+		t.Fatalf("readCreateSessionWorkspaceRequest returned error: %v", err)
+	}
+	if req.UserID != "user-query" || req.TenantID != "tenant-a" || req.RequestedProfileID != "cloud-vm" {
+		t.Fatalf("unexpected request: %+v", req)
+	}
+}
+
 func TestReadUploadResourceInputMissingFile(t *testing.T) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)

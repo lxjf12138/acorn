@@ -11,6 +11,7 @@ import (
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
+	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/server"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
@@ -60,7 +61,8 @@ func main() {
 		cfg.Sandbox.ServiceID: service.NewSandboxResourceAuthority(resourceContentClient),
 	})
 	uploadService := service.NewUploadService(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes)
-	workspaceService := service.NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, cfg.Sandbox.DefaultProfileID)
+	sandboxPolicyResolver := sandboxpolicydomain.NewConfigResolver(cfg.SandboxPolicies, cfg.Sandbox.DefaultProfileID)
+	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayAndPolicy(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger)

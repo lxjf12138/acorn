@@ -797,15 +797,16 @@ WorkspaceExecService
 local-process-dev backend
 Control Plane workspace exec forwarding
 ProfileRegistry / Sandbox Profile Selection Cleanup
+Control Plane SandboxPolicy / PlacementResolver
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: Control Plane SandboxPolicy
-  - Per-user or per-tenant default profile
-  - Allowed profile checks
-  - Placement policy foundation
+PR 1: Workspace execution lease / concurrency guard
+  - Single-writer or execution lease foundation
+  - Protect workspaces from concurrent command writes
+  - Keep run-level profile selection for later Agent Runtime work
 ```
 
 `local-process-dev` executes host processes for development and is not a strong
@@ -813,9 +814,10 @@ multi-tenant security boundary.
 
 Sandbox profile selection now follows one rule: sandbox-service ProfileRegistry
 is the source of truth. The sandbox descriptor is generated from enabled
-profiles, Control Plane validates its configured default profile against that
-descriptor before creating a workspace, and exec is gated by the stored
-workspace profile's capabilities and backend id.
+profiles. Control Plane SandboxPolicy chooses a workspace creation-time profile
+from requested, user, tenant, global, or legacy defaults, then verifies the
+selected profile is policy-allowed and advertised by the target sandbox-service.
+Exec is gated by the stored workspace profile's capabilities and backend id.
 
 ---
 

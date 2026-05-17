@@ -14,6 +14,8 @@ import (
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
+	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,8 +29,8 @@ type WorkspaceService struct {
 	resourceService  *ResourceService
 	resourceGateway  *ResourceGatewayService
 	sandboxServiceID string
-	sandboxProfileID string
-	profileCache     SandboxProfileCache
+	profileResolver  sandboxpolicydomain.Resolver
+	profileCatalog   *SandboxProfileCatalog
 }
 
 const sandboxProfileCacheTTL = 30 * time.Second
@@ -36,6 +38,14 @@ const sandboxProfileCacheTTL = 30 * time.Second
 type SessionWorkspaceState struct {
 	Record *workspacev1.WorkspaceRecord    `json:"workspace"`
 	State  *sandboxv1.HostedWorkspaceState `json:"state"`
+}
+
+type CreateSessionWorkspaceInput struct {
+	SessionID string
+	TenantID  string
+	UserID    string
+
+	RequestedProfileID string
 }
 
 type ExecSessionWorkspaceCommandInput struct {
@@ -61,47 +71,69 @@ func NewWorkspaceServiceWithResources(store workspacedomain.Store, sandboxClient
 }
 
 func NewWorkspaceServiceWithResourcesAndGateway(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
+	return NewWorkspaceServiceWithResourcesGatewayAndPolicy(store, sandboxClient, resourceService, resourceGateway, sandboxServiceID, sandboxpolicydomain.NewConfigResolver(confSandboxPolicies(sandboxProfileID), sandboxProfileID))
+}
+
+func NewWorkspaceServiceWithResourcesGatewayAndPolicy(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, profileResolver sandboxpolicydomain.Resolver) *WorkspaceService {
 	return &WorkspaceService{
 		store:            store,
 		sandboxClient:    sandboxClient,
 		resourceService:  resourceService,
 		resourceGateway:  resourceGateway,
 		sandboxServiceID: sandboxServiceID,
-		sandboxProfileID: sandboxProfileID,
+		profileResolver:  profileResolver,
+		profileCatalog:   NewSandboxProfileCatalog(sandboxClient, sandboxProfileCacheTTL),
+	}
+}
+
+func confSandboxPolicies(defaultProfileID string) conf.SandboxPolicies {
+	return conf.SandboxPolicies{
+		Global: conf.SandboxPolicyConfig{
+			DefaultProfileID:  defaultProfileID,
+			AllowedProfileIDs: []string{defaultProfileID},
+		},
 	}
 }
 
 func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID string, ownerUserID string) (*workspacev1.WorkspaceRecord, error) {
-	if sessionID == "" {
+	return s.CreateSessionWorkspaceWithInput(ctx, CreateSessionWorkspaceInput{
+		SessionID: sessionID,
+		UserID:    ownerUserID,
+	})
+}
+
+func (s *WorkspaceService) CreateSessionWorkspaceWithInput(ctx context.Context, input CreateSessionWorkspaceInput) (*workspacev1.WorkspaceRecord, error) {
+	if input.SessionID == "" {
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
-	if ownerUserID == "" {
-		ownerUserID = "dev-user"
+	if input.UserID == "" {
+		input.UserID = "dev-user"
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if existing, ok, err := s.store.GetBySession(ctx, sessionID); err != nil {
+	if existing, ok, err := s.store.GetBySession(ctx, input.SessionID); err != nil {
 		return nil, err
 	} else if ok {
 		return toProto(existing), nil
 	}
 
-	if err := s.ensureSandboxProfileAvailable(ctx, s.sandboxProfileID); err != nil {
-		return nil, err
-	}
-	hosted, err := s.sandboxClient.CreateHostedWorkspace(ctx, sessionID, ownerUserID, s.sandboxProfileID, fmt.Sprintf("workspace for session %s", sessionID))
+	profile, err := s.selectSandboxProfile(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	if err := validateHostedWorkspace(hosted, s.sandboxServiceID, s.sandboxProfileID); err != nil {
+	hosted, err := s.sandboxClient.CreateHostedWorkspace(ctx, input.SessionID, input.UserID, profile.ProfileID, fmt.Sprintf("workspace for session %s", input.SessionID))
+	if err != nil {
+		return nil, err
+	}
+	if err := validateHostedWorkspace(hosted, s.sandboxServiceID, profile.ProfileID); err != nil {
 		return nil, err
 	}
 	now := time.Now().UTC()
 	record, err := s.store.Create(ctx, workspacedomain.Record{
-		SessionID:   sessionID,
-		OwnerUserID: ownerUserID,
+		SessionID:   input.SessionID,
+		OwnerUserID: input.UserID,
 		Status:      workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
 		CurrentHost: hosted.GetRef(),
 		CreatedAt:   now,
@@ -113,29 +145,73 @@ func (s *WorkspaceService) CreateSessionWorkspace(ctx context.Context, sessionID
 	return toProto(record), nil
 }
 
+func (s *WorkspaceService) selectSandboxProfile(ctx context.Context, input CreateSessionWorkspaceInput) (*sandboxpolicydomain.ResolveWorkspaceProfileResult, error) {
+	if s.profileResolver == nil {
+		return nil, status.Error(codes.FailedPrecondition, "sandbox policy resolver is not configured")
+	}
+	available, err := s.profileCatalog.AvailableProfileIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := s.profileResolver.ResolveWorkspaceProfile(ctx, sandboxpolicydomain.ResolveWorkspaceProfileRequest{
+		TenantID:            input.TenantID,
+		UserID:              input.UserID,
+		RequestedProfileID:  input.RequestedProfileID,
+		AvailableProfileIDs: available,
+	})
+	if err != nil {
+		return nil, mapSandboxPolicyError(err)
+	}
+	return result, nil
+}
+
+type SandboxProfileCatalog struct {
+	client   sandboxclient.WorkspaceHostClient
+	cache    SandboxProfileCache
+	cacheTTL time.Duration
+}
+
 type SandboxProfileCache struct {
 	mu        sync.RWMutex
 	expiresAt time.Time
 	profiles  map[string]struct{}
 }
 
-func (s *WorkspaceService) ensureSandboxProfileAvailable(ctx context.Context, profileID string) error {
-	if profileID == "" {
-		return status.Error(codes.FailedPrecondition, "sandbox default profile is not configured")
+func NewSandboxProfileCatalog(client sandboxclient.WorkspaceHostClient, cacheTTL time.Duration) *SandboxProfileCatalog {
+	return &SandboxProfileCatalog{client: client, cacheTTL: cacheTTL}
+}
+
+func (c *SandboxProfileCatalog) AvailableProfileIDs(ctx context.Context) (map[string]struct{}, error) {
+	if profiles, ok := c.cache.Get(time.Now()); ok {
+		return profiles, nil
 	}
-	if s.profileCache.Has(profileID, time.Now()) {
-		return nil
+	descriptor, err := c.client.GetCapabilityDescriptor(ctx)
+	if err != nil {
+		return nil, err
 	}
-	descriptor, err := s.sandboxClient.GetCapabilityDescriptor(ctx)
+	profiles := availableSandboxProfiles(descriptor)
+	c.cache.Store(profiles, time.Now().Add(c.cacheTTL))
+	return cloneProfileSet(profiles), nil
+}
+
+func (c *SandboxProfileCatalog) EnsureAvailable(ctx context.Context, profileID string) error {
+	profiles, err := c.AvailableProfileIDs(ctx)
 	if err != nil {
 		return err
 	}
-	profiles := availableSandboxProfiles(descriptor)
-	s.profileCache.Store(profiles, time.Now().Add(sandboxProfileCacheTTL))
 	if _, ok := profiles[profileID]; !ok {
 		return status.Errorf(codes.FailedPrecondition, "sandbox profile unavailable: %s", profileID)
 	}
 	return nil
+}
+
+func (c *SandboxProfileCache) Get(now time.Time) (map[string]struct{}, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.profiles == nil || now.After(c.expiresAt) {
+		return nil, false
+	}
+	return cloneProfileSet(c.profiles), true
 }
 
 func (c *SandboxProfileCache) Has(profileID string, now time.Time) bool {
@@ -156,6 +232,27 @@ func (c *SandboxProfileCache) Store(profiles map[string]struct{}, expiresAt time
 		c.profiles[profileID] = struct{}{}
 	}
 	c.expiresAt = expiresAt
+}
+
+func cloneProfileSet(profiles map[string]struct{}) map[string]struct{} {
+	out := make(map[string]struct{}, len(profiles))
+	for profileID := range profiles {
+		out[profileID] = struct{}{}
+	}
+	return out
+}
+
+func mapSandboxPolicyError(err error) error {
+	switch {
+	case errors.Is(err, sandboxpolicydomain.ErrNoProfileSelected):
+		return status.Error(codes.FailedPrecondition, "no sandbox profile selected")
+	case errors.Is(err, sandboxpolicydomain.ErrProfileNotAllowed):
+		return status.Error(codes.PermissionDenied, "sandbox profile not allowed by policy")
+	case errors.Is(err, sandboxpolicydomain.ErrProfileUnavailable):
+		return status.Error(codes.FailedPrecondition, "sandbox profile unavailable")
+	default:
+		return err
+	}
 }
 
 func availableSandboxProfiles(descriptor *capabilityv1.CapabilityDescriptor) map[string]struct{} {

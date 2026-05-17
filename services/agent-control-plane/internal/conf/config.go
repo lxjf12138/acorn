@@ -10,11 +10,12 @@ import (
 )
 
 type Config struct {
-	Service  Service  `json:"service" yaml:"service"`
-	Server   Server   `json:"server" yaml:"server"`
-	Resource Resource `json:"resource" yaml:"resource"`
-	Sandbox  Sandbox  `json:"sandbox" yaml:"sandbox"`
-	Log      Log      `json:"log" yaml:"log"`
+	Service         Service         `json:"service" yaml:"service"`
+	Server          Server          `json:"server" yaml:"server"`
+	Resource        Resource        `json:"resource" yaml:"resource"`
+	Sandbox         Sandbox         `json:"sandbox" yaml:"sandbox"`
+	SandboxPolicies SandboxPolicies `json:"sandbox_policies" yaml:"sandbox_policies"`
+	Log             Log             `json:"log" yaml:"log"`
 }
 
 type Service struct {
@@ -51,6 +52,17 @@ type Sandbox struct {
 	ServiceID        string `json:"service_id" yaml:"service_id"`
 	GRPCAddr         string `json:"grpc_addr" yaml:"grpc_addr"`
 	DefaultProfileID string `json:"default_profile_id" yaml:"default_profile_id"`
+}
+
+type SandboxPolicies struct {
+	Global  SandboxPolicyConfig            `json:"global" yaml:"global"`
+	Tenants map[string]SandboxPolicyConfig `json:"tenants" yaml:"tenants"`
+	Users   map[string]SandboxPolicyConfig `json:"users" yaml:"users"`
+}
+
+type SandboxPolicyConfig struct {
+	DefaultProfileID  string   `json:"default_profile_id" yaml:"default_profile_id"`
+	AllowedProfileIDs []string `json:"allowed_profile_ids" yaml:"allowed_profile_ids"`
 }
 
 func Load(path string) (*Config, error) {

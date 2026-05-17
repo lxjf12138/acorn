@@ -12,37 +12,42 @@ import (
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
+	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type fakeWorkspaceHostClient struct {
-	err             error
-	stateErr        error
-	listErr         error
-	previewErr      error
-	exportErr       error
-	created         int
-	hosted          *sandboxv1.HostedWorkspace
-	state           *sandboxv1.HostedWorkspaceState
-	listResp        *sandboxv1.ListWorkspaceDirResponse
-	previewResp     *sandboxv1.PreviewWorkspaceFileResponse
-	exportResp      *sandboxv1.ExportWorkspacePathResponse
-	importResp      *sandboxv1.ImportResourceToWorkspaceResponse
-	importErr       error
-	execResp        *sandboxv1.ExecWorkspaceCommandResponse
-	execErr         error
-	descriptor      *capabilityv1.CapabilityDescriptor
-	descriptorErr   error
-	descriptorCalls int
-	lastListInput   sandboxclient.ListWorkspaceDirInput
-	lastExportInput sandboxclient.ExportWorkspacePathInput
-	lastImportInput sandboxclient.ImportResourceInput
-	lastExecInput   sandboxclient.ExecWorkspaceCommandInput
-	lastImportBody  string
-	useHosted       bool
+	err                   error
+	stateErr              error
+	listErr               error
+	previewErr            error
+	exportErr             error
+	created               int
+	hosted                *sandboxv1.HostedWorkspace
+	state                 *sandboxv1.HostedWorkspaceState
+	listResp              *sandboxv1.ListWorkspaceDirResponse
+	previewResp           *sandboxv1.PreviewWorkspaceFileResponse
+	exportResp            *sandboxv1.ExportWorkspacePathResponse
+	importResp            *sandboxv1.ImportResourceToWorkspaceResponse
+	importErr             error
+	execResp              *sandboxv1.ExecWorkspaceCommandResponse
+	execErr               error
+	descriptor            *capabilityv1.CapabilityDescriptor
+	descriptorErr         error
+	descriptorCalls       int
+	lastCreateSessionID   string
+	lastCreateOwnerUserID string
+	lastCreateProfileID   string
+	lastListInput         sandboxclient.ListWorkspaceDirInput
+	lastExportInput       sandboxclient.ExportWorkspacePathInput
+	lastImportInput       sandboxclient.ImportResourceInput
+	lastExecInput         sandboxclient.ExecWorkspaceCommandInput
+	lastImportBody        string
+	useHosted             bool
 }
 
 func (f *fakeWorkspaceHostClient) GetCapabilityDescriptor(context.Context) (*capabilityv1.CapabilityDescriptor, error) {
@@ -56,11 +61,14 @@ func (f *fakeWorkspaceHostClient) GetCapabilityDescriptor(context.Context) (*cap
 	return sandboxDescriptor("local-process"), nil
 }
 
-func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, _ string, sandboxProfileID string, _ string) (*sandboxv1.HostedWorkspace, error) {
+func (f *fakeWorkspaceHostClient) CreateHostedWorkspace(_ context.Context, sessionID string, ownerUserID string, sandboxProfileID string, _ string) (*sandboxv1.HostedWorkspace, error) {
 	if f.err != nil {
 		return nil, f.err
 	}
 	f.created++
+	f.lastCreateSessionID = sessionID
+	f.lastCreateOwnerUserID = ownerUserID
+	f.lastCreateProfileID = sandboxProfileID
 	if f.useHosted {
 		return f.hosted, nil
 	}
@@ -213,6 +221,31 @@ func sandboxDescriptor(profileIDs ...string) *capabilityv1.CapabilityDescriptor 
 		})
 	}
 	return &capabilityv1.CapabilityDescriptor{SandboxProfiles: profiles}
+}
+
+func testPolicies() conf.SandboxPolicies {
+	return conf.SandboxPolicies{
+		Global: conf.SandboxPolicyConfig{
+			DefaultProfileID:  "local-process",
+			AllowedProfileIDs: []string{"local-process"},
+		},
+		Tenants: map[string]conf.SandboxPolicyConfig{
+			"tenant-a": {
+				DefaultProfileID:  "cloud-vm",
+				AllowedProfileIDs: []string{"cloud-vm"},
+			},
+		},
+		Users: map[string]conf.SandboxPolicyConfig{
+			"alice": {
+				DefaultProfileID:  "cloud-vm",
+				AllowedProfileIDs: []string{"cloud-vm"},
+			},
+			"bob": {
+				DefaultProfileID:  "local-process",
+				AllowedProfileIDs: []string{"local-process", "cloud-vm"},
+			},
+		},
+	}
 }
 
 func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
@@ -393,6 +426,85 @@ func TestWorkspaceServiceCreateSessionWorkspaceProfileCache(t *testing.T) {
 	}
 	if client.descriptorCalls != 1 {
 		t.Fatalf("expected one descriptor call, got %d", client.descriptorCalls)
+	}
+}
+
+func TestWorkspaceServiceCreateSessionWorkspaceSelectsProfileThroughPolicy(t *testing.T) {
+	tests := []struct {
+		name        string
+		resolver    sandboxpolicydomain.Resolver
+		input       CreateSessionWorkspaceInput
+		descriptor  *capabilityv1.CapabilityDescriptor
+		wantProfile string
+		wantCode    codes.Code
+	}{
+		{
+			name:        "user default",
+			resolver:    sandboxpolicydomain.NewConfigResolver(testPolicies(), "local-process"),
+			input:       CreateSessionWorkspaceInput{SessionID: "sess-1", TenantID: "tenant-a", UserID: "alice"},
+			descriptor:  sandboxDescriptor("local-process", "cloud-vm"),
+			wantProfile: "cloud-vm",
+		},
+		{
+			name:        "tenant default",
+			resolver:    sandboxpolicydomain.NewConfigResolver(testPolicies(), "local-process"),
+			input:       CreateSessionWorkspaceInput{SessionID: "sess-1", TenantID: "tenant-a", UserID: "other-user"},
+			descriptor:  sandboxDescriptor("local-process", "cloud-vm"),
+			wantProfile: "cloud-vm",
+		},
+		{
+			name:        "global default",
+			resolver:    sandboxpolicydomain.NewConfigResolver(testPolicies(), "local-process"),
+			input:       CreateSessionWorkspaceInput{SessionID: "sess-1", UserID: "other-user"},
+			descriptor:  sandboxDescriptor("local-process", "cloud-vm"),
+			wantProfile: "local-process",
+		},
+		{
+			name:        "requested profile",
+			resolver:    sandboxpolicydomain.NewConfigResolver(testPolicies(), "local-process"),
+			input:       CreateSessionWorkspaceInput{SessionID: "sess-1", UserID: "bob", RequestedProfileID: "cloud-vm"},
+			descriptor:  sandboxDescriptor("local-process", "cloud-vm"),
+			wantProfile: "cloud-vm",
+		},
+		{
+			name:       "requested disallowed",
+			resolver:   sandboxpolicydomain.NewConfigResolver(testPolicies(), "local-process"),
+			input:      CreateSessionWorkspaceInput{SessionID: "sess-1", UserID: "other-user", RequestedProfileID: "cloud-vm"},
+			descriptor: sandboxDescriptor("local-process", "cloud-vm"),
+			wantCode:   codes.PermissionDenied,
+		},
+		{
+			name:       "selected unavailable",
+			resolver:   sandboxpolicydomain.NewConfigResolver(testPolicies(), "local-process"),
+			input:      CreateSessionWorkspaceInput{SessionID: "sess-1", TenantID: "tenant-a", UserID: "alice"},
+			descriptor: sandboxDescriptor("local-process"),
+			wantCode:   codes.FailedPrecondition,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &fakeWorkspaceHostClient{descriptor: tt.descriptor}
+			service := NewWorkspaceServiceWithResourcesGatewayAndPolicy(workspacedomain.NewMemoryStore(), client, nil, nil, "sandbox-service", tt.resolver)
+			record, err := service.CreateSessionWorkspaceWithInput(context.Background(), tt.input)
+			if tt.wantCode != codes.OK {
+				if status.Code(err) != tt.wantCode {
+					t.Fatalf("expected %s, got %v", tt.wantCode, err)
+				}
+				if client.created != 0 {
+					t.Fatalf("unexpected create call")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("CreateSessionWorkspaceWithInput returned error: %v", err)
+			}
+			if client.lastCreateProfileID != tt.wantProfile {
+				t.Fatalf("unexpected selected profile: %q", client.lastCreateProfileID)
+			}
+			if record.GetCurrentHost().GetSandboxProfileId() != tt.wantProfile {
+				t.Fatalf("workspace record did not store selected profile: %+v", record.GetCurrentHost())
+			}
+		})
 	}
 }
 

@@ -19,6 +19,21 @@ func TestConfigValidateAcceptsServiceIDAndName(t *testing.T) {
 	}
 }
 
+func TestConfigValidateKeepsSandboxPolicies(t *testing.T) {
+	cfg := validConfig()
+	cfg.SandboxPolicies.Global = SandboxPolicyConfig{
+		DefaultProfileID:  "local-process-dev",
+		AllowedProfileIDs: []string{"local-process-dev"},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+	if cfg.SandboxPolicies.Global.DefaultProfileID != "local-process-dev" ||
+		len(cfg.SandboxPolicies.Global.AllowedProfileIDs) != 1 {
+		t.Fatalf("unexpected sandbox policies: %+v", cfg.SandboxPolicies)
+	}
+}
+
 func validConfig() Config {
 	return Config{
 		Service: Service{

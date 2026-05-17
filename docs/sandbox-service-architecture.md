@@ -690,14 +690,48 @@ not currently expose as available.
 
 ---
 
+### PR 8: Control Plane SandboxPolicy / PlacementResolver
+
+Goal:
+
+```text
+Select the sandbox profile for workspace creation in the Control Plane.
+```
+
+Status:
+
+```text
+Implemented.
+```
+
+Rules:
+
+```text
+sandbox-service ProfileRegistry remains service-side capability truth.
+CapabilityDescriptor advertises available profiles.
+Control Plane SandboxPolicy decides who can use which profile.
+Selection order is requested profile, user default, tenant default, global
+default, then legacy sandbox.default_profile_id.
+The selected profile must be policy-allowed and advertised by the target
+sandbox-service as available.
+WorkspaceRecord.current_host.sandbox_profile_id records the final selected
+profile.
+```
+
+This is workspace creation-time placement only. It does not choose different
+profiles for individual runs inside an existing workspace, and it does not
+implement migration, scheduling, quota, or a new backend.
+
+---
+
 ## 11. Non-Goals For The Next PR
 
-The next PR can focus on Control Plane sandbox policy or execution operational
-semantics.
+The next PR can focus on execution operational semantics.
 Do not include:
 
 ```text
 Docker / VM / remote agent
+Run-level profile selection
 WorkspaceStore redesign
 Large config schema migration
 ```
