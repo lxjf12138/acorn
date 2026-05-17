@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -229,5 +230,8 @@ func (f *fakeBackingStore) ExportPath(_ context.Context, req workspacestore.Expo
 		Source:    workspacestore.PathInfo{Path: req.Path, Name: req.Path, Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: 12},
 		MimeType:  "text/plain",
 		SizeBytes: 12,
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("exported")), nil
+		},
 	}, nil
 }

@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
+	resourceblob "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/resourceblob"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
@@ -15,12 +19,16 @@ import (
 )
 
 func TestWorkspaceTransferServiceExportWorkspacePath(t *testing.T) {
-	transfer, backing, exportStore, workspace := newTestTransferService(t)
+	transfer, backing, blobStore, exportStore, workspace := newTestTransferService(t)
 	backing.exportResp = &workspacestore.ExportedPath{
 		Source:    workspacestore.PathInfo{Path: "outputs/report.txt", Name: "report.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: 6},
 		MimeType:  "text/plain; charset=utf-8",
 		SizeBytes: 6,
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("report")), nil
+		},
 	}
+	blobStore.contentHash = "sha256:abc"
 
 	resp, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{
 		ServiceWorkspaceId: workspace.ID,
@@ -32,6 +40,12 @@ func TestWorkspaceTransferServiceExportWorkspacePath(t *testing.T) {
 	}
 	if backing.lastExport.WorkspaceID != workspace.StoreWorkspaceID || backing.lastExport.Path != "outputs/report.txt" {
 		t.Fatalf("unexpected export request: %+v", backing.lastExport)
+	}
+	if blobStore.lastPut.ResourceID != resp.GetResource().GetId() || blobStore.lastPut.Name != "custom.txt" || blobStore.lastPut.MimeType != "text/plain; charset=utf-8" {
+		t.Fatalf("unexpected blob put request: %+v", blobStore.lastPut)
+	}
+	if blobStore.lastPutContent != "report" {
+		t.Fatalf("unexpected blob content: %q", blobStore.lastPutContent)
 	}
 	assertWorkspacePathRef(t, resp.GetSource(), workspace, "outputs/report.txt")
 	if resp.GetResource().GetId() == "" {
@@ -49,21 +63,32 @@ func TestWorkspaceTransferServiceExportWorkspacePath(t *testing.T) {
 	if resp.GetResource().GetSizeBytes() != 6 {
 		t.Fatalf("unexpected resource size: %d", resp.GetResource().GetSizeBytes())
 	}
+	if resp.GetResource().GetContentHash() != "sha256:abc" {
+		t.Fatalf("unexpected content hash: %q", resp.GetResource().GetContentHash())
+	}
 	record, err := exportStore.Get(context.Background(), resp.GetResource().GetId())
 	if err != nil {
 		t.Fatalf("export store Get returned error: %v", err)
 	}
-	if record.ServiceWorkspaceID != workspace.ID || record.WorkspacePath != "outputs/report.txt" || record.SizeBytes != 6 {
+	if record.SourceServiceWorkspaceID != workspace.ID ||
+		record.SourceWorkspacePath != "outputs/report.txt" ||
+		record.BlobStoreKind != "fakeblob" ||
+		record.BlobID != resp.GetResource().GetId() ||
+		record.ContentHash != "sha256:abc" ||
+		record.SizeBytes != 6 {
 		t.Fatalf("unexpected export record: %+v", record)
 	}
 }
 
 func TestWorkspaceTransferServiceExportWorkspacePathDefaultNameAndMime(t *testing.T) {
-	transfer, backing, _, workspace := newTestTransferService(t)
+	transfer, backing, _, _, workspace := newTestTransferService(t)
 	backing.exportResp = &workspacestore.ExportedPath{
 		Source:    workspacestore.PathInfo{Path: "outputs/blob.unknown", Name: "blob.unknown", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: 4},
 		MimeType:  "application/octet-stream",
 		SizeBytes: 4,
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("blob")), nil
+		},
 	}
 
 	resp, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{
@@ -96,7 +121,7 @@ func TestWorkspaceTransferServiceExportWorkspacePathErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			transfer, backing, _, workspace := newTestTransferService(t)
+			transfer, backing, _, _, workspace := newTestTransferService(t)
 			backing.exportErr = tt.err
 			_, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{
 				ServiceWorkspaceId: workspace.ID,
@@ -110,17 +135,74 @@ func TestWorkspaceTransferServiceExportWorkspacePathErrors(t *testing.T) {
 }
 
 func TestWorkspaceTransferServiceExportWorkspacePathMissingWorkspace(t *testing.T) {
-	transfer, _, _, _ := newTestTransferService(t)
+	transfer, _, _, _, _ := newTestTransferService(t)
 	_, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{ServiceWorkspaceId: "missing", Path: "file.txt"})
 	if status.Code(err) != codes.NotFound {
 		t.Fatalf("expected NotFound, got %v", err)
 	}
 }
 
-func newTestTransferService(t *testing.T) (*WorkspaceTransferService, *fakeBackingStore, exporteddomain.Store, workspacedomain.Workspace) {
+func TestWorkspaceTransferServiceExportWorkspacePathBlobPutError(t *testing.T) {
+	transfer, backing, blobStore, _, workspace := newTestTransferService(t)
+	backing.exportResp = &workspacestore.ExportedPath{
+		Source:    workspacestore.PathInfo{Path: "report.txt", Name: "report.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE},
+		MimeType:  "text/plain",
+		SizeBytes: 6,
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("report")), nil
+		},
+	}
+	blobStore.putErr = resourceblob.ErrStoreNotReady
+
+	_, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{ServiceWorkspaceId: workspace.ID, Path: "report.txt"})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
+}
+
+func TestWorkspaceTransferServiceExportWorkspacePathOpenError(t *testing.T) {
+	transfer, backing, _, _, workspace := newTestTransferService(t)
+	backing.exportResp = &workspacestore.ExportedPath{
+		Source:    workspacestore.PathInfo{Path: "report.txt", Name: "report.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE},
+		MimeType:  "text/plain",
+		SizeBytes: 6,
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return nil, errors.New("open failed")
+		},
+	}
+
+	_, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{ServiceWorkspaceId: workspace.ID, Path: "report.txt"})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+}
+
+func TestWorkspaceTransferServiceRollsBackBlobOnExportRecordFailure(t *testing.T) {
+	transfer, backing, blobStore, _, workspace := newTestTransferService(t)
+	backing.exportResp = &workspacestore.ExportedPath{
+		Source:    workspacestore.PathInfo{Path: "report.txt", Name: "report.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE},
+		MimeType:  "text/plain",
+		SizeBytes: 6,
+		Open: func(context.Context) (io.ReadCloser, error) {
+			return io.NopCloser(strings.NewReader("report")), nil
+		},
+	}
+	transfer.exportStore = failingExportStore{}
+
+	_, err := transfer.ExportWorkspacePath(context.Background(), &sandboxv1.ExportWorkspacePathRequest{ServiceWorkspaceId: workspace.ID, Path: "report.txt"})
+	if status.Code(err) != codes.Internal {
+		t.Fatalf("expected Internal, got %v", err)
+	}
+	if !blobStore.deleted {
+		t.Fatal("expected blob rollback delete")
+	}
+}
+
+func newTestTransferService(t *testing.T) (*WorkspaceTransferService, *fakeBackingStore, *fakeBlobStore, exporteddomain.Store, workspacedomain.Workspace) {
 	t.Helper()
 	store := workspacedomain.NewMemoryStore()
 	backing := &fakeBackingStore{}
+	blobStore := &fakeBlobStore{contentHash: "sha256:fake"}
 	exportStore := exporteddomain.NewMemoryStore()
 	workspace := workspacedomain.Workspace{
 		ID:               "ws-test",
@@ -135,5 +217,61 @@ func newTestTransferService(t *testing.T) (*WorkspaceTransferService, *fakeBacki
 	if err != nil {
 		t.Fatalf("Create workspace returned error: %v", err)
 	}
-	return NewWorkspaceTransferService("sandbox-service", store, backing, exportStore), backing, exportStore, created
+	return NewWorkspaceTransferService("sandbox-service", store, backing, blobStore, exportStore), backing, blobStore, exportStore, created
+}
+
+type fakeBlobStore struct {
+	putErr      error
+	contentHash string
+	deleted     bool
+
+	lastPut        resourceblob.PutRequest
+	lastPutContent string
+}
+
+func (f *fakeBlobStore) Kind() string { return "fakeblob" }
+
+func (f *fakeBlobStore) Put(_ context.Context, req resourceblob.PutRequest) (*resourceblob.StoredBlob, error) {
+	f.lastPut = req
+	if req.Source != nil {
+		body, _ := io.ReadAll(req.Source)
+		f.lastPutContent = string(body)
+	}
+	if f.putErr != nil {
+		return nil, f.putErr
+	}
+	size := int64(len(f.lastPutContent))
+	return &resourceblob.StoredBlob{
+		ResourceID:   req.ResourceID,
+		StoreKind:    f.Kind(),
+		StoreBlobID:  req.ResourceID,
+		Name:         req.Name,
+		MimeType:     req.MimeType,
+		SizeBytes:    size,
+		ContentHash:  f.contentHash,
+		MetadataJSON: append([]byte(nil), req.MetadataJSON...),
+	}, nil
+}
+
+func (f *fakeBlobStore) Open(context.Context, string) (io.ReadCloser, *resourceblob.BlobInfo, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+func (f *fakeBlobStore) Stat(context.Context, string) (*resourceblob.BlobInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeBlobStore) Delete(context.Context, string) error {
+	f.deleted = true
+	return nil
+}
+
+type failingExportStore struct{}
+
+func (failingExportStore) Create(context.Context, exporteddomain.Record) (exporteddomain.Record, error) {
+	return exporteddomain.Record{}, errors.New("create failed")
+}
+
+func (failingExportStore) Get(context.Context, string) (exporteddomain.Record, error) {
+	return exporteddomain.Record{}, errors.New("not implemented")
 }

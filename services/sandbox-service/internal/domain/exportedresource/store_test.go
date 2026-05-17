@@ -9,12 +9,15 @@ import (
 func TestMemoryStoreCreateGet(t *testing.T) {
 	store := NewMemoryStore()
 	record, err := store.Create(context.Background(), Record{
-		ResourceID:         "res_1",
-		ServiceWorkspaceID: "ws_1",
-		WorkspacePath:      "outputs/report.txt",
-		Name:               "report.txt",
-		MimeType:           "text/plain",
-		SizeBytes:          12,
+		ResourceID:               "res_1",
+		BlobStoreKind:            "localblob",
+		BlobID:                   "res_1",
+		SourceServiceWorkspaceID: "ws_1",
+		SourceWorkspacePath:      "outputs/report.txt",
+		Name:                     "report.txt",
+		MimeType:                 "text/plain",
+		SizeBytes:                12,
+		ContentHash:              "sha256:abc",
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -27,14 +30,14 @@ func TestMemoryStoreCreateGet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
-	if got.ResourceID != "res_1" || got.WorkspacePath != "outputs/report.txt" {
+	if got.ResourceID != "res_1" || got.BlobID != "res_1" || got.SourceWorkspacePath != "outputs/report.txt" || got.ContentHash != "sha256:abc" {
 		t.Fatalf("Get() = %+v", got)
 	}
 }
 
 func TestMemoryStoreDuplicateID(t *testing.T) {
 	store := NewMemoryStore()
-	record := Record{ResourceID: "res_1", ServiceWorkspaceID: "ws_1", WorkspacePath: "a.txt", Name: "a.txt"}
+	record := Record{ResourceID: "res_1", BlobStoreKind: "localblob", BlobID: "res_1", SourceServiceWorkspaceID: "ws_1", SourceWorkspacePath: "a.txt", Name: "a.txt"}
 	if _, err := store.Create(context.Background(), record); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}

@@ -769,6 +769,8 @@ Control Plane resource metadata HTTP/gRPC API
 Workspace Resource Export foundation
 ExportWorkspacePath
 Control Plane workspace export forwarding
+ResourceBlobStore / LocalBlobStore
+Snapshot-backed ExportWorkspacePath
 ```
 
 Next planned code sequence:

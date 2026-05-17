@@ -12,6 +12,7 @@ import (
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
+	resourceblob "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/resourceblob"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
 	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
@@ -24,14 +25,16 @@ type WorkspaceTransferService struct {
 	serviceID      string
 	workspaceStore workspacedomain.Store
 	backing        workspacestore.Store
+	blobStore      resourceblob.Store
 	exportStore    exporteddomain.Store
 }
 
-func NewWorkspaceTransferService(serviceID string, workspaceStore workspacedomain.Store, backing workspacestore.Store, exportStore exporteddomain.Store) *WorkspaceTransferService {
+func NewWorkspaceTransferService(serviceID string, workspaceStore workspacedomain.Store, backing workspacestore.Store, blobStore resourceblob.Store, exportStore exporteddomain.Store) *WorkspaceTransferService {
 	return &WorkspaceTransferService{
 		serviceID:      serviceID,
 		workspaceStore: workspaceStore,
 		backing:        backing,
+		blobStore:      blobStore,
 		exportStore:    exportStore,
 	}
 }
@@ -52,14 +55,38 @@ func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req 
 		mimeType = exported.MimeType
 	}
 
+	reader, err := exported.Open(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "open exported workspace path: %v", err)
+	}
+	defer reader.Close()
+
+	blob, err := s.blobStore.Put(ctx, resourceblob.PutRequest{
+		ResourceID:   resourceID,
+		Name:         name,
+		MimeType:     mimeType,
+		Source:       reader,
+		MetadataJSON: req.GetMetadataJson(),
+	})
+	if err != nil {
+		return nil, mapResourceBlobError(err)
+	}
+
 	if _, err := s.exportStore.Create(ctx, exporteddomain.Record{
-		ResourceID:         resourceID,
-		ServiceWorkspaceID: workspace.ID,
-		WorkspacePath:      exported.Source.Path,
-		Name:               name,
-		MimeType:           mimeType,
-		SizeBytes:          exported.SizeBytes,
+		ResourceID: resourceID,
+
+		BlobStoreKind: blob.StoreKind,
+		BlobID:        blob.StoreBlobID,
+
+		Name:        blob.Name,
+		MimeType:    blob.MimeType,
+		SizeBytes:   blob.SizeBytes,
+		ContentHash: blob.ContentHash,
+
+		SourceServiceWorkspaceID: workspace.ID,
+		SourceWorkspacePath:      exported.Source.Path,
 	}); err != nil {
+		_ = s.blobStore.Delete(ctx, resourceID)
 		if errors.Is(err, exporteddomain.ErrAlreadyExists) {
 			return nil, status.Error(codes.AlreadyExists, "exported resource already exists")
 		}
@@ -80,9 +107,10 @@ func (s *WorkspaceTransferService) ExportWorkspacePath(ctx context.Context, req 
 		Resource: &resourcev1.ResourceRef{
 			Id:                 resourceID,
 			AuthorityServiceId: s.serviceID,
-			Name:               name,
-			MimeType:           mimeType,
-			SizeBytes:          exported.SizeBytes,
+			Name:               blob.Name,
+			MimeType:           blob.MimeType,
+			SizeBytes:          blob.SizeBytes,
+			ContentHash:        blob.ContentHash,
 			MetadataJson:       append([]byte(nil), req.GetMetadataJson()...),
 		},
 	}, nil

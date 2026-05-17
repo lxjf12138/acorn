@@ -44,7 +44,8 @@ type Log struct {
 }
 
 type Sandbox struct {
-	WorkspaceRoot string `json:"workspace_root" yaml:"workspace_root"`
+	WorkspaceRoot    string `json:"workspace_root" yaml:"workspace_root"`
+	ResourceBlobRoot string `json:"resource_blob_root" yaml:"resource_blob_root"`
 }
 
 func Load(path string) (*Config, error) {
@@ -97,6 +98,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Sandbox.WorkspaceRoot == "" {
 		c.Sandbox.WorkspaceRoot = "/tmp/acorn/sandbox/workspaces"
+	}
+	if c.Sandbox.ResourceBlobRoot == "" {
+		c.Sandbox.ResourceBlobRoot = "/tmp/acorn/sandbox/resources"
 	}
 	if c.Log.Level == "" {
 		c.Log.Level = "info"

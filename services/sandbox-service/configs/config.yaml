@@ -15,6 +15,7 @@ server:
 
 sandbox:
   workspace_root: /tmp/acorn/sandbox/workspaces
+  resource_blob_root: /tmp/acorn/sandbox/resources
 
 log:
   level: info

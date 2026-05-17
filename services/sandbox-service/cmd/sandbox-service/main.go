@@ -11,6 +11,7 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localblob"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localfs"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
@@ -45,10 +46,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	blobStore, err := localblob.NewStore(localblob.Config{BaseDir: cfg.Sandbox.ResourceBlobRoot})
+	if err != nil {
+		panic(err)
+	}
 	exportStore := exporteddomain.NewMemoryStore()
 	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore, backingStore)
 	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
-	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, exportStore)
+	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, blobStore, exportStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
 	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, logger)

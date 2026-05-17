@@ -27,6 +27,9 @@ func TestConfigValidateDefaultsWorkspaceRoot(t *testing.T) {
 	if cfg.Sandbox.WorkspaceRoot != "/tmp/acorn/sandbox/workspaces" {
 		t.Fatalf("unexpected workspace root: %q", cfg.Sandbox.WorkspaceRoot)
 	}
+	if cfg.Sandbox.ResourceBlobRoot != "/tmp/acorn/sandbox/resources" {
+		t.Fatalf("unexpected resource blob root: %q", cfg.Sandbox.ResourceBlobRoot)
+	}
 }
 
 func validConfig() Config {

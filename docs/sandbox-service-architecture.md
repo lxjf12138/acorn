@@ -367,8 +367,8 @@ that logic should not live in service code.
 
 ## 8. ResourceBlobStore
 
-This is not part of the WorkspaceStore abstraction PR, but it is the next
-important boundary.
+`ResourceBlobStore` is the internal content snapshot store for exported
+resources.
 
 Reason:
 
@@ -377,10 +377,12 @@ Workspace files are mutable live state.
 ResourceRef should represent stable content.
 ```
 
-Future interface:
+Implemented interface:
 
 ```go
 type Store interface {
+    Kind() string
+
     Put(ctx context.Context, req PutRequest) (*StoredBlob, error)
     Open(ctx context.Context, resourceID string) (io.ReadCloser, *BlobInfo, error)
     Stat(ctx context.Context, resourceID string) (*BlobInfo, error)
@@ -388,7 +390,7 @@ type Store interface {
 }
 ```
 
-Future export flow:
+Implemented export flow:
 
 ```text
 WorkspaceStore.ExportPath
@@ -398,13 +400,12 @@ WorkspaceStore.ExportPath
   -> Control Plane RegisterResource
 ```
 
-Until this exists, exported resources are metadata foundations, not durable
-downloadable snapshots.
+`ExportWorkspacePath` now creates snapshot-backed `ResourceRef` metadata. The
+current local implementation stores blob metadata in memory and blob bytes on
+local disk.
 
-The Resource Download Gateway must not treat the current
-`resource_id -> workspace path` mapping as the durable behavior. Before public
-download is enabled, export should become snapshot-backed through
-`ResourceBlobStore`.
+This still does not expose download streaming. The Resource Download Gateway is
+the next external user-visible resource content flow.
 
 ---
 
@@ -515,6 +516,12 @@ Add domain/resourceblob
 Add infra/localblob
 ExportWorkspacePath copies bytes into ResourceBlobStore
 exportedresource record points to blob metadata, not live workspace path
+```
+
+Status:
+
+```text
+Implemented.
 ```
 
 ### PR 3: Resource Download Gateway

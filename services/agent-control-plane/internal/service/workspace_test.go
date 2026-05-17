@@ -130,6 +130,7 @@ func (f *fakeWorkspaceHostClient) ExportWorkspacePath(_ context.Context, input s
 			Name:               input.ResourceName,
 			MimeType:           input.MimeType,
 			SizeBytes:          12,
+			ContentHash:        "sha256:abc",
 		},
 	}, nil
 }
@@ -465,6 +466,9 @@ func TestWorkspaceServiceExportSessionWorkspacePath(t *testing.T) {
 	}
 	if record.GetRef().GetId() != "res_1" || record.GetRef().GetAuthorityServiceId() != "sandbox-service" {
 		t.Fatalf("unexpected resource ref: %+v", record.GetRef())
+	}
+	if record.GetRef().GetContentHash() != "sha256:abc" || record.GetRef().GetSizeBytes() != 12 {
+		t.Fatalf("resource snapshot metadata was not propagated: %+v", record.GetRef())
 	}
 	if record.GetOwnerUserId() != "user-1" || record.GetSessionId() != "sess-1" {
 		t.Fatalf("unexpected resource owner/session: %+v", record)
