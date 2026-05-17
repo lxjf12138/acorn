@@ -16,6 +16,8 @@ type Workspace struct {
 	SandboxProfileID string
 	DisplayName      string
 	Status           workspacev1.WorkspaceStatus
+	StoreKind        string
+	StoreWorkspaceID string
 	RootPath         string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

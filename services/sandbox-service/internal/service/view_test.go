@@ -2,9 +2,7 @@ package service
 
 import (
 	"context"
-	"os"
-	"path/filepath"
-	"runtime"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -12,16 +10,20 @@ import (
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func TestWorkspaceViewServiceListWorkspaceDir(t *testing.T) {
-	view, workspace := newTestViewService(t)
-	writeFile(t, workspace.RootPath, "b.txt", "bee")
-	writeFile(t, workspace.RootPath, "a.txt", "aye")
-	if err := os.Mkdir(filepath.Join(workspace.RootPath, "src"), 0o700); err != nil {
-		t.Fatalf("mkdir src: %v", err)
+	view, backing, workspace := newTestViewService(t)
+	backing.listResp = &workspacestore.DirListing{
+		Directory: workspacestore.PathInfo{Path: "", Name: "", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_DIRECTORY},
+		Entries: []workspacestore.PathInfo{
+			{Path: "a.txt", Name: "a.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: 3, ModifiedAt: time.Now().UTC()},
+			{Path: "src", Name: "src", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_DIRECTORY},
+		},
+		NextToken: "2",
 	}
 
 	resp, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{
@@ -32,91 +34,30 @@ func TestWorkspaceViewServiceListWorkspaceDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListWorkspaceDir returned error: %v", err)
 	}
+	if backing.lastList.WorkspaceID != workspace.StoreWorkspaceID || backing.lastList.PageSize != 2 {
+		t.Fatalf("unexpected list request: %+v", backing.lastList)
+	}
 	if resp.GetDirectory().GetPath() != "" || resp.GetDirectory().GetKind() != sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_DIRECTORY {
 		t.Fatalf("unexpected directory ref: %+v", resp.GetDirectory())
 	}
-	if got := entryNames(resp.GetEntries()); strings.Join(got, ",") != "a.txt,b.txt" {
+	if got := entryNames(resp.GetEntries()); strings.Join(got, ",") != "a.txt,src" {
 		t.Fatalf("unexpected entries: %v", got)
 	}
-	if resp.GetNextPageToken() == "" {
-		t.Fatal("expected next page token")
+	if resp.GetNextPageToken() != "2" {
+		t.Fatalf("unexpected next page token: %q", resp.GetNextPageToken())
 	}
-	for _, entry := range resp.GetEntries() {
-		assertWorkspacePathRef(t, entry.GetRef(), workspace, entry.GetName())
-	}
-}
-
-func TestWorkspaceViewServiceListWorkspaceDirPagination(t *testing.T) {
-	view, workspace := newTestViewService(t)
-	writeFile(t, workspace.RootPath, "a.txt", "a")
-	writeFile(t, workspace.RootPath, "b.txt", "b")
-	writeFile(t, workspace.RootPath, "c.txt", "c")
-
-	first, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{
-		ServiceWorkspaceId: workspace.ID,
-		PageSize:           2,
-	})
-	if err != nil {
-		t.Fatalf("ListWorkspaceDir returned error: %v", err)
-	}
-	second, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{
-		ServiceWorkspaceId: workspace.ID,
-		PageSize:           2,
-		PageToken:          first.GetNextPageToken(),
-	})
-	if err != nil {
-		t.Fatalf("ListWorkspaceDir returned error: %v", err)
-	}
-	if got := entryNames(second.GetEntries()); strings.Join(got, ",") != "c.txt" {
-		t.Fatalf("unexpected second page: %v", got)
-	}
-	if second.GetNextPageToken() != "" {
-		t.Fatalf("unexpected next page token: %q", second.GetNextPageToken())
-	}
-}
-
-func TestWorkspaceViewServiceListWorkspaceDirErrors(t *testing.T) {
-	view, workspace := newTestViewService(t)
-	writeFile(t, workspace.RootPath, "file.txt", "content")
-	if runtime.GOOS != "windows" {
-		outside := t.TempDir()
-		if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
-			t.Fatalf("write outside secret: %v", err)
-		}
-		if err := os.Symlink(outside, filepath.Join(workspace.RootPath, "linkdir")); err != nil {
-			t.Fatalf("symlink outside dir: %v", err)
-		}
-	}
-	tests := []struct {
-		name string
-		req  *sandboxv1.ListWorkspaceDirRequest
-		code codes.Code
-	}{
-		{name: "missing workspace", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: "missing"}, code: codes.NotFound},
-		{name: "file path", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, Path: "file.txt"}, code: codes.FailedPrecondition},
-		{name: "traversal", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, Path: "../secret"}, code: codes.InvalidArgument},
-		{name: "bad page token", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, PageToken: "bad"}, code: codes.InvalidArgument},
-	}
-	if runtime.GOOS != "windows" {
-		tests = append(tests, struct {
-			name string
-			req  *sandboxv1.ListWorkspaceDirRequest
-			code codes.Code
-		}{name: "parent symlink escape", req: &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID, Path: "linkdir"}, code: codes.PermissionDenied})
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_, err := view.ListWorkspaceDir(context.Background(), tt.req)
-			if status.Code(err) != tt.code {
-				t.Fatalf("expected %s, got %v", tt.code, err)
-			}
-		})
-	}
+	assertWorkspacePathRef(t, resp.GetEntries()[0].GetRef(), workspace, "a.txt")
 }
 
 func TestWorkspaceViewServicePreviewWorkspaceFile(t *testing.T) {
-	view, workspace := newTestViewService(t)
-	writeFile(t, workspace.RootPath, "report.txt", "hello world")
+	view, backing, workspace := newTestViewService(t)
+	modifiedAt := time.Now().UTC()
+	backing.previewResp = &workspacestore.FilePreview{
+		File:      workspacestore.PathInfo{Path: "report.txt", Name: "report.txt", Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: 11, ModifiedAt: modifiedAt},
+		MimeType:  "text/plain; charset=utf-8",
+		Bytes:     []byte("hello"),
+		Truncated: true,
+	}
 
 	resp, err := view.PreviewWorkspaceFile(context.Background(), &sandboxv1.PreviewWorkspaceFileRequest{
 		ServiceWorkspaceId: workspace.ID,
@@ -126,64 +67,42 @@ func TestWorkspaceViewServicePreviewWorkspaceFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PreviewWorkspaceFile returned error: %v", err)
 	}
+	if backing.lastPreview.WorkspaceID != workspace.StoreWorkspaceID || backing.lastPreview.Path != "report.txt" || backing.lastPreview.MaxBytes != 5 {
+		t.Fatalf("unexpected preview request: %+v", backing.lastPreview)
+	}
 	assertWorkspacePathRef(t, resp.GetFile(), workspace, "report.txt")
-	if string(resp.GetPreviewBytes()) != "hello" {
-		t.Fatalf("unexpected preview bytes: %q", string(resp.GetPreviewBytes()))
-	}
-	if !resp.GetTruncated() {
-		t.Fatal("expected truncated preview")
-	}
-	if resp.GetSizeBytes() != int64(len("hello world")) {
-		t.Fatalf("unexpected size: %d", resp.GetSizeBytes())
-	}
-	if resp.GetMimeType() == "" || resp.GetModifiedAt() == nil {
-		t.Fatalf("missing mime type or modified_at: %+v", resp)
+	if string(resp.GetPreviewBytes()) != "hello" || !resp.GetTruncated() || resp.GetSizeBytes() != 11 || resp.GetMimeType() == "" || resp.GetModifiedAt() == nil {
+		t.Fatalf("unexpected preview response: %+v", resp)
 	}
 }
 
-func TestWorkspaceViewServicePreviewWorkspaceFileErrors(t *testing.T) {
-	view, workspace := newTestViewService(t)
-	if err := os.Mkdir(filepath.Join(workspace.RootPath, "dir"), 0o700); err != nil {
-		t.Fatalf("mkdir dir: %v", err)
+func TestWorkspaceViewServiceMissingWorkspace(t *testing.T) {
+	view, _, _ := newTestViewService(t)
+	_, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: "missing"})
+	if status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
 	}
-	writeFile(t, workspace.RootPath, "file.txt", "content")
-	if runtime.GOOS != "windows" {
-		if err := os.Symlink(filepath.Join(workspace.RootPath, "file.txt"), filepath.Join(workspace.RootPath, "link.txt")); err != nil {
-			t.Fatalf("symlink: %v", err)
-		}
-		outside := t.TempDir()
-		if err := os.WriteFile(filepath.Join(outside, "secret.txt"), []byte("secret"), 0o600); err != nil {
-			t.Fatalf("write outside secret: %v", err)
-		}
-		if err := os.Symlink(outside, filepath.Join(workspace.RootPath, "linkdir")); err != nil {
-			t.Fatalf("symlink outside dir: %v", err)
-		}
-	}
+}
 
+func TestWorkspaceViewServiceMapsStoreErrors(t *testing.T) {
 	tests := []struct {
 		name string
-		req  *sandboxv1.PreviewWorkspaceFileRequest
+		err  error
 		code codes.Code
 	}{
-		{name: "missing file", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "missing.txt"}, code: codes.NotFound},
-		{name: "directory", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "dir"}, code: codes.FailedPrecondition},
-		{name: "traversal", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "../secret"}, code: codes.InvalidArgument},
-	}
-	if runtime.GOOS != "windows" {
-		tests = append(tests, struct {
-			name string
-			req  *sandboxv1.PreviewWorkspaceFileRequest
-			code codes.Code
-		}{name: "symlink", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "link.txt"}, code: codes.PermissionDenied})
-		tests = append(tests, struct {
-			name string
-			req  *sandboxv1.PreviewWorkspaceFileRequest
-			code codes.Code
-		}{name: "parent symlink escape", req: &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "linkdir/secret.txt"}, code: codes.PermissionDenied})
+		{name: "invalid path", err: workspacestore.ErrInvalidPath, code: codes.InvalidArgument},
+		{name: "not found", err: workspacestore.ErrPathNotFound, code: codes.NotFound},
+		{name: "not directory", err: workspacestore.ErrPathNotDirectory, code: codes.FailedPrecondition},
+		{name: "is directory", err: workspacestore.ErrPathIsDirectory, code: codes.FailedPrecondition},
+		{name: "symlink", err: workspacestore.ErrSymlinkNotAllowed, code: codes.PermissionDenied},
+		{name: "escape", err: workspacestore.ErrPathEscapesWorkspace, code: codes.PermissionDenied},
+		{name: "not ready", err: workspacestore.ErrWorkspaceNotReady, code: codes.FailedPrecondition},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := view.PreviewWorkspaceFile(context.Background(), tt.req)
+			view, backing, workspace := newTestViewService(t)
+			backing.listErr = tt.err
+			_, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID})
 			if status.Code(err) != tt.code {
 				t.Fatalf("expected %s, got %v", tt.code, err)
 			}
@@ -191,33 +110,16 @@ func TestWorkspaceViewServicePreviewWorkspaceFileErrors(t *testing.T) {
 	}
 }
 
-func TestWorkspaceViewServiceRejectsEmptyRootPath(t *testing.T) {
+func newTestViewService(t *testing.T) (*WorkspaceViewService, *fakeBackingStore, workspacedomain.Workspace) {
+	t.Helper()
 	store := workspacedomain.NewMemoryStore()
-	workspace := workspacedomain.Workspace{
-		ID:               "ws-empty-root",
-		SandboxProfileID: "local-process",
-		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
-	}
-	if _, err := store.Create(context.Background(), workspace); err != nil {
-		t.Fatalf("Create workspace returned error: %v", err)
-	}
-	view := NewWorkspaceViewService("sandbox-service", store)
-	if _, err := view.ListWorkspaceDir(context.Background(), &sandboxv1.ListWorkspaceDirRequest{ServiceWorkspaceId: workspace.ID}); status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("expected FailedPrecondition for list, got %v", err)
-	}
-	if _, err := view.PreviewWorkspaceFile(context.Background(), &sandboxv1.PreviewWorkspaceFileRequest{ServiceWorkspaceId: workspace.ID, Path: "file.txt"}); status.Code(err) != codes.FailedPrecondition {
-		t.Fatalf("expected FailedPrecondition for preview, got %v", err)
-	}
-}
-
-func newTestViewService(t *testing.T) (*WorkspaceViewService, workspacedomain.Workspace) {
-	store := workspacedomain.NewMemoryStore()
-	root := t.TempDir()
+	backing := &fakeBackingStore{}
 	workspace := workspacedomain.Workspace{
 		ID:               "ws-test",
 		SandboxProfileID: "local-process",
 		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
-		RootPath:         root,
+		StoreKind:        "fake",
+		StoreWorkspaceID: "ws-backing",
 		CreatedAt:        time.Now().UTC(),
 		UpdatedAt:        time.Now().UTC(),
 	}
@@ -225,18 +127,7 @@ func newTestViewService(t *testing.T) (*WorkspaceViewService, workspacedomain.Wo
 	if err != nil {
 		t.Fatalf("Create workspace returned error: %v", err)
 	}
-	return NewWorkspaceViewService("sandbox-service", store), created
-}
-
-func writeFile(t *testing.T, root string, rel string, content string) {
-	t.Helper()
-	path := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		t.Fatalf("mkdir parent: %v", err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatalf("write file: %v", err)
-	}
+	return NewWorkspaceViewService("sandbox-service", store, backing), backing, created
 }
 
 func entryNames(entries []*sandboxv1.WorkspaceDirEntry) []string {
@@ -255,4 +146,88 @@ func assertWorkspacePathRef(t *testing.T, ref *sandboxv1.WorkspacePathRef, works
 		ref.GetPath() != path {
 		t.Fatalf("unexpected workspace path ref: %+v", ref)
 	}
+}
+
+type fakeBackingStore struct {
+	createResp  *workspacestore.BackingWorkspace
+	createErr   error
+	listResp    *workspacestore.DirListing
+	listErr     error
+	previewResp *workspacestore.FilePreview
+	previewErr  error
+	exportResp  *workspacestore.ExportedPath
+	exportErr   error
+
+	lastCreate  workspacestore.CreateBackingWorkspaceRequest
+	lastList    workspacestore.ListDirRequest
+	lastPreview workspacestore.PreviewFileRequest
+	lastExport  workspacestore.ExportPathRequest
+}
+
+func (f *fakeBackingStore) Kind() string { return "fake" }
+
+func (f *fakeBackingStore) CreateBackingWorkspace(_ context.Context, req workspacestore.CreateBackingWorkspaceRequest) (*workspacestore.BackingWorkspace, error) {
+	f.lastCreate = req
+	if f.createErr != nil {
+		return nil, f.createErr
+	}
+	if f.createResp != nil {
+		return f.createResp, nil
+	}
+	return &workspacestore.BackingWorkspace{
+		ID:               req.WorkspaceID,
+		StoreKind:        "fake",
+		StoreWorkspaceID: req.WorkspaceID,
+		SandboxProfileID: req.SandboxProfileID,
+		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
+	}, nil
+}
+
+func (f *fakeBackingStore) DeleteBackingWorkspace(context.Context, string) error { return nil }
+
+func (f *fakeBackingStore) ListDir(_ context.Context, req workspacestore.ListDirRequest) (*workspacestore.DirListing, error) {
+	f.lastList = req
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	if f.listResp != nil {
+		return f.listResp, nil
+	}
+	return &workspacestore.DirListing{
+		Directory: workspacestore.PathInfo{Path: req.Path, Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_DIRECTORY},
+	}, nil
+}
+
+func (f *fakeBackingStore) PreviewFile(_ context.Context, req workspacestore.PreviewFileRequest) (*workspacestore.FilePreview, error) {
+	f.lastPreview = req
+	if f.previewErr != nil {
+		return nil, f.previewErr
+	}
+	if f.previewResp != nil {
+		return f.previewResp, nil
+	}
+	return &workspacestore.FilePreview{
+		File:     workspacestore.PathInfo{Path: req.Path, Name: req.Path, Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE},
+		MimeType: "text/plain",
+		Bytes:    []byte("preview"),
+	}, nil
+}
+
+func (f *fakeBackingStore) StatPath(context.Context, workspacestore.StatPathRequest) (*workspacestore.PathInfo, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeBackingStore) ExportPath(_ context.Context, req workspacestore.ExportPathRequest) (*workspacestore.ExportedPath, error) {
+	f.lastExport = req
+	if f.exportErr != nil {
+		return nil, f.exportErr
+	}
+	if f.exportResp != nil {
+		return f.exportResp, nil
+	}
+	return &workspacestore.ExportedPath{
+		Source:    workspacestore.PathInfo{Path: req.Path, Name: req.Path, Kind: sandboxv1.WorkspacePathKind_WORKSPACE_PATH_KIND_FILE, SizeBytes: 12},
+		MimeType:  "text/plain",
+		SizeBytes: 12,
+	}, nil
 }

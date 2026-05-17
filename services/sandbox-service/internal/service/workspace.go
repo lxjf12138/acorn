@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
 	"time"
 
 	capabilityv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/capability/v1"
@@ -12,6 +10,7 @@ import (
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -21,17 +20,17 @@ type WorkspaceService struct {
 	sandboxv1.UnimplementedWorkspaceHostServiceServer
 
 	serviceID string
-	rootPath  string
 	profiles  *descriptor.Source
 	store     workspacedomain.Store
+	backing   workspacestore.Store
 }
 
-func NewWorkspaceService(serviceID string, rootPath string, profiles *descriptor.Source, store workspacedomain.Store) *WorkspaceService {
+func NewWorkspaceService(serviceID string, profiles *descriptor.Source, store workspacedomain.Store, backing workspacestore.Store) *WorkspaceService {
 	return &WorkspaceService{
 		serviceID: serviceID,
-		rootPath:  rootPath,
 		profiles:  profiles,
 		store:     store,
+		backing:   backing,
 	}
 }
 
@@ -42,16 +41,22 @@ func (s *WorkspaceService) CreateHostedWorkspace(ctx context.Context, req *sandb
 	}
 	now := time.Now().UTC()
 	workspaceID := workspacedomain.NewID()
-	rootPath := filepath.Join(s.rootPath, workspaceID)
-	if err := os.MkdirAll(rootPath, 0o700); err != nil {
-		return nil, status.Errorf(codes.Internal, "create workspace root: %v", err)
+	backing, err := s.backing.CreateBackingWorkspace(ctx, workspacestore.CreateBackingWorkspaceRequest{
+		WorkspaceID:      workspaceID,
+		SandboxProfileID: profile.GetId(),
+		DisplayName:      req.GetDisplayName(),
+		MetadataJSON:     req.GetMetadataJson(),
+	})
+	if err != nil {
+		return nil, mapWorkspaceStoreError(err)
 	}
 	workspace, err := s.store.Create(ctx, workspacedomain.Workspace{
 		ID:               workspaceID,
 		SandboxProfileID: profile.GetId(),
 		DisplayName:      req.GetDisplayName(),
 		Status:           workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE,
-		RootPath:         rootPath,
+		StoreKind:        backing.StoreKind,
+		StoreWorkspaceID: backing.StoreWorkspaceID,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 		MetadataJSON:     req.GetMetadataJson(),

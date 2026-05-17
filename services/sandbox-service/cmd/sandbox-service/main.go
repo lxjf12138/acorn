@@ -11,6 +11,7 @@ import (
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	exporteddomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/exportedresource"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	"github.com/lxjf12138/acorn/services/sandbox-service/internal/infra/localfs"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/server"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/service"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/version"
@@ -40,10 +41,14 @@ func main() {
 	descriptorSource := descriptor.NewSourceFromConfig(cfg, version.Version)
 	descriptorService := service.NewDescriptorService(descriptorSource)
 	workspaceStore := workspacedomain.NewMemoryStore()
+	backingStore, err := localfs.NewWorkspaceStore(localfs.Config{BaseDir: cfg.Sandbox.WorkspaceRoot})
+	if err != nil {
+		panic(err)
+	}
 	exportStore := exporteddomain.NewMemoryStore()
-	workspaceService := service.NewWorkspaceService(cfg.Service.ID, cfg.Sandbox.WorkspaceRoot, descriptorSource, workspaceStore)
-	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore)
-	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, exportStore)
+	workspaceService := service.NewWorkspaceService(cfg.Service.ID, descriptorSource, workspaceStore, backingStore)
+	viewService := service.NewWorkspaceViewService(cfg.Service.ID, workspaceStore, backingStore)
+	transferService := service.NewWorkspaceTransferService(cfg.Service.ID, workspaceStore, backingStore, exportStore)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, descriptorSource, logger)
 	grpcSrv := server.NewGRPCServer(cfg, descriptorService, workspaceService, viewService, transferService, logger)

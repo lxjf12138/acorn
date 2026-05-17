@@ -474,6 +474,12 @@ Move local filesystem assumptions out of service/view.go, service/transfer.go,
 and service/workspace.go.
 ```
 
+Status:
+
+```text
+Implemented.
+```
+
 Scope:
 
 ```text

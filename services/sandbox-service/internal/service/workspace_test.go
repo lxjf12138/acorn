@@ -2,20 +2,19 @@ package service
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"testing"
 
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	"github.com/lxjf12138/acorn/services/sandbox-service/internal/descriptor"
 	workspacedomain "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspace"
+	workspacestore "github.com/lxjf12138/acorn/services/sandbox-service/internal/domain/workspacestore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, backing := newTestWorkspaceService(t)
 	resp, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{})
 	if err != nil {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
@@ -27,13 +26,13 @@ func TestWorkspaceServiceCreateHostedWorkspaceDefaultProfile(t *testing.T) {
 	if resp.GetWorkspace().GetStatus() != workspacev1.WorkspaceStatus_WORKSPACE_STATUS_ACTIVE {
 		t.Fatalf("unexpected status: %s", resp.GetWorkspace().GetStatus())
 	}
-	if _, err := os.Stat(service.storeRootForTest(resp.GetWorkspace().GetRef().GetServiceWorkspaceId())); err != nil {
-		t.Fatalf("workspace root was not created: %v", err)
+	if backing.lastCreate.WorkspaceID != ref.GetServiceWorkspaceId() || backing.lastCreate.SandboxProfileID != "local-process" {
+		t.Fatalf("unexpected backing create request: %+v", backing.lastCreate)
 	}
 }
 
 func TestWorkspaceServiceCreateHostedWorkspaceExplicitProfile(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, backing := newTestWorkspaceService(t)
 	resp, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
 		SandboxProfileId: "local-docker",
 		DisplayName:      "docker workspace",
@@ -47,10 +46,13 @@ func TestWorkspaceServiceCreateHostedWorkspaceExplicitProfile(t *testing.T) {
 	if got := resp.GetWorkspace().GetDisplayName(); got != "docker workspace" {
 		t.Fatalf("unexpected display name: %q", got)
 	}
+	if backing.lastCreate.SandboxProfileID != "local-docker" || backing.lastCreate.DisplayName != "docker workspace" {
+		t.Fatalf("unexpected backing create request: %+v", backing.lastCreate)
+	}
 }
 
 func TestWorkspaceServiceCreateHostedWorkspaceUnknownProfile(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, _ := newTestWorkspaceService(t)
 	_, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
 		SandboxProfileId: "missing",
 	})
@@ -60,7 +62,7 @@ func TestWorkspaceServiceCreateHostedWorkspaceUnknownProfile(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspace(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, _ := newTestWorkspaceService(t)
 	created, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{})
 	if err != nil {
 		t.Fatalf("CreateHostedWorkspace returned error: %v", err)
@@ -77,7 +79,7 @@ func TestWorkspaceServiceGetHostedWorkspace(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, _ := newTestWorkspaceService(t)
 	_, err := service.GetHostedWorkspace(context.Background(), &sandboxv1.GetHostedWorkspaceRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
@@ -85,7 +87,7 @@ func TestWorkspaceServiceGetHostedWorkspaceEmptyID(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, _ := newTestWorkspaceService(t)
 	created, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{
 		SandboxProfileId: "local-process",
 	})
@@ -123,7 +125,7 @@ func TestWorkspaceServiceGetHostedWorkspaceState(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceStateEmptyID(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, _ := newTestWorkspaceService(t)
 	_, err := service.GetHostedWorkspaceState(context.Background(), &sandboxv1.GetHostedWorkspaceStateRequest{})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", err)
@@ -131,7 +133,7 @@ func TestWorkspaceServiceGetHostedWorkspaceStateEmptyID(t *testing.T) {
 }
 
 func TestWorkspaceServiceGetHostedWorkspaceStateNotFound(t *testing.T) {
-	service := newTestWorkspaceService(t)
+	service, _ := newTestWorkspaceService(t)
 	_, err := service.GetHostedWorkspaceState(context.Background(), &sandboxv1.GetHostedWorkspaceStateRequest{
 		ServiceWorkspaceId: "missing",
 	})
@@ -140,16 +142,21 @@ func TestWorkspaceServiceGetHostedWorkspaceStateNotFound(t *testing.T) {
 	}
 }
 
-func newTestWorkspaceService(t *testing.T) *WorkspaceService {
-	root := t.TempDir()
-	return NewWorkspaceService(
-		"sandbox-service-id",
-		root,
-		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id"}),
-		workspacedomain.NewMemoryStore(),
-	)
+func TestWorkspaceServiceCreateHostedWorkspaceBackingFailure(t *testing.T) {
+	service, backing := newTestWorkspaceService(t)
+	backing.createErr = workspacestore.ErrWorkspaceNotReady
+	_, err := service.CreateHostedWorkspace(context.Background(), &sandboxv1.CreateHostedWorkspaceRequest{})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition, got %v", err)
+	}
 }
 
-func (s *WorkspaceService) storeRootForTest(workspaceID string) string {
-	return filepath.Join(s.rootPath, workspaceID)
+func newTestWorkspaceService(t *testing.T) (*WorkspaceService, *fakeBackingStore) {
+	backing := &fakeBackingStore{}
+	return NewWorkspaceService(
+		"sandbox-service-id",
+		descriptor.NewSource(descriptor.Options{ServiceID: "sandbox-service-id"}),
+		workspacedomain.NewMemoryStore(),
+		backing,
+	), backing
 }
