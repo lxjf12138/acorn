@@ -263,3 +263,17 @@ the OTel Logs SDK. Traces explain execution paths and latency; metrics explain
 aggregate trends; events explain selected business facts. Durable audit and UI
 timeline features should be future projections over an explicit product store,
 not a replacement for OTel telemetry.
+
+## Execution Records
+
+ExecutionRecord is Control Plane runtime state, not a telemetry signal. It
+records synchronous workspace exec attempts so the Control Plane can answer
+which command summary ran in which session/workspace/profile, when it started
+and completed, whether it succeeded, failed, or timed out, and which trace/span
+ids correlate with the request.
+
+Execution records do not replace OpenTelemetry spans, metrics, or log-based
+events. They do not store stdout/stderr content, full command args, environment
+values, workspace paths, file content, or secrets. Phase 1 execution records
+are in-memory and synchronous; they are not Agent Runs, async jobs,
+long-running process management, cancellation, or durable audit storage.

@@ -802,21 +802,29 @@ ProfileRegistry / Sandbox Profile Selection Cleanup
 Control Plane SandboxPolicy / PlacementResolver
 Workspace Execution Lease / Concurrency Guard
 Observability Foundation
+ExecutionRecord Foundation
 ```
 
 Next planned code sequence:
 
 ```text
-PR 1: Minimal Run model / ExecutionRecord
-  - Record who executed what and when
-  - Store exit code and output summary
-  - Associate execution with session, user, workspace, and future run id
+PR 1: Minimal Run model
+  - Group related execution records under a run
+  - Prepare run-level profile and backend selection
+  - Keep individual workspace exec attempts queryable as ExecutionRecords
 ```
 
 Observability now uses servicekit OpenTelemetry initialization and Kratos
 HTTP/gRPC tracing middleware. Acorn adds domain spans, low-cardinality metrics,
 and selected log-based domain events over the same OpenTelemetry substrate. See
 `docs/observability.md`.
+
+ExecutionRecord is Control Plane runtime state for synchronous workspace exec
+attempts. It records session/workspace/profile identifiers, command basename,
+argument count, timestamps, exit status, truncation flags, and trace/span ids
+for correlation. It does not store full command args, environment values,
+stdout/stderr content, workspace paths, or file content, and it is not an Agent
+Run, async job, background process, or durable audit log.
 
 `local-process-dev` executes host processes for development and is not a strong
 multi-tenant security boundary.

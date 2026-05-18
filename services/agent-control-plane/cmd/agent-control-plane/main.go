@@ -15,6 +15,7 @@ import (
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/infra/executionstore"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/server"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/version"
@@ -53,6 +54,7 @@ func main() {
 	statusService := service.NewStatusService()
 	resourceStore := resourcedomain.NewMemoryStore()
 	resourceService := service.NewResourceService(resourceStore)
+	executionService := service.NewExecutionService(executionstore.NewMemoryStore())
 	blobStore, err := localblob.NewStore(localblob.Config{BaseDir: cfg.Resource.BlobRoot})
 	if err != nil {
 		panic(err)
@@ -74,9 +76,9 @@ func main() {
 	})
 	uploadService := service.NewUploadServiceWithEvents(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes, obs.EventEmitter)
 	sandboxPolicyResolver := sandboxpolicydomain.NewConfigResolver(cfg.SandboxPolicies, cfg.Sandbox.DefaultProfileID)
-	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver, obs.EventEmitter)
+	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayPolicyEventsAndExecutions(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver, obs.EventEmitter, executionService)
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger, obs.TracingEnabled)
+	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, executionService, logger, obs.TracingEnabled)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger, obs.TracingEnabled)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)

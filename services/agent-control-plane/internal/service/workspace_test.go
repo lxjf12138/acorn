@@ -14,6 +14,7 @@ import (
 	"github.com/lxjf12138/acorn/packages/core/events"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/execution"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
@@ -302,6 +303,21 @@ func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
 		event.Attributes[events.AttrExecExitCode] != int32(0) {
 		t.Fatalf("unexpected exec event attributes: %+v", event.Attributes)
 	}
+	result, err := service.ExecSessionWorkspaceCommandWithRecord(context.Background(), ExecSessionWorkspaceCommandInput{
+		SessionID: "sess-1",
+		UserID:    "user-1",
+		Command:   "go",
+	})
+	if err != nil {
+		t.Fatalf("ExecSessionWorkspaceCommandWithRecord returned error: %v", err)
+	}
+	if result.Execution == nil || result.Execution.ID == "" ||
+		result.Execution.Status != execution.StatusSucceeded ||
+		result.Execution.CommandName != "go" ||
+		result.Execution.SandboxProfileID != "local-process" ||
+		result.Execution.ServiceWorkspaceID != "ws_sess-1" {
+		t.Fatalf("unexpected execution record: %+v", result.Execution)
+	}
 }
 
 func TestWorkspaceServiceExecSessionWorkspaceCommandEmitsWarningForNonzeroExit(t *testing.T) {
@@ -318,13 +334,17 @@ func TestWorkspaceServiceExecSessionWorkspaceCommandEmitsWarningForNonzeroExit(t
 	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
 	}
-	if _, err := service.ExecSessionWorkspaceCommand(context.Background(), ExecSessionWorkspaceCommandInput{
+	result, err := service.ExecSessionWorkspaceCommandWithRecord(context.Background(), ExecSessionWorkspaceCommandInput{
 		SessionID: "sess-1",
 		UserID:    "user-1",
 		Command:   "/usr/bin/go",
 		Args:      []string{"test", "./..."},
-	}); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("ExecSessionWorkspaceCommand returned error: %v", err)
+	}
+	if result.Execution.Status != execution.StatusFailed || result.Execution.ExitCode != 2 {
+		t.Fatalf("unexpected execution record: %+v", result.Execution)
 	}
 	event := emitter.events[len(emitter.events)-1]
 	if event.Name != events.WorkspaceExecCompleted || event.Severity != events.SeverityWarning {
@@ -360,6 +380,13 @@ func TestWorkspaceServiceExecSessionWorkspaceCommandEmitsFailedEvent(t *testing.
 	}
 	if event.Attributes[events.AttrExecTimedOut] != true {
 		t.Fatalf("expected timed out event attribute, got %+v", event.Attributes)
+	}
+	result, err := service.executions.List(context.Background(), execution.ListFilter{SessionID: "sess-1"})
+	if err != nil {
+		t.Fatalf("List executions returned error: %v", err)
+	}
+	if len(result.Records) != 1 || result.Records[0].Status != execution.StatusTimeout {
+		t.Fatalf("unexpected execution records: %+v", result.Records)
 	}
 }
 

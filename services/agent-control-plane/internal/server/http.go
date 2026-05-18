@@ -17,6 +17,7 @@ import (
 	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
+	executiondomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/execution"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
@@ -30,7 +31,7 @@ import (
 const multipartUploadOverheadBytes = int64(10 << 20)
 const execRequestMaxBytes = int64(1 << 20)
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger, tracingEnabled bool) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, executionService *service.ExecutionService, logger klog.Logger, tracingEnabled bool) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
@@ -131,7 +132,7 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		resp, err := workspaceService.ExecSessionWorkspaceCommand(ctx, service.ExecSessionWorkspaceCommandInput{
+		result, err := workspaceService.ExecSessionWorkspaceCommandWithRecord(ctx, service.ExecSessionWorkspaceCommandInput{
 			SessionID:      ctx.Vars().Get("session_id"),
 			UserID:         req.UserID,
 			Command:        req.Command,
@@ -145,7 +146,28 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 		if err != nil {
 			return err
 		}
-		return httpx.WriteProtoJSON(ctx, nethttp.StatusOK, resp)
+		return writeExecWorkspaceCommandJSON(ctx, nethttp.StatusOK, result)
+	})
+	router.GET("/sessions/{session_id}/executions", func(ctx khttp.Context) error {
+		filter, err := executionFilterFromQuery(ctx, ctx.Vars().Get("session_id"))
+		if err != nil {
+			return err
+		}
+		result, err := executionService.List(ctx, filter)
+		if err != nil {
+			return err
+		}
+		return ctx.JSON(nethttp.StatusOK, listExecutionsResponseFromResult(result))
+	})
+	router.GET("/sessions/{session_id}/executions/{execution_id}", func(ctx khttp.Context) error {
+		record, err := executionService.Get(ctx, ctx.Vars().Get("execution_id"))
+		if err != nil {
+			return err
+		}
+		if record.SessionID != ctx.Vars().Get("session_id") {
+			return status.Error(codes.NotFound, "execution not found")
+		}
+		return ctx.JSON(nethttp.StatusOK, executionResponseFromRecord(record))
 	})
 	router.POST("/resources", func(ctx khttp.Context) error {
 		var req resourcev1.RegisterResourceRequest
@@ -299,6 +321,17 @@ func parseInt64Query(value string, name string) (int64, error) {
 		return 0, nil
 	}
 	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, status.Errorf(codes.InvalidArgument, "invalid %s", name)
+	}
+	return parsed, nil
+}
+
+func parseIntQuery(value string, name string) (int, error) {
+	if value == "" {
+		return 0, nil
+	}
+	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return 0, status.Errorf(codes.InvalidArgument, "invalid %s", name)
 	}
@@ -482,6 +515,144 @@ func writeRegisterResourceJSON(ctx khttp.Context, code int, record *resourcev1.R
 
 func writeGetResourceJSON(ctx khttp.Context, code int, record *resourcev1.ResourceRecord) error {
 	return httpx.WriteProtoJSON(ctx, code, &resourcev1.GetResourceResponse{Resource: record})
+}
+
+type execWorkspaceCommandResponse struct {
+	Execution *executionResponse `json:"execution"`
+	Result    json.RawMessage    `json:"result"`
+}
+
+type executionResponse struct {
+	ID                 string `json:"id"`
+	TenantID           string `json:"tenant_id,omitempty"`
+	UserID             string `json:"user_id,omitempty"`
+	SessionID          string `json:"session_id,omitempty"`
+	WorkspaceID        string `json:"workspace_id,omitempty"`
+	ServiceWorkspaceID string `json:"service_workspace_id,omitempty"`
+	SandboxServiceID   string `json:"sandbox_service_id,omitempty"`
+	SandboxProfileID   string `json:"sandbox_profile_id,omitempty"`
+	SandboxBackendID   string `json:"sandbox_backend_id,omitempty"`
+	Status             string `json:"status"`
+	CommandName        string `json:"command_name,omitempty"`
+	ArgCount           int    `json:"arg_count"`
+	CWDSet             bool   `json:"cwd_set"`
+	ExitCode           int32  `json:"exit_code,omitempty"`
+	ErrorCode          string `json:"error_code,omitempty"`
+	ErrorMessage       string `json:"error_message,omitempty"`
+	StdoutSizeBytes    int64  `json:"stdout_size_bytes,omitempty"`
+	StderrSizeBytes    int64  `json:"stderr_size_bytes,omitempty"`
+	StdoutTruncated    bool   `json:"stdout_truncated"`
+	StderrTruncated    bool   `json:"stderr_truncated"`
+	TraceID            string `json:"trace_id,omitempty"`
+	SpanID             string `json:"span_id,omitempty"`
+	StartedAt          string `json:"started_at,omitempty"`
+	CompletedAt        string `json:"completed_at,omitempty"`
+	UpdatedAt          string `json:"updated_at,omitempty"`
+}
+
+type listExecutionsResponse struct {
+	Executions    []*executionResponse `json:"executions"`
+	NextPageToken string               `json:"next_page_token,omitempty"`
+}
+
+func writeExecWorkspaceCommandJSON(ctx khttp.Context, code int, result *service.ExecSessionWorkspaceCommandResult) error {
+	marshaler := protojson.MarshalOptions{UseProtoNames: true, EmitUnpopulated: true}
+	resultJSON, err := marshaler.Marshal(result.Response)
+	if err != nil {
+		return err
+	}
+	body, err := json.Marshal(execWorkspaceCommandResponse{
+		Execution: executionResponseFromRecord(result.Execution),
+		Result:    resultJSON,
+	})
+	if err != nil {
+		return err
+	}
+	return ctx.Blob(code, "application/json", body)
+}
+
+func executionFilterFromQuery(ctx khttp.Context, sessionID string) (executiondomain.ListFilter, error) {
+	limit, err := parseIntQuery(ctx.Query().Get("limit"), "limit")
+	if err != nil {
+		return executiondomain.ListFilter{}, err
+	}
+	statusValue, err := parseExecutionStatus(ctx.Query().Get("status"))
+	if err != nil {
+		return executiondomain.ListFilter{}, err
+	}
+	return executiondomain.ListFilter{
+		TenantID:    ctx.Query().Get("tenant_id"),
+		UserID:      ctx.Query().Get("user_id"),
+		SessionID:   sessionID,
+		WorkspaceID: ctx.Query().Get("workspace_id"),
+		Status:      statusValue,
+		Limit:       limit,
+		PageToken:   ctx.Query().Get("page_token"),
+	}, nil
+}
+
+func parseExecutionStatus(value string) (executiondomain.Status, error) {
+	if value == "" {
+		return "", nil
+	}
+	switch executiondomain.Status(value) {
+	case executiondomain.StatusRunning,
+		executiondomain.StatusSucceeded,
+		executiondomain.StatusFailed,
+		executiondomain.StatusTimeout,
+		executiondomain.StatusCanceled:
+		return executiondomain.Status(value), nil
+	default:
+		return "", status.Errorf(codes.InvalidArgument, "invalid execution status: %s", value)
+	}
+}
+
+func listExecutionsResponseFromResult(result *executiondomain.ListResult) listExecutionsResponse {
+	resp := listExecutionsResponse{NextPageToken: result.NextPageToken}
+	for _, record := range result.Records {
+		resp.Executions = append(resp.Executions, executionResponseFromRecord(record))
+	}
+	return resp
+}
+
+func executionResponseFromRecord(record *executiondomain.ExecutionRecord) *executionResponse {
+	if record == nil {
+		return nil
+	}
+	return &executionResponse{
+		ID:                 record.ID,
+		TenantID:           record.TenantID,
+		UserID:             record.UserID,
+		SessionID:          record.SessionID,
+		WorkspaceID:        record.WorkspaceID,
+		ServiceWorkspaceID: record.ServiceWorkspaceID,
+		SandboxServiceID:   record.SandboxServiceID,
+		SandboxProfileID:   record.SandboxProfileID,
+		SandboxBackendID:   record.SandboxBackendID,
+		Status:             string(record.Status),
+		CommandName:        record.CommandName,
+		ArgCount:           record.ArgCount,
+		CWDSet:             record.CWDSet,
+		ExitCode:           record.ExitCode,
+		ErrorCode:          record.ErrorCode,
+		ErrorMessage:       record.ErrorMessage,
+		StdoutSizeBytes:    record.StdoutSizeBytes,
+		StderrSizeBytes:    record.StderrSizeBytes,
+		StdoutTruncated:    record.StdoutTruncated,
+		StderrTruncated:    record.StderrTruncated,
+		TraceID:            record.TraceID,
+		SpanID:             record.SpanID,
+		StartedAt:          formatTime(record.StartedAt),
+		CompletedAt:        formatTime(record.CompletedAt),
+		UpdatedAt:          formatTime(record.UpdatedAt),
+	}
+}
+
+func formatTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339Nano)
 }
 
 func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService) error {

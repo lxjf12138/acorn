@@ -18,8 +18,10 @@ import (
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
+	executiondomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/execution"
 	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/infra/executionstore"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,6 +38,7 @@ type WorkspaceService struct {
 	profileResolver  sandboxpolicydomain.Resolver
 	profileCatalog   *SandboxProfileCatalog
 	events           events.Emitter
+	executions       *ExecutionService
 }
 
 const sandboxProfileCacheTTL = 30 * time.Second
@@ -67,6 +70,11 @@ type ExecSessionWorkspaceCommandInput struct {
 	MaxStderrBytes int64
 }
 
+type ExecSessionWorkspaceCommandResult struct {
+	Response  *sandboxv1.ExecWorkspaceCommandResponse
+	Execution *executiondomain.ExecutionRecord
+}
+
 func NewWorkspaceService(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, sandboxServiceID string, sandboxProfileID string) *WorkspaceService {
 	return NewWorkspaceServiceWithResources(store, sandboxClient, nil, sandboxServiceID, sandboxProfileID)
 }
@@ -84,8 +92,15 @@ func NewWorkspaceServiceWithResourcesGatewayAndPolicy(store workspacedomain.Stor
 }
 
 func NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, profileResolver sandboxpolicydomain.Resolver, emitter events.Emitter) *WorkspaceService {
+	return NewWorkspaceServiceWithResourcesGatewayPolicyEventsAndExecutions(store, sandboxClient, resourceService, resourceGateway, sandboxServiceID, profileResolver, emitter, nil)
+}
+
+func NewWorkspaceServiceWithResourcesGatewayPolicyEventsAndExecutions(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, profileResolver sandboxpolicydomain.Resolver, emitter events.Emitter, executions *ExecutionService) *WorkspaceService {
 	if emitter == nil {
 		emitter = eventing.NoopEmitter{}
+	}
+	if executions == nil {
+		executions = NewExecutionService(executionstore.NewMemoryStore())
 	}
 	return &WorkspaceService{
 		store:            store,
@@ -96,6 +111,7 @@ func NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(store workspacedomai
 		profileResolver:  profileResolver,
 		profileCatalog:   NewSandboxProfileCatalog(sandboxClient, sandboxProfileCacheTTL),
 		events:           emitter,
+		executions:       executions,
 	}
 }
 
@@ -582,6 +598,14 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 }
 
 func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, input ExecSessionWorkspaceCommandInput) (*sandboxv1.ExecWorkspaceCommandResponse, error) {
+	result, err := s.ExecSessionWorkspaceCommandWithRecord(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	return result.Response, nil
+}
+
+func (s *WorkspaceService) ExecSessionWorkspaceCommandWithRecord(ctx context.Context, input ExecSessionWorkspaceCommandInput) (*ExecSessionWorkspaceCommandResult, error) {
 	ctx, span := telemetry.Start(ctx, "agent-control-plane/workspace", telemetry.SpanWorkspaceExec)
 	defer span.End()
 	startedAt := time.Now()
@@ -618,6 +642,13 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
+	executionRecord, err := s.startExecution(ctx, input, record, userID)
+	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
+		return nil, err
+	}
 	resp, err := s.sandboxClient.ExecWorkspaceCommand(ctx, sandboxclient.ExecWorkspaceCommandInput{
 		SessionID:          record.SessionID,
 		UserID:             userID,
@@ -634,6 +665,11 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
+		updated, updateErr := s.failExecution(ctx, executionRecord, err)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+		executionRecord = updated
 		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
@@ -641,6 +677,11 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		recordWorkspaceExec(ctx, telemetry.StatusError, sandboxProfileID, time.Since(startedAt))
+		updated, updateErr := s.failExecution(ctx, executionRecord, err)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+		executionRecord = updated
 		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
@@ -655,6 +696,12 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordWorkspaceExec(ctx, metricStatus, sandboxProfileID, time.Since(startedAt))
+	executionRecord, err = s.completeExecution(ctx, executionRecord, resp)
+	if err != nil {
+		telemetry.RecordError(span, err)
+		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
+		return nil, err
+	}
 	eventSeverity := events.SeverityInfo
 	if resp.GetExitCode() != 0 {
 		eventSeverity = events.SeverityWarning
@@ -671,7 +718,44 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 			events.AttrExecStderrTruncated: resp.GetStderrTruncated(),
 		},
 	})
-	return resp, nil
+	return &ExecSessionWorkspaceCommandResult{Response: resp, Execution: executionRecord}, nil
+}
+
+func (s *WorkspaceService) startExecution(ctx context.Context, input ExecSessionWorkspaceCommandInput, record workspacedomain.Record, userID string) (*executiondomain.ExecutionRecord, error) {
+	if s.executions == nil {
+		return nil, status.Error(codes.FailedPrecondition, "execution service is not configured")
+	}
+	return s.executions.Start(ctx, StartExecutionInput{
+		UserID:             userID,
+		SessionID:          record.SessionID,
+		WorkspaceID:        record.ID,
+		ServiceWorkspaceID: record.CurrentHost.GetServiceWorkspaceId(),
+		SandboxServiceID:   record.CurrentHost.GetServiceId(),
+		SandboxProfileID:   record.CurrentHost.GetSandboxProfileId(),
+		CommandName:        telemetry.SafeCommandName(input.Command),
+		ArgCount:           len(input.Args),
+		CWDSet:             input.CWD != "",
+	})
+}
+
+func (s *WorkspaceService) completeExecution(ctx context.Context, record *executiondomain.ExecutionRecord, resp *sandboxv1.ExecWorkspaceCommandResponse) (*executiondomain.ExecutionRecord, error) {
+	if s.executions == nil {
+		return nil, status.Error(codes.FailedPrecondition, "execution service is not configured")
+	}
+	return s.executions.Complete(ctx, record.ID, CompleteExecutionInput{
+		ExitCode:        resp.GetExitCode(),
+		StdoutSizeBytes: int64(len(resp.GetStdout())),
+		StderrSizeBytes: int64(len(resp.GetStderr())),
+		StdoutTruncated: resp.GetStdoutTruncated(),
+		StderrTruncated: resp.GetStderrTruncated(),
+	})
+}
+
+func (s *WorkspaceService) failExecution(ctx context.Context, record *executiondomain.ExecutionRecord, err error) (*executiondomain.ExecutionRecord, error) {
+	if s.executions == nil {
+		return nil, status.Error(codes.FailedPrecondition, "execution service is not configured")
+	}
+	return s.executions.Fail(ctx, record.ID, FailExecutionInput{Err: err})
 }
 
 func (s *WorkspaceService) emitWorkspaceExecFailed(ctx context.Context, sandboxProfileID string, input ExecSessionWorkspaceCommandInput, err error) {
