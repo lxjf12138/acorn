@@ -407,7 +407,7 @@ Capability Service
   ├─ State Surface
   ├─ View Surface
   ├─ Resource Surface
-  ├─ Observation Surface
+  ├─ Telemetry Semantics
   ├─ Governance Surface
   └─ Domain Runtime
 ```
@@ -510,7 +510,7 @@ sandbox exported workspace path -> ResourceRef
 workspace bundle export -> ResourceRef
 ```
 
-### 6.5 Observation Surface
+### 6.5 Telemetry Semantics
 
 Tracing, metrics, structured domain events, debug signals, and future audit or
 UI timeline projections.

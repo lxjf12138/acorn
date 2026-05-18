@@ -48,6 +48,10 @@ observability:
     enabled: false
     exporter: noop
     otlp_endpoint: ""
+  logs:
+    enabled: false
+    exporter: noop
+    otlp_endpoint: ""
 
 log:
   level: info

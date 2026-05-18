@@ -64,6 +64,17 @@ observability:
     sample_ratio: 1.0
 ```
 
+Log-based Acorn domain events are disabled by default. Local development can
+enable stdout logs for event validation:
+
+```yaml
+observability:
+  logs:
+    enabled: true
+    exporter: stdout
+    otlp_endpoint: ""
+```
+
 Production-like deployments should set `exporter: otlp` and provide an
 `otlp_endpoint`.
 
