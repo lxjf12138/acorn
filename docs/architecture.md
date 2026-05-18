@@ -78,7 +78,6 @@ Session
 WorkspaceRecord
 CapabilityDescriptor
 ResourceRecord
-EventRecord
 Policy / Audit
 ```
 

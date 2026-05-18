@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"io"
 	"mime/multipart"
 	nethttp "net/http"
@@ -448,17 +447,13 @@ func (c *downloadTestContext) Response() nethttp.ResponseWriter { return c.respo
 func (c *downloadTestContext) Middleware(handler middleware.Handler) middleware.Handler {
 	return handler
 }
-func (c *downloadTestContext) Bind(any) error           { return nil }
-func (c *downloadTestContext) BindVars(any) error       { return nil }
-func (c *downloadTestContext) BindQuery(any) error      { return nil }
-func (c *downloadTestContext) BindForm(any) error       { return nil }
-func (c *downloadTestContext) Returns(any, error) error { return nil }
-func (c *downloadTestContext) Result(int, any) error    { return nil }
-func (c *downloadTestContext) JSON(code int, v any) error {
-	c.response.Header().Set("Content-Type", "application/json")
-	c.response.WriteHeader(code)
-	return json.NewEncoder(c.response).Encode(v)
-}
+func (c *downloadTestContext) Bind(any) error                                 { return nil }
+func (c *downloadTestContext) BindVars(any) error                             { return nil }
+func (c *downloadTestContext) BindQuery(any) error                            { return nil }
+func (c *downloadTestContext) BindForm(any) error                             { return nil }
+func (c *downloadTestContext) Returns(any, error) error                       { return nil }
+func (c *downloadTestContext) Result(int, any) error                          { return nil }
+func (c *downloadTestContext) JSON(int, any) error                            { return nil }
 func (c *downloadTestContext) XML(int, any) error                             { return nil }
 func (c *downloadTestContext) String(int, string) error                       { return nil }
 func (c *downloadTestContext) Blob(int, string, []byte) error                 { return nil }

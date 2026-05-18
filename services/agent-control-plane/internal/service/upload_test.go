@@ -9,9 +9,7 @@ import (
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	"github.com/lxjf12138/acorn/packages/servicekit/localblob"
-	eventdomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/event"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
-	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/infra/eventstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -19,8 +17,7 @@ import (
 func TestUploadServiceUploadResource(t *testing.T) {
 	blobStore := newUploadTestBlobStore(t)
 	resourceService := NewResourceService(resourcedomain.NewMemoryStore())
-	events := NewEventService("agent-control-plane", eventstore.NewMemoryStore())
-	upload := NewUploadService("agent-control-plane", blobStore, resourceService, 100).WithEvents(events)
+	upload := NewUploadService("agent-control-plane", blobStore, resourceService, 100)
 
 	record, err := upload.UploadResource(context.Background(), UploadResourceInput{
 		UserID:    "user-1",
@@ -59,13 +56,6 @@ func TestUploadServiceUploadResource(t *testing.T) {
 	}
 	if string(body) != "hello" {
 		t.Fatalf("unexpected blob body: %q", string(body))
-	}
-	eventResult, err := events.List(context.Background(), eventdomain.ListFilter{SessionID: "sess-1"})
-	if err != nil {
-		t.Fatalf("List events returned error: %v", err)
-	}
-	if len(eventResult.Events) != 1 || eventResult.Events[0].Type != eventdomain.TypeResourceUploaded {
-		t.Fatalf("expected resource uploaded event, got %+v", eventResult.Events)
 	}
 }
 

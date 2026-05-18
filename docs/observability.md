@@ -224,31 +224,3 @@ labels.
 OpenTelemetry traces explain system execution. Acorn Event Surface records will
 explain product and audit history. Events may reference trace/span ids, but
 traces are not a substitute for audit records or user-visible timelines.
-
-## Event Surface Foundation
-
-Acorn events are product and audit timeline records. They capture business
-facts such as a resource being uploaded or a workspace command completing.
-OpenTelemetry remains the source for traces, metrics, spans, backend latency,
-and transport diagnostics.
-
-Current event records may include `trace_id` and `span_id` so a product
-timeline item can be correlated with the request trace. Events are not sampled,
-but the first implementation uses an in-memory Control Plane store and is not a
-durable audit log.
-
-Implemented event types:
-
-```text
-workspace.created
-resource.uploaded
-resource.imported_to_workspace
-resource.exported_from_workspace
-workspace.exec.completed
-workspace.exec.failed
-```
-
-Event payloads intentionally avoid file content, stdout/stderr content, full
-command arguments, environment values, workspace paths, tokens, and secrets.
-The current foundation does not include a distributed event bus, SQL-backed
-event log, subscription API, event replay, or UI timeline.

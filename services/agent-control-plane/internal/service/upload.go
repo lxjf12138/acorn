@@ -8,7 +8,6 @@ import (
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
-	eventdomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/event"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
@@ -22,7 +21,6 @@ type UploadService struct {
 	blobStore       resourceblob.Store
 	resourceService resourceRegistrar
 	maxUploadBytes  int64
-	events          EventAppender
 }
 
 type resourceRegistrar interface {
@@ -50,11 +48,6 @@ func NewUploadService(serviceID string, blobStore resourceblob.Store, resourceSe
 		resourceService: resourceService,
 		maxUploadBytes:  maxUploadBytes,
 	}
-}
-
-func (s *UploadService) WithEvents(events EventAppender) *UploadService {
-	s.events = events
-	return s
 }
 
 func (s *UploadService) UploadResource(ctx context.Context, input UploadResourceInput) (*resourcev1.ResourceRecord, error) {
@@ -132,21 +125,6 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordResourceTransfer(ctx, "upload", telemetry.StatusOK, record.GetRef().GetAuthorityServiceId(), record.GetRef().GetSizeBytes())
-	bestEffortAppendEvent(ctx, s.events, AppendEventInput{
-		Type:       eventdomain.TypeResourceUploaded,
-		Severity:   eventdomain.SeverityInfo,
-		UserID:     input.UserID,
-		SessionID:  input.SessionID,
-		ResourceID: record.GetRef().GetId(),
-		Actor:      eventdomain.EventActor{Type: "user", ID: input.UserID},
-		Subject:    eventdomain.EventSubject{Type: "resource", ID: record.GetRef().GetId()},
-		Payload: map[string]any{
-			"name":                 record.GetRef().GetName(),
-			"mime_type":            record.GetRef().GetMimeType(),
-			"size_bytes":           record.GetRef().GetSizeBytes(),
-			"authority_service_id": record.GetRef().GetAuthorityServiceId(),
-		},
-	})
 	return record, nil
 }
 

@@ -17,7 +17,6 @@ import (
 	"github.com/lxjf12138/acorn/packages/core/telemetry"
 	"github.com/lxjf12138/acorn/packages/servicekit"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
-	eventdomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/event"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"go.opentelemetry.io/otel/attribute"
 	"google.golang.org/grpc/codes"
@@ -31,7 +30,7 @@ import (
 const multipartUploadOverheadBytes = int64(10 << 20)
 const execRequestMaxBytes = int64(1 << 20)
 
-func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, eventService *service.EventService, logger klog.Logger, tracingEnabled bool) *khttp.Server {
+func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, workspaceService *service.WorkspaceService, resourceService *service.ResourceService, resourceGatewayService *service.ResourceGatewayService, uploadService *service.UploadService, logger klog.Logger, tracingEnabled bool) *khttp.Server {
 	srv := khttp.NewServer(
 		khttp.Address(cfg.Server.HTTP.Addr),
 		khttp.Timeout(cfg.Server.HTTP.TimeoutDuration()),
@@ -81,9 +80,6 @@ func NewHTTPServer(cfg *conf.Config, statusService *service.StatusService, works
 			return err
 		}
 		return writeSessionWorkspaceStateJSON(ctx, nethttp.StatusOK, sessionState)
-	})
-	router.GET("/sessions/{session_id}/events", func(ctx khttp.Context) error {
-		return listSessionEvents(ctx, eventService)
 	})
 	router.GET("/sessions/{session_id}/workspace/files", func(ctx khttp.Context) error {
 		pageSize, err := parseInt32Query(ctx.Query().Get("page_size"), "page_size")
@@ -296,17 +292,6 @@ func parseInt32Query(value string, name string) (int32, error) {
 		return 0, status.Errorf(codes.InvalidArgument, "invalid %s", name)
 	}
 	return int32(parsed), nil
-}
-
-func parseIntQuery(value string, name string) (int, error) {
-	if value == "" {
-		return 0, nil
-	}
-	parsed, err := strconv.Atoi(value)
-	if err != nil {
-		return 0, status.Errorf(codes.InvalidArgument, "invalid %s", name)
-	}
-	return parsed, nil
 }
 
 func parseInt64Query(value string, name string) (int64, error) {
@@ -561,23 +546,6 @@ func downloadResource(ctx khttp.Context, gateway *service.ResourceGatewayService
 			return err
 		}
 	}
-}
-
-func listSessionEvents(ctx khttp.Context, eventService *service.EventService) error {
-	limit, err := parseIntQuery(ctx.Query().Get("limit"), "limit")
-	if err != nil {
-		return err
-	}
-	result, err := eventService.List(ctx, eventdomain.ListFilter{
-		SessionID: ctx.Vars().Get("session_id"),
-		UserID:    ownerUserID(ctx),
-		Limit:     limit,
-		PageToken: ctx.Query().Get("page_token"),
-	})
-	if err != nil {
-		return err
-	}
-	return ctx.JSON(nethttp.StatusOK, eventListResponse(result))
 }
 
 func httpTelemetryStatusValue(err error) string {
