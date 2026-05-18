@@ -9,7 +9,7 @@ The system is organized around:
 - runtime Capability Descriptors
 - sandbox profiles and backends
 - MCP agent-surface adapters
-- Acorn-native control/state/view/resource/signal/governance APIs
+- Acorn-native control/state/view/resource/governance APIs
 - OpenTelemetry-based telemetry semantics
 
 A Capability Service exposes a runtime Capability Descriptor describing:
@@ -19,11 +19,12 @@ A Capability Service exposes a runtime Capability Descriptor describing:
 - State Surface
 - View Surface
 - Resource Surface
-- Signal Surface
-- Telemetry Semantics
 - Governance Surface
 - sandbox profiles, when applicable
 - implemented endpoints and transport addresses
+
+Telemetry is configured as a cross-cutting runtime concern, not as a Phase 1
+Capability Surface. Signal APIs are deferred.
 
 The first concrete Capability Service is `sandbox-service`.
 

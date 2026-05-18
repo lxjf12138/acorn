@@ -4,6 +4,26 @@ Acorn uses OpenTelemetry as the standard observability substrate. Kratos
 middleware handles transport-level tracing and context propagation. servicekit
 owns shared initialization and middleware wiring.
 
+## Relationship
+
+```text
+OpenTelemetry
+  telemetry substrate for traces, metrics, and logs / log-based events
+
+Kratos
+  HTTP/gRPC transport middleware integration
+
+servicekit
+  provider initialization and middleware wiring
+
+Acorn
+  domain telemetry semantic conventions
+```
+
+Acorn does not define a separate observability or event substrate in Phase 1.
+It defines workspace, resource, sandbox, exec, and event semantics over
+OpenTelemetry.
+
 ## Layers
 
 ```text
@@ -273,7 +293,10 @@ and completed, whether it succeeded, failed, or timed out, and which trace/span
 ids correlate with the request.
 
 Execution records do not replace OpenTelemetry spans, metrics, or log-based
-events. They do not store stdout/stderr content, full command args, environment
-values, workspace paths, file content, or secrets. Phase 1 execution records
-are in-memory and synchronous; they are not Agent Runs, async jobs,
-long-running process management, cancellation, or durable audit storage.
+events. They are not Acorn Events. They store trace_id/span_id only for
+correlation with OpenTelemetry traces.
+
+They do not store stdout/stderr content, full command args, environment values,
+workspace paths, file content, or secrets. Phase 1 execution records are
+in-memory and synchronous; they are not Agent Runs, async jobs, long-running
+process management, cancellation, or durable audit storage.

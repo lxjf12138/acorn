@@ -2,6 +2,11 @@
 
 > This document defines Acorn's current Phase 1 architecture baseline. It is intentionally narrower than a full Agent Runtime: Acorn is the capability service substrate that a future runtime can build on.
 
+For detailed Control Plane internals, see
+[`docs/control-plane-architecture.md`](control-plane-architecture.md). For
+persistence and store boundaries, see
+[`docs/persistence-boundaries.md`](persistence-boundaries.md).
+
 ---
 
 ## 1. Architecture Positioning
@@ -16,6 +21,7 @@ Control Plane
   -> Workspace
   -> View / Preview
   -> ResourceRef
+  -> ExecutionRecord
   -> future Agent Runtime / MCP Tool
 ```
 
@@ -32,9 +38,10 @@ Acorn
 │  ├─ WorkspaceRecord
 │  ├─ CapabilityDescriptor Registry
 │  ├─ ResourceRecord / Resource Gateway
+│  ├─ ExecutionRecord
 │  ├─ View Gateway
 │  ├─ Policy / Audit
-│  └─ future Agent Runtime
+│  └─ future RunRecord / Agent Runtime
 │
 ├─ Capability Services
 │  ├─ sandbox-service
@@ -63,6 +70,12 @@ Acorn
    ├─ MCP adapter
    ├─ future native tool router
    └─ model-facing tools
+
+Cross-cutting
+└─ Telemetry Semantics over OpenTelemetry
+   ├─ traces
+   ├─ metrics
+   └─ logs / log-based events
 ```
 
 ---
@@ -78,6 +91,7 @@ Session
 WorkspaceRecord
 CapabilityDescriptor
 ResourceRecord
+ExecutionRecord
 Policy / Audit
 ```
 
@@ -384,7 +398,7 @@ calendar.event
 approval.request
 ```
 
-Current Phase 1 concepts remain:
+Current Phase 1 concepts:
 
 ```text
 WorkspaceRecord
@@ -392,7 +406,13 @@ HostedWorkspace
 WorkspacePathRef
 ResourceRef
 ResourceRecord
+ExecutionRecord
+future RunRecord
 ```
+
+ExecutionRecord is implemented Control Plane runtime state for synchronous
+workspace exec attempts. RunRecord is planned and will group related execution
+records under a user or agent task attempt.
 
 ---
 
@@ -407,7 +427,6 @@ Capability Service
   ├─ State Surface
   ├─ View Surface
   ├─ Resource Surface
-  ├─ Telemetry Semantics
   ├─ Governance Surface
   └─ Domain Runtime
 ```
@@ -512,10 +531,19 @@ workspace bundle export -> ResourceRef
 
 ### 6.5 Telemetry Semantics
 
-Tracing, metrics, structured domain events, debug signals, and future audit or
-UI timeline projections.
+Telemetry is cross-cutting and configured through service observability
+configuration. It is not a Phase 1 Capability Surface and does not belong in
+CapabilityDescriptor as an externally callable domain API.
 
-Examples:
+OpenTelemetry is the Phase 1 telemetry substrate:
+
+```text
+traces for request and operation execution paths
+metrics for aggregate measurements
+logs / log-based events for structured domain events
+```
+
+Acorn domain event examples:
 
 ```text
 workspace.created
@@ -526,10 +554,11 @@ workspace.exec.completed
 workspace.exec.failed
 ```
 
-OpenTelemetry is the Phase 1 telemetry substrate. Acorn defines event names and
-attributes, then emits selected domain events through OpenTelemetry Logs. This
-does not imply an Acorn EventStore, EventService implementation, subscription
-stream, UI timeline, or durable audit log.
+Acorn defines event names and attributes, then emits selected domain events
+through OpenTelemetry Logs. This does not imply an Acorn EventStore,
+EventService implementation, subscription stream, UI timeline, or durable audit
+log. Signal Surface is deferred; Phase 1 OTel log-based events are not a
+separate Signal Surface.
 
 ### 6.6 Governance Surface
 
