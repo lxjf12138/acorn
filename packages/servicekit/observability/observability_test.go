@@ -18,6 +18,12 @@ func TestInitDisabledReturnsNoop(t *testing.T) {
 	if providers.MetricsEnabled {
 		t.Fatal("expected metrics disabled")
 	}
+	if providers.LogsEnabled {
+		t.Fatal("expected logs disabled")
+	}
+	if providers.EventEmitter == nil {
+		t.Fatal("expected event emitter")
+	}
 	if err := providers.Shutdown(context.Background()); err != nil {
 		t.Fatalf("Shutdown returned error: %v", err)
 	}
@@ -65,6 +71,34 @@ func TestInitStdoutMetrics(t *testing.T) {
 	}
 }
 
+func TestInitStdoutLogs(t *testing.T) {
+	providers, err := Init(context.Background(), testBuildInfo(), Config{
+		Enabled: true,
+		Logs: LogsConfig{
+			Enabled:  true,
+			Exporter: ExporterStdout,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Init returned error: %v", err)
+	}
+	if providers.TracingEnabled {
+		t.Fatal("expected tracing disabled")
+	}
+	if providers.MetricsEnabled {
+		t.Fatal("expected metrics disabled")
+	}
+	if !providers.LogsEnabled {
+		t.Fatal("expected logs enabled")
+	}
+	if providers.EventEmitter == nil {
+		t.Fatal("expected event emitter")
+	}
+	if err := providers.Shutdown(context.Background()); err != nil {
+		t.Fatalf("Shutdown returned error: %v", err)
+	}
+}
+
 func TestInitUnknownTracingExporter(t *testing.T) {
 	_, err := Init(context.Background(), testBuildInfo(), Config{
 		Enabled: true,
@@ -91,6 +125,19 @@ func TestInitUnknownMetricsExporter(t *testing.T) {
 	}
 }
 
+func TestInitUnknownLogsExporter(t *testing.T) {
+	_, err := Init(context.Background(), testBuildInfo(), Config{
+		Enabled: true,
+		Logs: LogsConfig{
+			Enabled:  true,
+			Exporter: "wat",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestInitTracingOTLPRequiresEndpoint(t *testing.T) {
 	_, err := Init(context.Background(), testBuildInfo(), Config{
 		Enabled: true,
@@ -108,6 +155,19 @@ func TestInitMetricsOTLPRequiresEndpoint(t *testing.T) {
 	_, err := Init(context.Background(), testBuildInfo(), Config{
 		Enabled: true,
 		Metrics: MetricsConfig{
+			Enabled:  true,
+			Exporter: ExporterOTLP,
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
+func TestInitLogsOTLPRequiresEndpoint(t *testing.T) {
+	_, err := Init(context.Background(), testBuildInfo(), Config{
+		Enabled: true,
+		Logs: LogsConfig{
 			Enabled:  true,
 			Exporter: ExporterOTLP,
 		},

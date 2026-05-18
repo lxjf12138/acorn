@@ -18,13 +18,15 @@ servicekit observability
 Acorn domain instrumentation
   workspace/resource/sandbox spans and metrics
 
-Acorn Event Surface
-  product timeline and audit events linked to trace/span ids
+Acorn event semantics
+  structured domain events emitted through OpenTelemetry logs
 ```
 
 The initial observability foundation enabled transport-level tracing. The
 current domain tracing layer adds selected Acorn resource and workspace spans.
-Metrics, audit logs, and Event Surface records remain follow-up work.
+The metrics foundation adds low-cardinality platform metrics. Acorn domain
+events are emitted as OpenTelemetry log-based events; durable audit stores and
+product timeline projections remain follow-up work.
 
 ## Resource Attributes
 
@@ -116,7 +118,7 @@ Exec / Backend
 ```
 
 These spans use the active OpenTelemetry context created by transport
-middleware. They do not add metrics, audit logs, or Acorn Event Surface records.
+middleware. They do not replace metrics, audit logs, or Acorn domain events.
 
 Current span attributes are intentionally small:
 
@@ -219,8 +221,34 @@ Metrics do not use `workspace_id`, `resource_id`, `user_id`, `session_id`,
 paths, filenames, command arguments, content hashes, or environment values as
 labels.
 
-## Event Surface Boundary
+## Acorn Event Semantics
 
-OpenTelemetry traces explain system execution. Acorn Event Surface records will
-explain product and audit history. Events may reference trace/span ids, but
-traces are not a substitute for audit records or user-visible timelines.
+Acorn events are structured domain events carried by OpenTelemetry Logs. They
+are log-based events with stable event names and low-risk attributes. They do
+not create an Acorn EventStore, EventService implementation, `/events` HTTP
+endpoint, subscription stream, product timeline, or durable audit log in this
+phase.
+
+Implemented event names:
+
+```text
+workspace.created
+resource.uploaded
+resource.imported_to_workspace
+resource.exported_from_workspace
+workspace.exec.completed
+workspace.exec.failed
+```
+
+Event attributes intentionally avoid file content, stdout/stderr content,
+environment values, full command arguments, workspace paths, resource ids,
+workspace ids, user ids, and session ids. Exec events record command basename,
+argument count, exit code, timeout flag, and stdout/stderr truncation flags.
+Resource events record mime type, size, authority service id where available,
+and selected sandbox profile where relevant.
+
+Log-based events are correlated with the current OpenTelemetry context through
+the OTel Logs SDK. Traces explain execution paths and latency; metrics explain
+aggregate trends; events explain selected business facts. Durable audit and UI
+timeline features should be future projections over an explicit product store,
+not a replacement for OTel telemetry.

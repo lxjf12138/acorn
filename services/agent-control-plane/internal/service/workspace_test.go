@@ -11,6 +11,7 @@ import (
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
+	"github.com/lxjf12138/acorn/packages/core/events"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
@@ -251,7 +252,8 @@ func testPolicies() conf.SandboxPolicies {
 func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
 	workspaceStore := workspacedomain.NewMemoryStore()
 	client := &fakeWorkspaceHostClient{}
-	service := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process")
+	emitter := &fakeEventEmitter{}
+	service := NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspaceStore, client, nil, nil, "sandbox-service", sandboxpolicydomain.NewConfigResolver(confSandboxPolicies("local-process"), "local-process"), emitter)
 	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
 	}
@@ -283,6 +285,81 @@ func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
 		client.lastExecInput.MaxStdoutBytes != 10 ||
 		client.lastExecInput.MaxStderrBytes != 11 {
 		t.Fatalf("unexpected exec input: %+v", client.lastExecInput)
+	}
+	if len(emitter.events) != 2 {
+		t.Fatalf("expected workspace.created and exec.completed events, got %d", len(emitter.events))
+	}
+	if emitter.events[0].Name != events.WorkspaceCreated {
+		t.Fatalf("unexpected create event: %+v", emitter.events[0])
+	}
+	event := emitter.events[1]
+	if event.Name != events.WorkspaceExecCompleted || event.Severity != events.SeverityInfo {
+		t.Fatalf("unexpected exec event: %+v", event)
+	}
+	if event.Attributes[events.AttrSandboxProfileID] != "local-process" ||
+		event.Attributes[events.AttrExecCommandName] != "go" ||
+		event.Attributes[events.AttrExecArgCount] != 1 ||
+		event.Attributes[events.AttrExecExitCode] != int32(0) {
+		t.Fatalf("unexpected exec event attributes: %+v", event.Attributes)
+	}
+}
+
+func TestWorkspaceServiceExecSessionWorkspaceCommandEmitsWarningForNonzeroExit(t *testing.T) {
+	workspaceStore := workspacedomain.NewMemoryStore()
+	client := &fakeWorkspaceHostClient{
+		execResp: &sandboxv1.ExecWorkspaceCommandResponse{
+			Workspace:       &workspacev1.WorkspaceHostRef{ServiceId: "sandbox-service", ServiceWorkspaceId: "ws_sess-1", SandboxProfileId: "local-process"},
+			ExitCode:        2,
+			StderrTruncated: true,
+		},
+	}
+	emitter := &fakeEventEmitter{}
+	service := NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspaceStore, client, nil, nil, "sandbox-service", sandboxpolicydomain.NewConfigResolver(confSandboxPolicies("local-process"), "local-process"), emitter)
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	if _, err := service.ExecSessionWorkspaceCommand(context.Background(), ExecSessionWorkspaceCommandInput{
+		SessionID: "sess-1",
+		UserID:    "user-1",
+		Command:   "/usr/bin/go",
+		Args:      []string{"test", "./..."},
+	}); err != nil {
+		t.Fatalf("ExecSessionWorkspaceCommand returned error: %v", err)
+	}
+	event := emitter.events[len(emitter.events)-1]
+	if event.Name != events.WorkspaceExecCompleted || event.Severity != events.SeverityWarning {
+		t.Fatalf("unexpected exec event: %+v", event)
+	}
+	if event.Attributes[events.AttrExecCommandName] != "go" ||
+		event.Attributes[events.AttrExecArgCount] != 2 ||
+		event.Attributes[events.AttrExecExitCode] != int32(2) ||
+		event.Attributes[events.AttrExecStderrTruncated] != true {
+		t.Fatalf("unexpected exec event attributes: %+v", event.Attributes)
+	}
+}
+
+func TestWorkspaceServiceExecSessionWorkspaceCommandEmitsFailedEvent(t *testing.T) {
+	workspaceStore := workspacedomain.NewMemoryStore()
+	client := &fakeWorkspaceHostClient{execErr: status.Error(codes.DeadlineExceeded, "timeout")}
+	emitter := &fakeEventEmitter{}
+	service := NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspaceStore, client, nil, nil, "sandbox-service", sandboxpolicydomain.NewConfigResolver(confSandboxPolicies("local-process"), "local-process"), emitter)
+	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
+		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
+	}
+	_, err := service.ExecSessionWorkspaceCommand(context.Background(), ExecSessionWorkspaceCommandInput{
+		SessionID: "sess-1",
+		UserID:    "user-1",
+		Command:   "go",
+	})
+	if status.Code(err) != codes.DeadlineExceeded {
+		t.Fatalf("expected DeadlineExceeded, got %v", err)
+	}
+	event := emitter.events[len(emitter.events)-1]
+	if event.Name != events.WorkspaceExecFailed || event.Severity != events.SeverityError {
+		t.Fatalf("unexpected exec failed event: %+v", event)
+	}
+	if event.Attributes[events.AttrExecTimedOut] != true {
+		t.Fatalf("expected timed out event attribute, got %+v", event.Attributes)
 	}
 }
 
@@ -808,7 +885,8 @@ func TestWorkspaceServicePreviewSessionWorkspaceFileRejectsMismatchedRef(t *test
 func TestWorkspaceServiceExportSessionWorkspacePath(t *testing.T) {
 	client := &fakeWorkspaceHostClient{}
 	resourceService := NewResourceService(resourcedomain.NewMemoryStore())
-	service := NewWorkspaceServiceWithResources(workspacedomain.NewMemoryStore(), client, resourceService, "sandbox-service", "local-process")
+	emitter := &fakeEventEmitter{}
+	service := NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspacedomain.NewMemoryStore(), client, resourceService, nil, "sandbox-service", sandboxpolicydomain.NewConfigResolver(confSandboxPolicies("local-process"), "local-process"), emitter)
 	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "owner-1"); err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
 	}
@@ -838,6 +916,15 @@ func TestWorkspaceServiceExportSessionWorkspacePath(t *testing.T) {
 		source.GetServiceWorkspaceId() != "ws_sess-1" ||
 		source.GetSourcePath() != "outputs/report.txt" {
 		t.Fatalf("unexpected resource source: %+v", source)
+	}
+	event := emitter.events[len(emitter.events)-1]
+	if event.Name != events.ResourceExportedFromWorkspace || event.Severity != events.SeverityInfo {
+		t.Fatalf("unexpected export event: %+v", event)
+	}
+	if event.Attributes[events.AttrResourceAuthorityServiceID] != "sandbox-service" ||
+		event.Attributes[events.AttrResourceSizeBytes] != int64(12) ||
+		event.Attributes[events.AttrSandboxProfileID] != "local-process" {
+		t.Fatalf("unexpected export event attributes: %+v", event.Attributes)
 	}
 }
 
@@ -950,7 +1037,8 @@ func TestWorkspaceServiceImportResourceToSessionWorkspace(t *testing.T) {
 			},
 		}},
 	})
-	service := NewWorkspaceServiceWithResourcesAndGateway(workspaceStore, client, NewResourceService(resourceStore), gateway, "sandbox-service", "local-process")
+	emitter := &fakeEventEmitter{}
+	service := NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspaceStore, client, NewResourceService(resourceStore), gateway, "sandbox-service", sandboxpolicydomain.NewConfigResolver(confSandboxPolicies("local-process"), "local-process"), emitter)
 	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
 	}
@@ -970,6 +1058,15 @@ func TestWorkspaceServiceImportResourceToSessionWorkspace(t *testing.T) {
 	}
 	if resp.GetPath().GetPath() != "inputs/report.txt" {
 		t.Fatalf("unexpected import response: %+v", resp)
+	}
+	event := emitter.events[len(emitter.events)-1]
+	if event.Name != events.ResourceImportedToWorkspace || event.Severity != events.SeverityInfo {
+		t.Fatalf("unexpected import event: %+v", event)
+	}
+	if event.Attributes[events.AttrResourceMimeType] != "text/plain" ||
+		event.Attributes[events.AttrResourceSizeBytes] != int64(11) ||
+		event.Attributes[events.AttrSandboxProfileID] != "local-process" {
+		t.Fatalf("unexpected import event attributes: %+v", event.Attributes)
 	}
 }
 

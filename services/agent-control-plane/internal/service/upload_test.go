@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	"github.com/lxjf12138/acorn/packages/core/events"
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	"github.com/lxjf12138/acorn/packages/servicekit/localblob"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
@@ -17,7 +18,8 @@ import (
 func TestUploadServiceUploadResource(t *testing.T) {
 	blobStore := newUploadTestBlobStore(t)
 	resourceService := NewResourceService(resourcedomain.NewMemoryStore())
-	upload := NewUploadService("agent-control-plane", blobStore, resourceService, 100)
+	emitter := &fakeEventEmitter{}
+	upload := NewUploadServiceWithEvents("agent-control-plane", blobStore, resourceService, 100, emitter)
 
 	record, err := upload.UploadResource(context.Background(), UploadResourceInput{
 		UserID:    "user-1",
@@ -56,6 +58,18 @@ func TestUploadServiceUploadResource(t *testing.T) {
 	}
 	if string(body) != "hello" {
 		t.Fatalf("unexpected blob body: %q", string(body))
+	}
+	if len(emitter.events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(emitter.events))
+	}
+	event := emitter.events[0]
+	if event.Name != events.ResourceUploaded || event.Severity != events.SeverityInfo {
+		t.Fatalf("unexpected event: %+v", event)
+	}
+	if event.Attributes[events.AttrResourceAuthorityServiceID] != "agent-control-plane" ||
+		event.Attributes[events.AttrResourceMimeType] != "text/csv" ||
+		event.Attributes[events.AttrResourceSizeBytes] != int64(5) {
+		t.Fatalf("unexpected event attributes: %+v", event.Attributes)
 	}
 }
 
@@ -105,6 +119,14 @@ func (failingRegistrar) RegisterRecord(context.Context, *resourcev1.RegisterReso
 
 type rollbackBlobStore struct {
 	deleted bool
+}
+
+type fakeEventEmitter struct {
+	events []events.Event
+}
+
+func (e *fakeEventEmitter) Emit(_ context.Context, event events.Event) {
+	e.events = append(e.events, event)
 }
 
 func (s *rollbackBlobStore) Kind() string { return "fake" }

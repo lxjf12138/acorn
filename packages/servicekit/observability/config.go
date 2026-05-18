@@ -6,6 +6,7 @@ type Config struct {
 
 	Tracing TracingConfig `json:"tracing" yaml:"tracing"`
 	Metrics MetricsConfig `json:"metrics" yaml:"metrics"`
+	Logs    LogsConfig    `json:"logs" yaml:"logs"`
 }
 
 type TracingConfig struct {
@@ -16,6 +17,12 @@ type TracingConfig struct {
 }
 
 type MetricsConfig struct {
+	Enabled      bool   `json:"enabled" yaml:"enabled"`
+	Exporter     string `json:"exporter" yaml:"exporter"`
+	OTLPEndpoint string `json:"otlp_endpoint" yaml:"otlp_endpoint"`
+}
+
+type LogsConfig struct {
 	Enabled      bool   `json:"enabled" yaml:"enabled"`
 	Exporter     string `json:"exporter" yaml:"exporter"`
 	OTLPEndpoint string `json:"otlp_endpoint" yaml:"otlp_endpoint"`
@@ -42,6 +49,9 @@ func (c Config) normalized() Config {
 	}
 	if c.Metrics.Exporter == "" {
 		c.Metrics.Exporter = ExporterNoop
+	}
+	if c.Logs.Exporter == "" {
+		c.Logs.Exporter = ExporterNoop
 	}
 	return c
 }

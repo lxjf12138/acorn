@@ -5,8 +5,10 @@ import (
 	"io"
 
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
+	"github.com/lxjf12138/acorn/packages/core/events"
 	resourceblob "github.com/lxjf12138/acorn/packages/core/resourceblob"
 	"github.com/lxjf12138/acorn/packages/core/telemetry"
+	"github.com/lxjf12138/acorn/packages/servicekit/eventing"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,6 +23,7 @@ type UploadService struct {
 	blobStore       resourceblob.Store
 	resourceService resourceRegistrar
 	maxUploadBytes  int64
+	events          events.Emitter
 }
 
 type resourceRegistrar interface {
@@ -39,14 +42,22 @@ type UploadResourceInput struct {
 }
 
 func NewUploadService(serviceID string, blobStore resourceblob.Store, resourceService resourceRegistrar, maxUploadBytes int64) *UploadService {
+	return NewUploadServiceWithEvents(serviceID, blobStore, resourceService, maxUploadBytes, eventing.NoopEmitter{})
+}
+
+func NewUploadServiceWithEvents(serviceID string, blobStore resourceblob.Store, resourceService resourceRegistrar, maxUploadBytes int64, emitter events.Emitter) *UploadService {
 	if maxUploadBytes <= 0 {
 		maxUploadBytes = defaultMaxUploadBytes
+	}
+	if emitter == nil {
+		emitter = eventing.NoopEmitter{}
 	}
 	return &UploadService{
 		serviceID:       serviceID,
 		blobStore:       blobStore,
 		resourceService: resourceService,
 		maxUploadBytes:  maxUploadBytes,
+		events:          emitter,
 	}
 }
 
@@ -125,6 +136,15 @@ func (s *UploadService) UploadResource(ctx context.Context, input UploadResource
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordResourceTransfer(ctx, "upload", telemetry.StatusOK, record.GetRef().GetAuthorityServiceId(), record.GetRef().GetSizeBytes())
+	s.events.Emit(ctx, events.Event{
+		Name:     events.ResourceUploaded,
+		Severity: events.SeverityInfo,
+		Attributes: map[string]any{
+			events.AttrResourceAuthorityServiceID: record.GetRef().GetAuthorityServiceId(),
+			events.AttrResourceMimeType:           record.GetRef().GetMimeType(),
+			events.AttrResourceSizeBytes:          record.GetRef().GetSizeBytes(),
+		},
+	})
 	return record, nil
 }
 

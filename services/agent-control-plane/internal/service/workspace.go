@@ -12,7 +12,9 @@ import (
 	resourcev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/resource/v1"
 	sandboxv1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/sandbox/v1"
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
+	"github.com/lxjf12138/acorn/packages/core/events"
 	"github.com/lxjf12138/acorn/packages/core/telemetry"
+	"github.com/lxjf12138/acorn/packages/servicekit/eventing"
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
@@ -33,6 +35,7 @@ type WorkspaceService struct {
 	sandboxServiceID string
 	profileResolver  sandboxpolicydomain.Resolver
 	profileCatalog   *SandboxProfileCatalog
+	events           events.Emitter
 }
 
 const sandboxProfileCacheTTL = 30 * time.Second
@@ -77,6 +80,13 @@ func NewWorkspaceServiceWithResourcesAndGateway(store workspacedomain.Store, san
 }
 
 func NewWorkspaceServiceWithResourcesGatewayAndPolicy(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, profileResolver sandboxpolicydomain.Resolver) *WorkspaceService {
+	return NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(store, sandboxClient, resourceService, resourceGateway, sandboxServiceID, profileResolver, eventing.NoopEmitter{})
+}
+
+func NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(store workspacedomain.Store, sandboxClient sandboxclient.WorkspaceHostClient, resourceService *ResourceService, resourceGateway *ResourceGatewayService, sandboxServiceID string, profileResolver sandboxpolicydomain.Resolver, emitter events.Emitter) *WorkspaceService {
+	if emitter == nil {
+		emitter = eventing.NoopEmitter{}
+	}
 	return &WorkspaceService{
 		store:            store,
 		sandboxClient:    sandboxClient,
@@ -85,6 +95,7 @@ func NewWorkspaceServiceWithResourcesGatewayAndPolicy(store workspacedomain.Stor
 		sandboxServiceID: sandboxServiceID,
 		profileResolver:  profileResolver,
 		profileCatalog:   NewSandboxProfileCatalog(sandboxClient, sandboxProfileCacheTTL),
+		events:           emitter,
 	}
 }
 
@@ -144,6 +155,13 @@ func (s *WorkspaceService) CreateSessionWorkspaceWithInput(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
+	s.events.Emit(ctx, events.Event{
+		Name:     events.WorkspaceCreated,
+		Severity: events.SeverityInfo,
+		Attributes: map[string]any{
+			events.AttrSandboxProfileID: record.CurrentHost.GetSandboxProfileId(),
+		},
+	})
 	return toProto(record), nil
 }
 
@@ -478,6 +496,16 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordResourceTransfer(ctx, "export", telemetry.StatusOK, registered.GetRef().GetAuthorityServiceId(), registered.GetRef().GetSizeBytes())
+	s.events.Emit(ctx, events.Event{
+		Name:     events.ResourceExportedFromWorkspace,
+		Severity: events.SeverityInfo,
+		Attributes: map[string]any{
+			events.AttrResourceAuthorityServiceID: registered.GetRef().GetAuthorityServiceId(),
+			events.AttrResourceMimeType:           registered.GetRef().GetMimeType(),
+			events.AttrResourceSizeBytes:          registered.GetRef().GetSizeBytes(),
+			events.AttrSandboxProfileID:           record.CurrentHost.GetSandboxProfileId(),
+		},
+	})
 	return registered, nil
 }
 
@@ -541,6 +569,15 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordResourceTransfer(ctx, "import", telemetry.StatusOK, resourceAuthorityServiceID, resp.GetSizeBytes())
+	s.events.Emit(ctx, events.Event{
+		Name:     events.ResourceImportedToWorkspace,
+		Severity: events.SeverityInfo,
+		Attributes: map[string]any{
+			events.AttrResourceMimeType:  resp.GetMimeType(),
+			events.AttrResourceSizeBytes: resp.GetSizeBytes(),
+			events.AttrSandboxProfileID:  record.CurrentHost.GetSandboxProfileId(),
+		},
+	})
 	return resp, nil
 }
 
@@ -559,6 +596,7 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusInvalid))
 		recordWorkspaceExec(ctx, telemetry.StatusInvalid, sandboxProfileID, time.Since(startedAt))
+		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
 	record, err := s.getWorkspaceRecordForView(ctx, input.SessionID)
@@ -566,6 +604,7 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
+		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
 	sandboxProfileID = record.CurrentHost.GetSandboxProfileId()
@@ -576,6 +615,7 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusDenied))
 		recordWorkspaceExec(ctx, telemetry.StatusDenied, sandboxProfileID, time.Since(startedAt))
+		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
 	resp, err := s.sandboxClient.ExecWorkspaceCommand(ctx, sandboxclient.ExecWorkspaceCommandInput{
@@ -594,12 +634,14 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
+		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
 	if err := validateWorkspaceHostRef(resp.GetWorkspace(), record.CurrentHost); err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		recordWorkspaceExec(ctx, telemetry.StatusError, sandboxProfileID, time.Since(startedAt))
+		s.emitWorkspaceExecFailed(ctx, sandboxProfileID, input, err)
 		return nil, err
 	}
 	metricStatus := telemetry.StatusOK
@@ -613,7 +655,36 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordWorkspaceExec(ctx, metricStatus, sandboxProfileID, time.Since(startedAt))
+	eventSeverity := events.SeverityInfo
+	if resp.GetExitCode() != 0 {
+		eventSeverity = events.SeverityWarning
+	}
+	s.events.Emit(ctx, events.Event{
+		Name:     events.WorkspaceExecCompleted,
+		Severity: eventSeverity,
+		Attributes: map[string]any{
+			events.AttrSandboxProfileID:    sandboxProfileID,
+			events.AttrExecCommandName:     telemetry.SafeCommandName(input.Command),
+			events.AttrExecArgCount:        len(input.Args),
+			events.AttrExecExitCode:        resp.GetExitCode(),
+			events.AttrExecStdoutTruncated: resp.GetStdoutTruncated(),
+			events.AttrExecStderrTruncated: resp.GetStderrTruncated(),
+		},
+	})
 	return resp, nil
+}
+
+func (s *WorkspaceService) emitWorkspaceExecFailed(ctx context.Context, sandboxProfileID string, input ExecSessionWorkspaceCommandInput, err error) {
+	s.events.Emit(ctx, events.Event{
+		Name:     events.WorkspaceExecFailed,
+		Severity: events.SeverityError,
+		Attributes: map[string]any{
+			events.AttrSandboxProfileID: sandboxProfileID,
+			events.AttrExecCommandName:  telemetry.SafeCommandName(input.Command),
+			events.AttrExecArgCount:     len(input.Args),
+			events.AttrExecTimedOut:     status.Code(err) == codes.DeadlineExceeded,
+		},
+	})
 }
 
 func (s *WorkspaceService) getWorkspaceRecordForView(ctx context.Context, sessionID string) (workspacedomain.Record, error) {

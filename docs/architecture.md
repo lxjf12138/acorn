@@ -407,7 +407,7 @@ Capability Service
   ├─ State Surface
   ├─ View Surface
   ├─ Resource Surface
-  ├─ Observation / Event Surface
+  ├─ Observation Surface
   ├─ Governance Surface
   └─ Domain Runtime
 ```
@@ -510,24 +510,26 @@ sandbox exported workspace path -> ResourceRef
 workspace bundle export -> ResourceRef
 ```
 
-### 6.5 Observation / Event Surface
+### 6.5 Observation Surface
 
-Audit, UI timeline, debug, metrics, tracing, and replay.
+Tracing, metrics, structured domain events, debug signals, and future audit or
+UI timeline projections.
 
 Examples:
 
 ```text
 workspace.created
-workspace.file.previewed
-resource.exported
-browser.screenshot.previewed
-mail.attachment.exported
-tool.call.started
-tool.call.completed
-policy.denied
+resource.uploaded
+resource.imported_to_workspace
+resource.exported_from_workspace
+workspace.exec.completed
+workspace.exec.failed
 ```
 
-View is returned to the user. Event records that something happened. These surfaces must not be confused.
+OpenTelemetry is the Phase 1 telemetry substrate. Acorn defines event names and
+attributes, then emits selected domain events through OpenTelemetry Logs. This
+does not imply an Acorn EventStore, EventService implementation, subscription
+stream, UI timeline, or durable audit log.
 
 ### 6.6 Governance Surface
 
@@ -812,8 +814,8 @@ PR 1: Minimal Run model / ExecutionRecord
 ```
 
 Observability now uses servicekit OpenTelemetry initialization and Kratos
-HTTP/gRPC tracing middleware. This is transport-level tracing only; domain
-spans, metrics, audit logs, and Event Surface records are separate layers. See
+HTTP/gRPC tracing middleware. Acorn adds domain spans, low-cardinality metrics,
+and selected log-based domain events over the same OpenTelemetry substrate. See
 `docs/observability.md`.
 
 `local-process-dev` executes host processes for development and is not a strong

@@ -72,9 +72,9 @@ func main() {
 		cfg.Service.ID:        service.NewLocalResourceAuthority(cfg.Service.ID, blobStore),
 		cfg.Sandbox.ServiceID: service.NewSandboxResourceAuthority(resourceContentClient),
 	})
-	uploadService := service.NewUploadService(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes)
+	uploadService := service.NewUploadServiceWithEvents(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes, obs.EventEmitter)
 	sandboxPolicyResolver := sandboxpolicydomain.NewConfigResolver(cfg.SandboxPolicies, cfg.Sandbox.DefaultProfileID)
-	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayAndPolicy(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver)
+	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayPolicyAndEvents(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver, obs.EventEmitter)
 
 	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger, obs.TracingEnabled)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger, obs.TracingEnabled)
