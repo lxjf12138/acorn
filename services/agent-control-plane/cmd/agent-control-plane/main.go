@@ -15,6 +15,7 @@ import (
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/infra/eventstore"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/server"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/service"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/version"
@@ -51,6 +52,7 @@ func main() {
 	})
 	helper := klog.NewHelper(logger)
 	statusService := service.NewStatusService()
+	eventService := service.NewEventService(cfg.Service.ID, eventstore.NewMemoryStore())
 	resourceStore := resourcedomain.NewMemoryStore()
 	resourceService := service.NewResourceService(resourceStore)
 	blobStore, err := localblob.NewStore(localblob.Config{BaseDir: cfg.Resource.BlobRoot})
@@ -72,11 +74,11 @@ func main() {
 		cfg.Service.ID:        service.NewLocalResourceAuthority(cfg.Service.ID, blobStore),
 		cfg.Sandbox.ServiceID: service.NewSandboxResourceAuthority(resourceContentClient),
 	})
-	uploadService := service.NewUploadService(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes)
+	uploadService := service.NewUploadService(cfg.Service.ID, blobStore, resourceService, cfg.Resource.UploadMaxBytes).WithEvents(eventService)
 	sandboxPolicyResolver := sandboxpolicydomain.NewConfigResolver(cfg.SandboxPolicies, cfg.Sandbox.DefaultProfileID)
-	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayAndPolicy(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver)
+	workspaceService := service.NewWorkspaceServiceWithResourcesGatewayAndPolicy(workspaceStore, workspaceClient, resourceService, resourceGatewayService, cfg.Sandbox.ServiceID, sandboxPolicyResolver).WithEvents(eventService)
 
-	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, logger, obs.TracingEnabled)
+	httpSrv := server.NewHTTPServer(cfg, statusService, workspaceService, resourceService, resourceGatewayService, uploadService, eventService, logger, obs.TracingEnabled)
 	grpcSrv := server.NewGRPCServer(cfg, resourceService, logger, obs.TracingEnabled)
 
 	kratosApp := app.New(cfg.Service.Name, version.Version, logger, httpSrv, grpcSrv)

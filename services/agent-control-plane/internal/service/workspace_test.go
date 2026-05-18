@@ -13,9 +13,11 @@ import (
 	workspacev1 "github.com/lxjf12138/acorn/packages/api/gen/acorn/workspace/v1"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
+	eventdomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/event"
 	resourcedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/resource"
 	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
+	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/infra/eventstore"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -251,7 +253,8 @@ func testPolicies() conf.SandboxPolicies {
 func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
 	workspaceStore := workspacedomain.NewMemoryStore()
 	client := &fakeWorkspaceHostClient{}
-	service := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process")
+	events := NewEventService("agent-control-plane", eventstore.NewMemoryStore())
+	service := NewWorkspaceService(workspaceStore, client, "sandbox-service", "local-process").WithEvents(events)
 	if _, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1"); err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
 	}
@@ -283,6 +286,13 @@ func TestWorkspaceServiceExecSessionWorkspaceCommand(t *testing.T) {
 		client.lastExecInput.MaxStdoutBytes != 10 ||
 		client.lastExecInput.MaxStderrBytes != 11 {
 		t.Fatalf("unexpected exec input: %+v", client.lastExecInput)
+	}
+	eventResult, err := events.List(context.Background(), eventdomain.ListFilter{SessionID: "sess-1"})
+	if err != nil {
+		t.Fatalf("List events returned error: %v", err)
+	}
+	if !hasEventType(eventResult.Events, eventdomain.TypeWorkspaceExecCompleted) {
+		t.Fatalf("expected exec completed event, got %+v", eventResult.Events)
 	}
 }
 
@@ -354,7 +364,8 @@ func TestWorkspaceServiceExecSessionWorkspaceCommandErrors(t *testing.T) {
 
 func TestWorkspaceServiceCreateSessionWorkspace(t *testing.T) {
 	client := &fakeWorkspaceHostClient{}
-	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process")
+	events := NewEventService("agent-control-plane", eventstore.NewMemoryStore())
+	service := NewWorkspaceService(workspacedomain.NewMemoryStore(), client, "sandbox-service", "local-process").WithEvents(events)
 	record, err := service.CreateSessionWorkspace(context.Background(), "sess-1", "user-1")
 	if err != nil {
 		t.Fatalf("CreateSessionWorkspace returned error: %v", err)
@@ -364,6 +375,13 @@ func TestWorkspaceServiceCreateSessionWorkspace(t *testing.T) {
 	}
 	if client.created != 1 {
 		t.Fatalf("unexpected hosted workspace create count: %d", client.created)
+	}
+	eventResult, err := events.List(context.Background(), eventdomain.ListFilter{SessionID: "sess-1"})
+	if err != nil {
+		t.Fatalf("List events returned error: %v", err)
+	}
+	if !hasEventType(eventResult.Events, eventdomain.TypeWorkspaceCreated) {
+		t.Fatalf("expected workspace created event, got %+v", eventResult.Events)
 	}
 }
 
@@ -541,6 +559,15 @@ func TestWorkspaceServiceDifferentSessionsCreateDifferentRecords(t *testing.T) {
 	if first.GetId() == second.GetId() || first.GetCurrentHost().GetServiceWorkspaceId() == second.GetCurrentHost().GetServiceWorkspaceId() {
 		t.Fatalf("different sessions reused workspace: first=%+v second=%+v", first, second)
 	}
+}
+
+func hasEventType(events []*eventdomain.EventRecord, eventType string) bool {
+	for _, event := range events {
+		if event.Type == eventType {
+			return true
+		}
+	}
+	return false
 }
 
 func TestWorkspaceServiceSandboxFailureDoesNotCreateRecord(t *testing.T) {

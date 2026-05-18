@@ -23,3 +23,11 @@ func RecordError(span trace.Span, err error) {
 func Start(ctx context.Context, tracerName string, spanName string) (context.Context, trace.Span) {
 	return Tracer(tracerName).Start(ctx, spanName)
 }
+
+func TraceContext(ctx context.Context) (string, string) {
+	spanContext := trace.SpanContextFromContext(ctx)
+	if !spanContext.IsValid() {
+		return "", ""
+	}
+	return spanContext.TraceID().String(), spanContext.SpanID().String()
+}

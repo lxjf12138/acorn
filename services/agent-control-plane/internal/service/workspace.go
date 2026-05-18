@@ -16,6 +16,7 @@ import (
 	"github.com/lxjf12138/acorn/packages/servicekit/httpx"
 	sandboxclient "github.com/lxjf12138/acorn/services/agent-control-plane/internal/client/sandbox"
 	"github.com/lxjf12138/acorn/services/agent-control-plane/internal/conf"
+	eventdomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/event"
 	sandboxpolicydomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/sandboxpolicy"
 	workspacedomain "github.com/lxjf12138/acorn/services/agent-control-plane/internal/domain/workspace"
 	"go.opentelemetry.io/otel/attribute"
@@ -33,6 +34,7 @@ type WorkspaceService struct {
 	sandboxServiceID string
 	profileResolver  sandboxpolicydomain.Resolver
 	profileCatalog   *SandboxProfileCatalog
+	events           EventAppender
 }
 
 const sandboxProfileCacheTTL = 30 * time.Second
@@ -40,6 +42,11 @@ const sandboxProfileCacheTTL = 30 * time.Second
 type SessionWorkspaceState struct {
 	Record *workspacev1.WorkspaceRecord    `json:"workspace"`
 	State  *sandboxv1.HostedWorkspaceState `json:"state"`
+}
+
+func (s *WorkspaceService) WithEvents(events EventAppender) *WorkspaceService {
+	s.events = events
+	return s
 }
 
 type CreateSessionWorkspaceInput struct {
@@ -144,7 +151,22 @@ func (s *WorkspaceService) CreateSessionWorkspaceWithInput(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	return toProto(record), nil
+	protoRecord := toProto(record)
+	bestEffortAppendEvent(ctx, s.events, AppendEventInput{
+		Type:        eventdomain.TypeWorkspaceCreated,
+		Severity:    eventdomain.SeverityInfo,
+		TenantID:    input.TenantID,
+		UserID:      input.UserID,
+		SessionID:   input.SessionID,
+		WorkspaceID: record.ID,
+		Actor:       eventdomain.EventActor{Type: "user", ID: input.UserID},
+		Subject:     eventdomain.EventSubject{Type: "workspace", ID: record.ID},
+		Payload: map[string]any{
+			"sandbox_profile_id": profile.ProfileID,
+			"sandbox_service_id": s.sandboxServiceID,
+		},
+	})
+	return protoRecord, nil
 }
 
 func (s *WorkspaceService) selectSandboxProfile(ctx context.Context, input CreateSessionWorkspaceInput) (*sandboxpolicydomain.ResolveWorkspaceProfileResult, error) {
@@ -478,6 +500,21 @@ func (s *WorkspaceService) ExportSessionWorkspacePath(ctx context.Context, sessi
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordResourceTransfer(ctx, "export", telemetry.StatusOK, registered.GetRef().GetAuthorityServiceId(), registered.GetRef().GetSizeBytes())
+	bestEffortAppendEvent(ctx, s.events, AppendEventInput{
+		Type:        eventdomain.TypeResourceExportedFromWorkspace,
+		Severity:    eventdomain.SeverityInfo,
+		UserID:      ownerUserID,
+		SessionID:   record.SessionID,
+		WorkspaceID: record.ID,
+		ResourceID:  registered.GetRef().GetId(),
+		Actor:       eventdomain.EventActor{Type: "user", ID: ownerUserID},
+		Subject:     eventdomain.EventSubject{Type: "resource", ID: registered.GetRef().GetId()},
+		Payload: map[string]any{
+			"mime_type":            registered.GetRef().GetMimeType(),
+			"size_bytes":           registered.GetRef().GetSizeBytes(),
+			"authority_service_id": registered.GetRef().GetAuthorityServiceId(),
+		},
+	})
 	return registered, nil
 }
 
@@ -541,6 +578,20 @@ func (s *WorkspaceService) ImportResourceToSessionWorkspace(ctx context.Context,
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordResourceTransfer(ctx, "import", telemetry.StatusOK, resourceAuthorityServiceID, resp.GetSizeBytes())
+	bestEffortAppendEvent(ctx, s.events, AppendEventInput{
+		Type:        eventdomain.TypeResourceImportedToWorkspace,
+		Severity:    eventdomain.SeverityInfo,
+		UserID:      ownerUserID,
+		SessionID:   record.SessionID,
+		WorkspaceID: record.ID,
+		ResourceID:  ref.GetId(),
+		Actor:       eventdomain.EventActor{Type: "user", ID: ownerUserID},
+		Subject:     eventdomain.EventSubject{Type: "workspace", ID: record.ID},
+		Payload: map[string]any{
+			"mime_type":  resp.GetMimeType(),
+			"size_bytes": resp.GetSizeBytes(),
+		},
+	})
 	return resp, nil
 }
 
@@ -594,12 +645,14 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, statusValue(err)))
 		recordWorkspaceExec(ctx, statusValue(err), sandboxProfileID, time.Since(startedAt))
+		appendWorkspaceExecFailedEvent(ctx, s.events, record, userID, input, err)
 		return nil, err
 	}
 	if err := validateWorkspaceHostRef(resp.GetWorkspace(), record.CurrentHost); err != nil {
 		telemetry.RecordError(span, err)
 		span.SetAttributes(attribute.String(telemetry.AttrStatus, telemetry.StatusError))
 		recordWorkspaceExec(ctx, telemetry.StatusError, sandboxProfileID, time.Since(startedAt))
+		appendWorkspaceExecFailedEvent(ctx, s.events, record, userID, input, err)
 		return nil, err
 	}
 	metricStatus := telemetry.StatusOK
@@ -613,7 +666,44 @@ func (s *WorkspaceService) ExecSessionWorkspaceCommand(ctx context.Context, inpu
 		attribute.String(telemetry.AttrStatus, telemetry.StatusOK),
 	)
 	recordWorkspaceExec(ctx, metricStatus, sandboxProfileID, time.Since(startedAt))
+	severity := eventdomain.SeverityInfo
+	if resp.GetExitCode() != 0 {
+		severity = eventdomain.SeverityWarning
+	}
+	bestEffortAppendEvent(ctx, s.events, AppendEventInput{
+		Type:        eventdomain.TypeWorkspaceExecCompleted,
+		Severity:    severity,
+		UserID:      userID,
+		SessionID:   record.SessionID,
+		WorkspaceID: record.ID,
+		Actor:       eventdomain.EventActor{Type: "user", ID: userID},
+		Subject:     eventdomain.EventSubject{Type: "workspace", ID: record.ID},
+		Payload: map[string]any{
+			"exit_code":        resp.GetExitCode(),
+			"stdout_truncated": resp.GetStdoutTruncated(),
+			"stderr_truncated": resp.GetStderrTruncated(),
+			"command_name":     telemetry.SafeCommandName(input.Command),
+			"arg_count":        len(input.Args),
+		},
+	})
 	return resp, nil
+}
+
+func appendWorkspaceExecFailedEvent(ctx context.Context, appender EventAppender, record workspacedomain.Record, userID string, input ExecSessionWorkspaceCommandInput, err error) {
+	bestEffortAppendEvent(ctx, appender, AppendEventInput{
+		Type:        eventdomain.TypeWorkspaceExecFailed,
+		Severity:    eventdomain.SeverityError,
+		UserID:      userID,
+		SessionID:   record.SessionID,
+		WorkspaceID: record.ID,
+		Actor:       eventdomain.EventActor{Type: "user", ID: userID},
+		Subject:     eventdomain.EventSubject{Type: "workspace", ID: record.ID},
+		Payload: map[string]any{
+			"error_code":   status.Code(err).String(),
+			"command_name": telemetry.SafeCommandName(input.Command),
+			"arg_count":    len(input.Args),
+		},
+	})
 }
 
 func (s *WorkspaceService) getWorkspaceRecordForView(ctx context.Context, sessionID string) (workspacedomain.Record, error) {
