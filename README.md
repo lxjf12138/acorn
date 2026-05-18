@@ -24,7 +24,9 @@ A Capability Service exposes a runtime Capability Descriptor describing:
 - implemented endpoints and transport addresses
 
 Telemetry is configured as a cross-cutting runtime concern, not as a Phase 1
-Capability Surface. Signal APIs are deferred.
+Capability Surface. Signal APIs are deferred; legacy signal proto scaffolding
+may exist in the repository, but Signal Surface is not part of the Phase 1
+runtime contract.
 
 The first concrete Capability Service is `sandbox-service`.
 

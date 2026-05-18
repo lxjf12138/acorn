@@ -40,7 +40,7 @@ Acorn
 │  ├─ ResourceRecord / Resource Gateway
 │  ├─ ExecutionRecord
 │  ├─ View Gateway
-│  ├─ Policy / Audit
+│  ├─ Policy / Governance
 │  └─ future RunRecord / Agent Runtime
 │
 ├─ Capability Services
@@ -92,7 +92,7 @@ WorkspaceRecord
 CapabilityDescriptor
 ResourceRecord
 ExecutionRecord
-Policy / Audit
+Policy / Governance
 ```
 
 The Control Plane does not own service internals:
@@ -649,7 +649,7 @@ Actual byte download is handled by a separate Resource Download Gateway flow.
 
 ---
 
-## 8. View / Resource / Observation Boundary
+## 8. View / Resource / Telemetry Boundary
 
 | User intent | Surface | Creates ResourceRef |
 | --- | --- | ---: |
@@ -661,7 +661,7 @@ Actual byte download is handled by a separate Resource Download Gateway flow.
 | Upload user file | Resource | Yes |
 | Import mail attachment into sandbox | Resource | Uses existing ResourceRef |
 | Attach sandbox file to mail | Resource | Yes |
-| Record who previewed what | Observation/Event | No |
+| Record who previewed what | Telemetry / future audit projection | No |
 
 Rule of thumb:
 
@@ -834,10 +834,15 @@ Observability Foundation
 ExecutionRecord Foundation
 ```
 
-Next planned code sequence:
+Near-term code sequence:
 
 ```text
-PR 1: Minimal Run model
+PR 1: RecordStore Contracts
+  - Clarify WorkspaceRecordStore / ResourceRecordStore / ExecutionRecordStore interfaces
+  - Keep current memory implementations in infra
+  - Do not introduce a database yet
+
+PR 2: Minimal RunRecord Foundation
   - Group related execution records under a run
   - Prepare run-level profile and backend selection
   - Keep individual workspace exec attempts queryable as ExecutionRecords
